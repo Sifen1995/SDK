@@ -10,9 +10,9 @@ import (
 	"skykin-platform/internal/events/dto"
 	eventsModel "skykin-platform/internal/events/model"
 	eventsRepo "skykin-platform/internal/events/repository"
+	"skykin-platform/internal/intents/mlclient"
 	intentModel "skykin-platform/internal/intents/model"
 	intentsRepo "skykin-platform/internal/intents/repository"
-	"skykin-platform/internal/intents/mlclient"
 	rewardModel "skykin-platform/internal/rewards/model"
 	rewardsRepo "skykin-platform/internal/rewards/repository"
 	usersRepo "skykin-platform/internal/users/repository"
@@ -24,7 +24,7 @@ type EventServiceInterface interface {
 
 type EventService struct {
 	repo       eventsRepo.EventRepository
-	userRepo   usersRepo.UserRepository
+	userRepo   usersRepo.UserRepository // Remains injected cleanly here
 	mlClient   *mlclient.MLClient
 	rewardRepo rewardsRepo.RewardRepository
 	intentRepo intentsRepo.IntentRepository
@@ -50,27 +50,27 @@ func NewEventService(
 }
 
 func (s *EventService) ProcessEvent(ctx context.Context, extUserID string, event *eventsModel.Event) (*dto.EventResponseDTO, int, error) {
-	// 1. Find or Create User by external_user_id
+	// 1. Let the User Module's Repository encapsulate the Find-or-Create loop
 	user, err := s.userRepo.FindOrCreate(ctx, extUserID)
 	if err != nil {
-		return nil, http.StatusInternalServerError, fmt.Errorf("failed to handle user: %w", err)
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to handle user matching context: %w", err)
 	}
 
-	// 2. Link the internal UUID to the event
+	// 2. Link the internal tracking UUID directly to the ingestion event payload
 	event.UserID = user.ID
 
-	// 3. Persist the event safely
+	// 3. Persist the event safely to the core tracking ledger
 	if err := s.repo.Create(ctx, event); err != nil {
 		return nil, http.StatusInternalServerError, fmt.Errorf("failed to save event: %w", err)
 	}
 
-	// 4. Fetch recent event history for context window
+	// 4. Fetch recent event history for context window processing
 	history, err := s.repo.GetRecentEvents(ctx, event.UserID, 5)
 	if err != nil {
 		return nil, http.StatusInternalServerError, fmt.Errorf("failed to load event history: %w", err)
 	}
 
-	// 5. Cold start: need more than two historical events before calling ML
+	// 5. Cold start check: require more than two historical data footprints before running ML evaluations
 	if len(history) <= 2 {
 		return &dto.EventResponseDTO{
 			EventID:           event.ID,
@@ -80,14 +80,14 @@ func (s *EventService) ProcessEvent(ctx context.Context, extUserID string, event
 		}, http.StatusAccepted, nil
 	}
 
-	// 6. Call ML with events oldest → newest (repo returns newest first)
+	// 6. Chronologically align events from oldest → newest for ML ingestion sequence compatibility
 	chronological := make([]eventsModel.Event, len(history))
 	for i := range history {
 		chronological[len(history)-1-i] = history[i]
 	}
 	mlResult, err := s.mlClient.PredictIntent(extUserID, chronological)
 	if err != nil {
-		// Fallback gracefully if ML microservice is down so the SDK transaction doesn't break
+		// Fallback gracefully if ML microservice is unavailable so ingestion processing isn't blocked
 		return &dto.EventResponseDTO{
 			EventID:           event.ID,
 			UserID:            extUserID,
@@ -96,7 +96,7 @@ func (s *EventService) ProcessEvent(ctx context.Context, extUserID string, event
 		}, http.StatusAccepted, nil
 	}
 
-	// 7. ALWAYS save the Intent record to Postgres
+	// 7. Persist predicted Intent record to Postgres
 	intentRecord := &intentModel.Intent{
 		UserID:     user.ID,
 		IntentName: mlResult.Intent,
@@ -108,7 +108,7 @@ func (s *EventService) ProcessEvent(ctx context.Context, extUserID string, event
 		return nil, http.StatusInternalServerError, fmt.Errorf("failed to save intent logs: %w", err)
 	}
 
-	// 8. Scenario A: Intent identified, but confidence DID NOT hit the reward threshold
+	// 8. Condition A: Intent identified, but confidence value misses the targeting reward criteria
 	if !mlResult.RewardTriggered {
 		response := dto.EventResponseDTO{
 			EventID:           event.ID,
@@ -121,10 +121,10 @@ func (s *EventService) ProcessEvent(ctx context.Context, extUserID string, event
 		return &response, http.StatusCreated, nil
 	}
 
-	// 9. Scenario B: Reward IS triggered -> Look up cached rule from your internal repo
+	// 9. Condition B: Reward evaluation triggered -> Look up active matching profile rule
 	rule, err := s.rewardRepo.GetRuleByIntent(ctx, mlResult.Intent)
 	if err != nil {
-		// If a rule is missing or inactive, still return the predicted intent details safely
+		// Fallback gracefully: return intent info safely even if configuration rule is inactive
 		return &dto.EventResponseDTO{
 			EventID:           event.ID,
 			UserID:            extUserID,
@@ -135,7 +135,7 @@ func (s *EventService) ProcessEvent(ctx context.Context, extUserID string, event
 		}, http.StatusCreated, nil
 	}
 
-	// 10. Generate the Reward record mapping Intent ID and Rule ID
+	// 10. Generate and assign the core Reward allocation payload metrics
 	reward := &rewardModel.Reward{
 		UserID:     user.ID,
 		IntentID:   intent.ID,
@@ -151,9 +151,11 @@ func (s *EventService) ProcessEvent(ctx context.Context, extUserID string, event
 	if err := s.rewardRepo.CreateReward(ctx, reward); err != nil {
 		return nil, http.StatusInternalServerError, fmt.Errorf("failed to persist reward allocation: %w", err)
 	}
+
+	// Asynchronously fire notification over WebSocket workers
 	go s.notifier.NotifyUser(user.ID, reward)
 
-	// 11. Return full payload including the freshly minted reward data structure
+	// 11. Return full confirmation payload envelope detailing the newly issued reward allocation
 	return &dto.EventResponseDTO{
 		EventID:         event.ID,
 		UserID:          extUserID,

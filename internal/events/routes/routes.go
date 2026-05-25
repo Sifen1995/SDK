@@ -4,10 +4,10 @@ import (
 	"skykin-platform/configs"
 	"skykin-platform/internal/common/websocket"
 	"skykin-platform/internal/events/controller"
-	"skykin-platform/internal/events/service"
 	eventsRepo "skykin-platform/internal/events/repository"
-	intentsRepo "skykin-platform/internal/intents/repository"
+	"skykin-platform/internal/events/service"
 	"skykin-platform/internal/intents/mlclient"
+	intentsRepo "skykin-platform/internal/intents/repository"
 	rewardsRepo "skykin-platform/internal/rewards/repository"
 	usersRepo "skykin-platform/internal/users/repository"
 	"strings"
@@ -18,7 +18,7 @@ import (
 
 func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB, config *configs.Config, hub *websocket.Hub) {
 	eRepo := eventsRepo.NewEventRepository(db, config)
-	uRepo := usersRepo.NewUserRepository(db, config)
+	uRepo := usersRepo.NewUserRepository(db)
 	iRepo := intentsRepo.NewIntentRepository(db, config)
 	rRepo := rewardsRepo.NewRewardRepository(db)
 

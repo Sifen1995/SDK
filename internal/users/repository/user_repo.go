@@ -2,8 +2,7 @@ package repository
 
 import (
 	"context"
-	"skykin-platform/configs"
-	"skykin-platform/internal/users/model"
+	"skykin-platform/internal/users/model" // Ensure this path points to your Users model
 
 	"gorm.io/gorm"
 )
@@ -12,29 +11,28 @@ type UserRepository interface {
 	FindOrCreate(ctx context.Context, externalUserID string) (*model.Users, error)
 }
 
-type userRepo struct {
-	db     *gorm.DB
-	config *configs.Config
+type userRepository struct {
+	db *gorm.DB
 }
 
-func NewUserRepository(db *gorm.DB, cfg *configs.Config) UserRepository {
-	return &userRepo{db: db, config: cfg}
+func NewUserRepository(db *gorm.DB) UserRepository {
+	return &userRepository{db: db}
 }
 
-func (r *userRepo) FindOrCreate(ctx context.Context, externalUserID string) (*model.Users, error) {
+// FindOrCreate automatically fetches an existing user or creates a new one cleanly
+func (r *userRepository) FindOrCreate(ctx context.Context, externalUserID string) (*model.Users, error) {
 	var user model.Users
-	err := r.db.WithContext(ctx).Where("external_user_id = ?", externalUserID).First(&user).Error
-	if err == nil {
-		return &user, nil // User found
-	}
-	if err != gorm.ErrRecordNotFound {
-		return nil, err // Some other error occurred
+
+	// GORM FirstOrCreate method natively checks for existence, handles thread safety,
+	// and drops an entry if missing using default values (like gen_random_uuid)
+	err := r.db.WithContext(ctx).
+		Where("external_user_id = ?", externalUserID).
+		FirstOrCreate(&user, model.Users{ExternalUserID: externalUserID}).
+		Error
+
+	if err != nil {
+		return nil, err
 	}
 
-	// User not found, create a new one
-	user = model.Users{ExternalUserID: externalUserID}
-	if err := r.db.WithContext(ctx).Create(&user).Error; err != nil {
-		return nil, err // Error creating user
-	}
-	return &user, nil // New user created
+	return &user, nil
 }

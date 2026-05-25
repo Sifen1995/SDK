@@ -28,6 +28,12 @@ func main() {
 		log.Fatalf("failed to open database target connection: %v", err)
 	}
 
+	// Run GORM auto-migrations
+	if err := database.Migrate(db); err != nil {
+		log.Fatalf("failed to run database migrations: %v", err)
+	}
+	log.Println("database migrations completed")
+
 	// Initialize the structural communication hub
 	hub := websocket.NewHub()
 

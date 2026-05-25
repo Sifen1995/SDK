@@ -44,11 +44,10 @@ func (ctrl *AuthController) CreateApplication(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
+	response.Success(c, http.StatusCreated, "Application registered successfully", gin.H{
 		"application": appRes,
 		"credentials": credentials,
 	})
-
 }
 
 func (ctrl *AuthController) RegisterDeveloper(c *gin.Context) {
@@ -68,16 +67,12 @@ func (ctrl *AuthController) RegisterDeveloper(c *gin.Context) {
 	}
 
 	// 3. Return a clean, successful tracking response (GORM struct tags automatically hide PasswordHash)
-	c.JSON(http.StatusCreated, gin.H{
-		"status":  "success",
-		"message": "Developer registered successfully",
-		"data": gin.H{
-			"developer": gin.H{
-				"id":         dev.ID.String(),
-				"name":       dev.Name,
-				"email":      dev.Email,
-				"created_at": dev.CreatedAt,
-			},
+	response.Success(c, http.StatusCreated, "Developer registered successfully", gin.H{
+		"developer": gin.H{
+			"id":         dev.ID.String(),
+			"name":       dev.Name,
+			"email":      dev.Email,
+			"created_at": dev.CreatedAt,
 		},
 	})
 }
