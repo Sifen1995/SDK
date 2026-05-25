@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Skykin SDK - Live Reward Demo</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 50px; }
+        #status { color: #00ff00; margin-bottom: 20px; }
+        .reward-card { background: #1e1e1e; border: 2px solid #ffd700; border-radius: 15px; padding: 20px; width: 300px; text-align: center; animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+        h2 { color: #ffd700; }
+    </style>
+</head>
+<body>
+    <h1>Skykin Live SDK Monitor</h1>
+    <div id="status">Connecting to Skykin...</div>
+    <div id="reward-container"></div>
+
+    <script>
+        const userID = "3a0f0c6f-e32d-4886-b54b-e1097a0c88f9"; // Replace with your test User UUID from Postgres
+        const socket = new WebSocket(`ws://localhost:8081/api/v1/ws/rewards/${userID}`);
+
+        socket.onopen = () => { document.getElementById('status').innerText = "Status: Online (Waiting for rewards...)"; };
+        
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const container = document.getElementById('reward-container');
+            
+            container.innerHTML = `
+                <div class="reward-card">
+                    <h2>🎉 Reward Received!</h2>
+                    <p><strong>Type:</strong> ${data.reward_type}</p>
+                    <p><strong>Amount:</strong> ${data.amount} ${data.currency}</p>
+                    <hr>
+                    <p><em>"${data.message}"</em></p>
+                </div>
+            `;
+            console.log("Reward Data:", data);
+        };
+
+        socket.onclose = () => { document.getElementById('status').innerText = "Status: Offline"; };
+    </script>
+</body>
+</html>

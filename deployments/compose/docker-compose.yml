@@ -1,0 +1,60 @@
+services:
+  # 1. PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: skykin_db
+    environment:
+      POSTGRES_USER: ${DB_USER:-skykin_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-skykin_db}
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. pgAdmin for Database Management
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: skykin_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@skykin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5055:80"
+    depends_on:
+      - db
+
+  # 3. Gin Backend (Go)
+  backend:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/api.Dockerfile
+    container_name: skykin_backend
+    ports:
+      - "8081:8081"
+    environment:
+      - GIN_MODE=release
+      - DATABASE_URL=postgres://${DB_USER:-skykin_user}:${DB_PASSWORD:-password}@db:5432/${DB_NAME:-skykin_db}?sslmode=disable
+      - DB_HOST=db
+      - DB_PORT=5432
+      - PORT=8081
+      - ML_SERVICE_URL=http://ml-service:8000
+    depends_on:
+      - db
+      - ml-service
+    env_file:
+      - ../../.env
+
+  # 4. ML Engine (Python)
+  ml-service:
+    build:
+      context: ../../ml
+      dockerfile: ../deployments/docker/ml.Dockerfile
+    container_name: skykin_ml
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
