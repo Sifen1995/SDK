@@ -1,36 +1,35 @@
 package routes
 
 import (
+	"skykin-platform/configs"
 	"skykin-platform/internal/auth/controller"
+	"skykin-platform/internal/auth/repository"
+	"skykin-platform/internal/auth/service"
 	"skykin-platform/internal/common/middleware"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-// RegisterAuthRoutes handles the endpoint mappings for the auth domain module using a single controller
-func RegisterAuthRoutes(r *gin.Engine, authCtrl *controller.AuthController) {
+// RegisterRoutes wires up the auth module and mounts its endpoints.
+// Returns the SDK auth middleware so the central router can protect other groups.
+func RegisterRoutes(r *gin.Engine, db *gorm.DB, cfg *configs.Config) gin.HandlerFunc {
+	repo := repository.NewAuthRepository(db, cfg)
+	serv := service.NewAuthService(repo, cfg)
+	ctrl := controller.NewAuthController(serv)
 
-	// Create a portal-specific base group for developer actions
 	portalGroup := r.Group("/api/v1/portal")
 	{
-		// ==========================================
-		// PUBLIC ENDPOINTS
-		// ==========================================
+		portalGroup.POST("/register", ctrl.RegisterDeveloper)
+		portalGroup.POST("/login", ctrl.LoginDeveloper)
 
-		// Open endpoint for new web portal platform signups
-		portalGroup.POST("/register", authCtrl.RegisterDeveloper)
-		portalGroup.POST("/login", authCtrl.LoginDeveloper)
-
-		// ==========================================
-		// PROTECTED PORTAL ENDPOINTS
-		// ==========================================
-
-		// Create a separate subgroup that strictly requires administrative developer authorization
 		protectedPortal := portalGroup.Group("/")
-		protectedPortal.Use(middleware.PortalAuthMiddleware())
+		protectedPortal.Use(middleware.PortalAuthMiddleware(cfg))
 		{
-			// Endpoint to create apps, generating publishable/secret key pairs
-			protectedPortal.POST("/applications", authCtrl.CreateApplication)
+			protectedPortal.POST("/applications", ctrl.CreateApplication)
+			protectedPortal.GET("/applications", ctrl.GetApplications)
 		}
 	}
+
+	return middleware.SDKAuthMiddleware(repo)
 }

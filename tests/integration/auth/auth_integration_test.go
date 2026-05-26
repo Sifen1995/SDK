@@ -41,7 +41,7 @@ func TestRegisterDeveloperEndpoint(t *testing.T) {
 	tx := db.Begin()
 	defer tx.Rollback()
 
-	cfg := &configs.Config{JwtSecretKey: "test_secret_key"}
+	cfg := &configs.Config{JwtSecret: "test_secret_key"}
 
 	// Spin up real application module layers running against the temporary transaction block
 	repo := repository.NewAuthRepository(tx, cfg)

@@ -23,6 +23,7 @@ import (
 type AuthService interface {
 	RegisterDeveloper(ctx context.Context, req dto.DeveloperRegisterRequest) (*model.Developer, error)
 	RegisterApplication(ctx context.Context, devID string, req dto.ApplicationCreateRequest) (*dto.ApplicationResponse, *dto.APIKeyCredentialResponse, error)
+	GetApplications(ctx context.Context, devID string) ([]dto.ApplicationResponse, error)
 	AuthenticateSDKKey(ctx context.Context, token string) (*model.Application, error)
 	LoginDeveloper(ctx context.Context, req dto.DeveloperLoginRequest) (*dto.LoginResponse, error)
 }
@@ -164,7 +165,7 @@ func (s *authService) LoginDeveloper(ctx context.Context, req dto.DeveloperLogin
 
 	// 4. Generate and sign the token using the secret signature key
 	tokenPayload := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := tokenPayload.SignedString([]byte(s.cfg.JwtSecretKey))
+	signedToken, err := tokenPayload.SignedString([]byte(s.cfg.JwtSecret))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate secure access token session: %w", err)
 	}
@@ -177,4 +178,24 @@ func (s *authService) LoginDeveloper(ctx context.Context, req dto.DeveloperLogin
 			"email": dev.Email,
 		},
 	}, nil
+}
+
+func (s *authService) GetApplications(ctx context.Context, devID string) ([]dto.ApplicationResponse, error) {
+	apps, err := s.repo.GetApplicationsByDeveloper(ctx, devID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.ApplicationResponse, len(apps))
+	for i, app := range apps {
+		result[i] = dto.ApplicationResponse{
+			ID:        app.ID.String(),
+			AppName:   app.AppName,
+			Platform:  app.Platform,
+			BundleID:  app.BundleID,
+			Status:    app.Status,
+			CreatedAt: app.CreatedAt,
+		}
+	}
+	return result, nil
 }

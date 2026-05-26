@@ -40,9 +40,21 @@ func (c *MLClient) predictEndpoint() string {
 }
 
 func (c *MLClient) PredictIntent(userID string, events []eventsModel.Event) (*MLResponse, error) {
+	mlEvents := make([]map[string]interface{}, len(events))
+	for i, e := range events {
+		meta := e.Metadata
+		if meta == nil {
+			meta = map[string]interface{}{}
+		}
+		mlEvents[i] = map[string]interface{}{
+			"event_type": e.EventType,
+			"metadata":   meta,
+		}
+	}
+
 	payload := map[string]interface{}{
 		"user_id": userID,
-		"events":  events,
+		"events":  mlEvents,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

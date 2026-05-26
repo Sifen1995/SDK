@@ -46,7 +46,7 @@ func (m *MockAuthRepository) GetApplicationsByDeveloper(ctx context.Context, dev
 // TEST CASE 1: Successful Login Token Generation
 func TestLoginDeveloper_Success(t *testing.T) {
 	mockRepo := &MockAuthRepository{}
-	cfg := &configs.Config{JwtSecretKey: "test_secret_key"}
+	cfg := &configs.Config{JwtSecret: "test_secret_key"}
 	service := authService.NewAuthService(mockRepo, cfg)
 
 	plainPassword := "securePassword123"
@@ -78,7 +78,7 @@ func TestLoginDeveloper_Success(t *testing.T) {
 // TEST CASE 2: Login Failure on Bad Password
 func TestLoginDeveloper_InvalidPassword(t *testing.T) {
 	mockRepo := &MockAuthRepository{}
-	cfg := &configs.Config{JwtSecretKey: "test_secret_key"}
+	cfg := &configs.Config{JwtSecret: "test_secret_key"}
 	service := authService.NewAuthService(mockRepo, cfg)
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correctPassword"), bcrypt.DefaultCost)

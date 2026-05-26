@@ -1,0 +1,449 @@
+basePath: /api/v1
+definitions:
+  skykin-platform_internal_auth_dto.ApplicationCreateRequest:
+    properties:
+      app_name:
+        example: My Shopping App
+        maxLength: 100
+        minLength: 2
+        type: string
+      bundle_id:
+        example: com.company.app
+        type: string
+      platform:
+        enum:
+        - flutter
+        - android
+        - ios
+        - web
+        example: flutter
+        type: string
+    required:
+    - app_name
+    - bundle_id
+    - platform
+    type: object
+  skykin-platform_internal_auth_dto.DeveloperLoginRequest:
+    properties:
+      email:
+        example: jane@company.com
+        type: string
+      password:
+        example: securepass123
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  skykin-platform_internal_auth_dto.DeveloperRegisterRequest:
+    properties:
+      email:
+        example: jane@company.com
+        type: string
+      name:
+        example: Jane Developer
+        maxLength: 100
+        minLength: 2
+        type: string
+      password:
+        example: securepass123
+        minLength: 8
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  skykin-platform_internal_common_response.APIError:
+    properties:
+      code:
+        description: HTTP Status Code
+        type: integer
+      details:
+        description: Validation specifics or structural logs
+      message:
+        description: High-level safe message
+        type: string
+      status:
+        description: '"error"'
+        type: string
+    type: object
+  skykin-platform_internal_common_response.JSONResponse:
+    properties:
+      data:
+        description: Dynamic payload envelope
+      message:
+        description: Optional human-readable message
+        type: string
+      status:
+        description: '"success"'
+        type: string
+    type: object
+  skykin-platform_internal_events_dto.BatchEventItemDTO:
+    properties:
+      event_id:
+        example: evt_001
+        type: string
+      event_type:
+        enum:
+        - search
+        - product_view
+        - category_view
+        - add_to_cart
+        - remove_from_cart
+        - signup_complete
+        - checkout_started
+        - checkout_complete
+        - store_visit
+        - ad_impression
+        - ad_click
+        - app_open
+        example: product_view
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      timestamp:
+        example: "2026-05-26T12:00:00Z"
+        type: string
+    required:
+    - event_id
+    - event_type
+    - metadata
+    - timestamp
+    type: object
+  skykin-platform_internal_events_dto.BatchEventRequestDTO:
+    properties:
+      events:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_events_dto.BatchEventItemDTO'
+        minItems: 1
+        type: array
+      external_user_id:
+        example: user_abc_123
+        type: string
+    required:
+    - events
+    - external_user_id
+    type: object
+  skykin-platform_internal_events_dto.BatchEventResponseDTO:
+    properties:
+      confidence:
+        example: 0.85
+        type: number
+      events_received:
+        example: 5
+        type: integer
+      intent:
+        example: coffee_interest
+        type: string
+      reward:
+        $ref: '#/definitions/skykin-platform_internal_events_dto.RewardResponseDTO'
+      reward_triggered:
+        example: true
+        type: boolean
+      user_id:
+        example: user_abc_123
+        type: string
+    type: object
+  skykin-platform_internal_events_dto.EventRequestDTO:
+    properties:
+      event_id:
+        example: evt_001
+        type: string
+      event_type:
+        enum:
+        - search
+        - product_view
+        - category_view
+        - add_to_cart
+        - remove_from_cart
+        - signup_complete
+        - checkout_started
+        - checkout_complete
+        - store_visit
+        - ad_impression
+        - ad_click
+        - app_open
+        example: product_view
+        type: string
+      external_user_id:
+        example: user_abc_123
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      timestamp:
+        example: "2026-05-26T12:00:00Z"
+        type: string
+    required:
+    - event_id
+    - event_type
+    - external_user_id
+    - metadata
+    - timestamp
+    type: object
+  skykin-platform_internal_events_dto.EventResponseDTO:
+    properties:
+      confidence:
+        example: 0.85
+        type: number
+      event_id:
+        example: evt_001
+        type: string
+      intent:
+        example: coffee_interest
+        type: string
+      queued_for_analysis:
+        example: false
+        type: boolean
+      reward:
+        $ref: '#/definitions/skykin-platform_internal_events_dto.RewardResponseDTO'
+      reward_triggered:
+        example: true
+        type: boolean
+      user_id:
+        example: user_abc_123
+        type: string
+    type: object
+  skykin-platform_internal_events_dto.RewardResponseDTO:
+    properties:
+      amount:
+        example: 20
+        type: number
+      currency:
+        example: ETB
+        type: string
+      message:
+        example: You earned 20 ETB cashback!
+        type: string
+      reward_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      reward_type:
+        example: cashback
+        type: string
+    type: object
+host: localhost:8081
+info:
+  contact: {}
+  description: Skykin SDK backend — handles developer authentication, application
+    management, event ingestion, intent prediction, and real-time reward notifications.
+  title: Skykin Platform API
+  version: "1.0"
+paths:
+  /events:
+    post:
+      consumes:
+      - application/json
+      description: Receives an SDK event, persists it, runs ML intent prediction,
+        and triggers rewards if the confidence threshold is met. Requires HMAC signature
+        via X-Signature header.
+      parameters:
+      - description: HMAC-SHA256 signature of the request body
+        in: header
+        name: X-Signature
+        type: string
+      - description: Event payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/skykin-platform_internal_events_dto.EventRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_events_dto.EventResponseDTO'
+        "202":
+          description: Event queued — cold start or ML unavailable
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_events_dto.EventResponseDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+      security:
+      - APIKeyAuth: []
+      summary: Ingest a user event
+      tags:
+      - SDK - Events
+  /events/batch:
+    post:
+      consumes:
+      - application/json
+      description: Receives a batch of events from the SDK (collected over 30s or
+        on app background), persists them all, runs one ML intent prediction on the
+        session, and returns the predicted intent and reward if triggered.
+      parameters:
+      - description: HMAC-SHA256 signature of the request body
+        in: header
+        name: X-Signature
+        type: string
+      - description: Batched events payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/skykin-platform_internal_events_dto.BatchEventRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_events_dto.BatchEventResponseDTO'
+        "202":
+          description: Events stored — cold start or ML unavailable
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_events_dto.BatchEventResponseDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+      security:
+      - APIKeyAuth: []
+      summary: Ingest batched user events
+      tags:
+      - SDK - Events
+  /portal/applications:
+    get:
+      description: Returns all applications belonging to the authenticated developer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.JSONResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+      security:
+      - BearerAuth: []
+      summary: List applications
+      tags:
+      - Portal - Applications
+    post:
+      consumes:
+      - application/json
+      description: Registers a new application under the authenticated developer and
+        generates SDK API key credentials. The secret key is only shown once.
+      parameters:
+      - description: Application details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/skykin-platform_internal_auth_dto.ApplicationCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.JSONResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+      security:
+      - BearerAuth: []
+      summary: Create a new application
+      tags:
+      - Portal - Applications
+  /portal/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a developer and returns a JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/skykin-platform_internal_auth_dto.DeveloperLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.JSONResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+      summary: Login developer
+      tags:
+      - Portal - Auth
+  /portal/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new developer account for the Skykin portal
+      parameters:
+      - description: Developer registration details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/skykin-platform_internal_auth_dto.DeveloperRegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.JSONResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_common_response.APIError'
+      summary: Register a new developer
+      tags:
+      - Portal - Auth
+securityDefinitions:
+  APIKeyAuth:
+    description: SDK publishable key (pk_live_...)
+    in: header
+    name: X-API-Key
+    type: apiKey
+  BearerAuth:
+    description: 'Enter your JWT token as: Bearer <token>'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

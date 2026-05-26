@@ -24,8 +24,19 @@ func handleControllerError(c *gin.Context, err error) {
 	response.HandleError(c, err)
 }
 
+// CreateApplication godoc
+// @Summary      Create a new application
+// @Description  Registers a new application under the authenticated developer and generates SDK API key credentials. The secret key is only shown once.
+// @Tags         Portal - Applications
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      dto.ApplicationCreateRequest  true  "Application details"
+// @Success      201   {object}  response.JSONResponse
+// @Failure      400   {object}  response.APIError
+// @Failure      401   {object}  response.APIError
+// @Router       /portal/applications [post]
 func (ctrl *AuthController) CreateApplication(c *gin.Context) {
-	// Extract developer ID from authentication token context (set by platform developer JWT login)
 	devID, exists := c.Get("developer_id")
 	if !exists {
 		response.Error(c, http.StatusUnauthorized, "unauthenticated developer context", nil)
@@ -50,23 +61,31 @@ func (ctrl *AuthController) CreateApplication(c *gin.Context) {
 	})
 }
 
+// RegisterDeveloper godoc
+// @Summary      Register a new developer
+// @Description  Creates a new developer account for the Skykin portal
+// @Tags         Portal - Auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.DeveloperRegisterRequest  true  "Developer registration details"
+// @Success      201   {object}  response.JSONResponse
+// @Failure      400   {object}  response.APIError
+// @Failure      409   {object}  response.APIError
+// @Router       /portal/register [post]
 func (ctrl *AuthController) RegisterDeveloper(c *gin.Context) {
 	var req dto.DeveloperRegisterRequest
 
-	// 1. Bind and automatically validate incoming JSON against our DTO struct tags
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
-	// 2. Hand off the raw data to the service layer for business rules and hashing
 	dev, err := ctrl.authService.RegisterDeveloper(c.Request.Context(), req)
 	if err != nil {
 		handleControllerError(c, err)
 		return
 	}
 
-	// 3. Return a clean, successful tracking response (GORM struct tags automatically hide PasswordHash)
 	response.Success(c, http.StatusCreated, "Developer registered successfully", gin.H{
 		"developer": gin.H{
 			"id":         dev.ID.String(),
@@ -77,19 +96,54 @@ func (ctrl *AuthController) RegisterDeveloper(c *gin.Context) {
 	})
 }
 
+// GetApplications godoc
+// @Summary      List applications
+// @Description  Returns all applications belonging to the authenticated developer
+// @Tags         Portal - Applications
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  response.JSONResponse
+// @Failure      401  {object}  response.APIError
+// @Router       /portal/applications [get]
+func (ctrl *AuthController) GetApplications(c *gin.Context) {
+	devID, exists := c.Get("developer_id")
+	if !exists {
+		response.Error(c, http.StatusUnauthorized, "unauthenticated developer context", nil)
+		return
+	}
+
+	apps, err := ctrl.authService.GetApplications(c.Request.Context(), devID.(string))
+	if err != nil {
+		handleControllerError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Applications retrieved", gin.H{
+		"applications": apps,
+	})
+}
+
+// LoginDeveloper godoc
+// @Summary      Login developer
+// @Description  Authenticates a developer and returns a JWT token
+// @Tags         Portal - Auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.DeveloperLoginRequest  true  "Login credentials"
+// @Success      200   {object}  response.JSONResponse
+// @Failure      400   {object}  response.APIError
+// @Failure      401   {object}  response.APIError
+// @Router       /portal/login [post]
 func (ctrl *AuthController) LoginDeveloper(c *gin.Context) {
 	var req dto.DeveloperLoginRequest
 
-	// Bind input validations
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Invalid request body structure", err.Error())
 		return
 	}
 
-	// Handle login execution flow
 	res, err := ctrl.authService.LoginDeveloper(c.Request.Context(), req)
 	if err != nil {
-		// Keep errors ambiguous for security, avoiding telling hackers if an email exists
 		response.Error(c, http.StatusUnauthorized, "Authentication failed", err.Error())
 		return
 	}

@@ -10,6 +10,7 @@ import (
 
 type EventRepository interface {
 	Create(ctx context.Context, event *model.Event) error
+	CreateBatch(ctx context.Context, events []model.Event) error
 	GetRecentEvents(ctx context.Context, userID string, limit int) ([]model.Event, error)
 }
 
@@ -24,6 +25,10 @@ func NewEventRepository(db *gorm.DB, cfg *configs.Config) EventRepository {
 
 func (r *eventRepo) Create(ctx context.Context, event *model.Event) error {
 	return r.db.WithContext(ctx).Create(event).Error
+}
+
+func (r *eventRepo) CreateBatch(ctx context.Context, events []model.Event) error {
+	return r.db.WithContext(ctx).Create(&events).Error
 }
 
 func (r *eventRepo) GetRecentEvents(ctx context.Context, userID string, limit int) ([]model.Event, error) {

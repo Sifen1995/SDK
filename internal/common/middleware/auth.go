@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"skykin-platform/configs"
 	"skykin-platform/internal/auth/repository"
 
 	"github.com/gin-gonic/gin"
@@ -75,9 +77,8 @@ func SDKAuthMiddleware(authRepo repository.AuthRepository) gin.HandlerFunc {
 }
 
 // PortalAuthMiddleware protects administrative developer dashboard actions using signed JWTs
-func PortalAuthMiddleware() gin.HandlerFunc {
-	// Re-reference our internal package token signature key array footprint
-	var jwtSecret = []byte("skykin_super_secret_portal_signing_key_change_me")
+func PortalAuthMiddleware(cfg *configs.Config) gin.HandlerFunc {
+	var jwtSecret = []byte(cfg.JwtSecret)
 
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -106,6 +107,7 @@ func PortalAuthMiddleware() gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
+			log.Printf("[Auth Debug] Token validation failed structural check: %v", err)
 			c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Session expired or invalid token authentication"})
 			c.Abort()
 			return

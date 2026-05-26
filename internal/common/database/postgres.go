@@ -47,7 +47,7 @@ func ConnectDB(cfg *configs.Config) (*gorm.DB, error) {
 func Migrate(db *gorm.DB) error {
 	db.Exec(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`)
 
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&usermodel.Users{},
 		&eventmodel.Event{},
 		&intentmodel.Intent{},
@@ -56,5 +56,25 @@ func Migrate(db *gorm.DB) error {
 		&authmodel.Developer{},
 		&authmodel.Application{},
 		&authmodel.APIKey{},
-	)
+	); err != nil {
+		return err
+	}
+
+	seedRewardRules(db)
+	return nil
+}
+
+func seedRewardRules(db *gorm.DB) {
+	rules := []rewardmodel.RewardRule{
+		{IntentName: "coffee_interest", RewardType: "cashback", Amount: 20.00, Currency: "ETB", Message: "You earned 20 ETB cashback for your coffee passion!", IsActive: true},
+		{IntentName: "crypto_interest", RewardType: "coins", Amount: 50.00, Currency: "FLIP_COINS", Message: "Crypto enthusiast! You earned 50 Flip Coins!", IsActive: true},
+		{IntentName: "fashion_interest", RewardType: "cashback", Amount: 15.00, Currency: "ETB", Message: "Stylish! Here is 15 ETB store credit for your next look.", IsActive: true},
+		{IntentName: "abandoned_cart", RewardType: "discount", Amount: 10.00, Currency: "PERCENT", Message: "We noticed you left something behind! Here is a 10% discount.", IsActive: true},
+		{IntentName: "signup_intent", RewardType: "points", Amount: 100.00, Currency: "POINTS", Message: "Welcome to Skykin! You earned 100 loyalty points.", IsActive: true},
+	}
+
+	for _, rule := range rules {
+		db.Where("intent_name = ?", rule.IntentName).FirstOrCreate(&rule)
+	}
+	log.Println("reward rules seeded")
 }

@@ -11,7 +11,7 @@ import (
 	rewardsRepo "skykin-platform/internal/rewards/repository"
 	usersRepo "skykin-platform/internal/users/repository"
 	"strings"
-
+ 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -32,4 +32,5 @@ func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB, config *configs.Config, hub
 	ctrl := controller.NewEventController(svc)
 
 	r.POST("/events", ctrl.PostEvent)
+	r.POST("/events/batch", ctrl.PostBatchEvents)
 }

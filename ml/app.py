@@ -30,6 +30,11 @@ VALID_EVENT_TYPES = {
     "remove_from_cart",
     "signup_complete",
     "checkout_started",
+    "checkout_complete",
+    "store_visit",
+    "ad_impression",
+    "ad_click",
+    "app_open",
 }
 
 

@@ -4,13 +4,33 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"skykin-platform/configs" // Import your new central routes setup
+	"skykin-platform/configs"
+	_ "skykin-platform/docs"
 	"skykin-platform/internal/common/database"
-	"skykin-platform/internal/common/route" // Import your new central routes setup
+	"skykin-platform/internal/common/route"
 	"skykin-platform/internal/common/websocket"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
+
+// @title           Skykin Platform API
+// @version         1.0
+// @description     Skykin SDK backend — handles developer authentication, application management, event ingestion, intent prediction, and real-time reward notifications.
+
+// @host            localhost:8081
+// @BasePath        /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter your JWT token as: Bearer <token>
+
+// @securityDefinitions.apikey APIKeyAuth
+// @in header
+// @name X-API-Key
+// @description SDK publishable key (pk_live_...)
 
 func main() {
 	// Initialize clean, bare engine instance
@@ -37,12 +57,12 @@ func main() {
 	// Initialize the structural communication hub
 	hub := websocket.NewHub()
 
-	// Global Health check line
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Ready to build!"})
 	})
 
-	// Hand off the engine instance to isolate structural setups cleanly
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	route.InitRouter(r, db, cfg, hub)
 
 	// Fire up the HTTP engine instance

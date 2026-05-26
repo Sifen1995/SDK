@@ -15,7 +15,6 @@ type Config struct {
 	JwtSecret    string
 	Port         string
 	MLServiceURL string
-	JwtSecretKey string
 }
 
 func LoadConfig() (*Config, error) {
@@ -35,6 +34,5 @@ func LoadConfig() (*Config, error) {
 		JwtSecret:    os.Getenv("JWT_SECRET"),
 		Port:         port,
 		MLServiceURL: os.Getenv("ML_SERVICE_URL"),
-		JwtSecretKey: os.Getenv("JWT_SECRET_KEY"),
 	}, nil
 }

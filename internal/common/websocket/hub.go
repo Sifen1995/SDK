@@ -2,13 +2,12 @@ package websocket
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"sync"
 
 	"github.com/gorilla/websocket"
 )
 
-// Notifier defines the interface for sending real-time messages
 type Notifier interface {
 	ConnectUser(userID string, conn *websocket.Conn)
 	DisconnectUser(userID string)
@@ -26,41 +25,49 @@ func NewHub() *Hub {
 	}
 }
 
-// ConnectUser adds a user to the active registry
 func (h *Hub) ConnectUser(userID string, conn *websocket.Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	if old, exists := h.connections[userID]; exists {
+		old.Close()
+	}
 	h.connections[userID] = conn
-	fmt.Printf("User %s connected to WebSocket\n", userID)
+	log.Printf("[WS] user %s connected (%d active)", userID, len(h.connections))
 }
 
-// DisconnectUser removes a user and closes the connection
 func (h *Hub) DisconnectUser(userID string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if conn, exists := h.connections[userID]; exists {
 		conn.Close()
 		delete(h.connections, userID)
-		fmt.Printf("User %s disconnected\n", userID)
+		log.Printf("[WS] user %s disconnected (%d active)", userID, len(h.connections))
 	}
 }
 
-// NotifyUser pushes data to a specific user if they are online
 func (h *Hub) NotifyUser(userID string, payload interface{}) error {
 	h.mu.RLock()
 	conn, exists := h.connections[userID]
 	h.mu.RUnlock()
 
 	if !exists {
-		// User is offline, we don't need to do anything
+		log.Printf("[WS] user %s is offline, notification skipped", userID)
 		return nil
 	}
 
-	// Convert payload to JSON and send
 	message, err := json.Marshal(payload)
 	if err != nil {
+		log.Printf("[WS] failed to marshal notification for user %s: %v", userID, err)
 		return err
 	}
 
-	return conn.WriteMessage(websocket.TextMessage, message)
+	if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
+		log.Printf("[WS] failed to send notification to user %s: %v", userID, err)
+		h.DisconnectUser(userID)
+		return err
+	}
+
+	log.Printf("[WS] notification sent to user %s (%d bytes)", userID, len(message))
+	return nil
 }
