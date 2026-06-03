@@ -66,3 +66,17 @@ Run all services (Database, Backend API, and ML Microservice) using docker-compo
 ```bash
 make docker-up
 ```
+
+### API testing (Postman)
+
+Import the collection and environment for **Ad Portal** (frontend), **Developer Portal** (SDK keys), and **SDK** (Flutter):
+
+- [`docs/AD_PORTAL_POSTMAN.md`](docs/AD_PORTAL_POSTMAN.md) — full reference
+- [`postman/Skykin-API.postman_collection.json`](postman/Skykin-API.postman_collection.json)
+- [`postman/Skykin-Local.postman_environment.json`](postman/Skykin-Local.postman_environment.json)
+
+In Postman: **File → Import** → select both JSON files → activate environment **Skykin — Local**.
+
+**Swagger UI:** `http://localhost:8081/swagger/index.html` (after `make run` or `make docker-up`). Regenerate with `make swagger`.
+
+**Ad portal DB:** Apply `internal/platform/database/migrations/20260603120000_advertisers_campaigns.sql`. Architecture: [`docs/AD_CAMPAIGN_ARCHITECTURE.md`](docs/AD_CAMPAIGN_ARCHITECTURE.md).

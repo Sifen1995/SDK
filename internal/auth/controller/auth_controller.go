@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"skykin-platform/internal/auth/dto"
 	"skykin-platform/internal/auth/service"
-	"skykin-platform/internal/common/response"
+	platformHTTP "skykin-platform/internal/platform/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,7 +21,7 @@ func handleControllerError(c *gin.Context, err error) {
 	if err == nil {
 		return
 	}
-	response.HandleError(c, err)
+	platformHTTP.HandleError(c, err)
 }
 
 // CreateApplication godoc
@@ -32,20 +32,20 @@ func handleControllerError(c *gin.Context, err error) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        body  body      dto.ApplicationCreateRequest  true  "Application details"
-// @Success      201   {object}  response.JSONResponse
-// @Failure      400   {object}  response.APIError
-// @Failure      401   {object}  response.APIError
+// @Success      201   {object}  platformHTTP.JSONResponse
+// @Failure      400   {object}  platformHTTP.APIError
+// @Failure      401   {object}  platformHTTP.APIError
 // @Router       /portal/applications [post]
 func (ctrl *AuthController) CreateApplication(c *gin.Context) {
 	devID, exists := c.Get("developer_id")
 	if !exists {
-		response.Error(c, http.StatusUnauthorized, "unauthenticated developer context", nil)
+		platformHTTP.Error(c, http.StatusUnauthorized, "unauthenticated developer context", nil)
 		return
 	}
 
 	var req dto.ApplicationCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		platformHTTP.Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -55,7 +55,7 @@ func (ctrl *AuthController) CreateApplication(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusCreated, "Application registered successfully", gin.H{
+	platformHTTP.Success(c, http.StatusCreated, "Application registered successfully", gin.H{
 		"application": appRes,
 		"credentials": credentials,
 	})
@@ -68,15 +68,15 @@ func (ctrl *AuthController) CreateApplication(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        body  body      dto.DeveloperRegisterRequest  true  "Developer registration details"
-// @Success      201   {object}  response.JSONResponse
-// @Failure      400   {object}  response.APIError
-// @Failure      409   {object}  response.APIError
+// @Success      201   {object}  platformHTTP.JSONResponse
+// @Failure      400   {object}  platformHTTP.APIError
+// @Failure      409   {object}  platformHTTP.APIError
 // @Router       /portal/register [post]
 func (ctrl *AuthController) RegisterDeveloper(c *gin.Context) {
 	var req dto.DeveloperRegisterRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		platformHTTP.Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -86,7 +86,7 @@ func (ctrl *AuthController) RegisterDeveloper(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusCreated, "Developer registered successfully", gin.H{
+	platformHTTP.Success(c, http.StatusCreated, "Developer registered successfully", gin.H{
 		"developer": gin.H{
 			"id":         dev.ID.String(),
 			"name":       dev.Name,
@@ -102,13 +102,13 @@ func (ctrl *AuthController) RegisterDeveloper(c *gin.Context) {
 // @Tags         Portal - Applications
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200  {object}  response.JSONResponse
-// @Failure      401  {object}  response.APIError
+// @Success      200  {object}  platformHTTP.JSONResponse
+// @Failure      401  {object}  platformHTTP.APIError
 // @Router       /portal/applications [get]
 func (ctrl *AuthController) GetApplications(c *gin.Context) {
 	devID, exists := c.Get("developer_id")
 	if !exists {
-		response.Error(c, http.StatusUnauthorized, "unauthenticated developer context", nil)
+		platformHTTP.Error(c, http.StatusUnauthorized, "unauthenticated developer context", nil)
 		return
 	}
 
@@ -118,7 +118,7 @@ func (ctrl *AuthController) GetApplications(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusOK, "Applications retrieved", gin.H{
+	platformHTTP.Success(c, http.StatusOK, "Applications retrieved", gin.H{
 		"applications": apps,
 	})
 }
@@ -130,23 +130,23 @@ func (ctrl *AuthController) GetApplications(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        body  body      dto.DeveloperLoginRequest  true  "Login credentials"
-// @Success      200   {object}  response.JSONResponse
-// @Failure      400   {object}  response.APIError
-// @Failure      401   {object}  response.APIError
+// @Success      200   {object}  platformHTTP.JSONResponse
+// @Failure      400   {object}  platformHTTP.APIError
+// @Failure      401   {object}  platformHTTP.APIError
 // @Router       /portal/login [post]
 func (ctrl *AuthController) LoginDeveloper(c *gin.Context) {
 	var req dto.DeveloperLoginRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Invalid request body structure", err.Error())
+		platformHTTP.Error(c, http.StatusBadRequest, "Invalid request body structure", err.Error())
 		return
 	}
 
 	res, err := ctrl.authService.LoginDeveloper(c.Request.Context(), req)
 	if err != nil {
-		response.Error(c, http.StatusUnauthorized, "Authentication failed", err.Error())
+		platformHTTP.Error(c, http.StatusUnauthorized, "Authentication failed", err.Error())
 		return
 	}
 
-	response.Success(c, http.StatusOK, "Session authorized successfully", res)
+	platformHTTP.Success(c, http.StatusOK, "Session authorized successfully", res)
 }

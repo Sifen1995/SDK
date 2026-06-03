@@ -5,7 +5,7 @@ import (
 	"skykin-platform/internal/auth/controller"
 	"skykin-platform/internal/auth/repository"
 	"skykin-platform/internal/auth/service"
-	"skykin-platform/internal/common/middleware"
+	platformMiddleware "skykin-platform/internal/platform/middleware"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -24,12 +24,12 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB, cfg *configs.Config) gin.Handler
 		portalGroup.POST("/login", ctrl.LoginDeveloper)
 
 		protectedPortal := portalGroup.Group("/")
-		protectedPortal.Use(middleware.PortalAuthMiddleware(cfg))
+		protectedPortal.Use(platformMiddleware.PortalAuthMiddleware(cfg))
 		{
 			protectedPortal.POST("/applications", ctrl.CreateApplication)
 			protectedPortal.GET("/applications", ctrl.GetApplications)
 		}
 	}
 
-	return middleware.SDKAuthMiddleware(repo)
+	return platformMiddleware.SDKAuthMiddleware(repo)
 }

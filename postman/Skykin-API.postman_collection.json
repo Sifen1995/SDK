@@ -1,0 +1,703 @@
+{
+  "info": {
+    "_postman_id": "skykin-platform-api",
+    "name": "Skykin Platform API",
+    "description": "Campaign Ad Portal (frontend), Developer Portal (SDK keys), and SDK (Flutter) endpoints.\n\n**Setup:** Import `Skykin-Local.postman_environment.json`, select environment **Skykin — Local**, run `docker compose up`.\n\n**Docs:** `docs/AD_PORTAL_POSTMAN.md`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/ping",
+            "description": "API health check."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ad Portal — Auth (Campaign UI)",
+      "description": "JWT campaign management portal for React/Next.js. Token variable: `adPortalToken`.",
+      "item": [
+        {
+          "name": "Register Advertiser",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Ads\",\n  \"email\": \"advertiser@test.com\",\n  \"password\": \"SecurePass1!\",\n  \"company_name\": \"Acme Inc\",\n  \"role\": \"advertiser\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/register",
+            "description": "Self-register as `advertiser` or `read_only_analyst`."
+          },
+          "response": []
+        },
+        {
+          "name": "Login Advertiser",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "if (j.token) {",
+                  "  pm.environment.set('adPortalToken', j.token);",
+                  "  console.log('adPortalToken saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"advertiser@test.com\",\n  \"password\": \"SecurePass1!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Login Operator Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.token) pm.environment.set('adPortalToken', j.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/login",
+            "description": "Default seeded admin. Override with ADMIN_EMAIL / ADMIN_PASSWORD env on server."
+          },
+          "response": []
+        },
+        {
+          "name": "Me",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ad-portal/me"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ad Portal — Campaigns",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Create Campaign (banner / crypto)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.environment.set('campaignId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Crypto Promo\",\n  \"target_intent\": \"crypto_interest\",\n  \"channel\": \"banner\",\n  \"budget\": 1000\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Campaign (sms_plus)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Crypto SMS+\",\n  \"target_intent\": \"crypto_interest\",\n  \"channel\": \"sms_plus\",\n  \"budget\": 500\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Campaign (push)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Crypto Push\",\n  \"target_intent\": \"crypto_interest\",\n  \"channel\": \"push\",\n  \"budget\": 500\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns"
+          },
+          "response": []
+        },
+        {
+          "name": "List Campaigns",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Campaign",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns/{{campaignId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Campaign",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns/{{campaignId}}/activate",
+            "description": "Requires at least one creative with validation_status `passed`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ad Portal — Creatives",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Create Creative — Banner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.environment.set('creativeId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"banner\",\n  \"payload\": {\n    \"image_url\": \"https://via.placeholder.com/320x50.png\",\n    \"click_url\": \"https://example.com\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns/{{campaignId}}/creatives"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Creative — Push",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"push\",\n  \"payload\": {\n    \"title\": \"Flash sale\",\n    \"body\": \"20% off today only\",\n    \"icon_url\": \"https://via.placeholder.com/64\",\n    \"deep_link\": \"https://example.com/deals\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns/{{campaignId}}/creatives"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Creative — SMS+",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"sms_plus\",\n  \"payload\": {\n    \"image_url\": \"https://via.placeholder.com/150\",\n    \"title\": \"Deal\",\n    \"description\": \"Save on crypto fees today\",\n    \"cta_url\": \"https://example.com\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns/{{campaignId}}/creatives"
+          },
+          "response": []
+        },
+        {
+          "name": "List Creatives",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns/{{campaignId}}/creatives"
+          },
+          "response": []
+        },
+        {
+          "name": "Preview Creative (simulator)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns/{{campaignId}}/creatives/{{creativeId}}/preview"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ad Portal — Admin",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Create Portal User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Analyst Jane\",\n  \"email\": \"analyst@acme.com\",\n  \"password\": \"SecurePass1!\",\n  \"role\": \"read_only_analyst\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/admin/users",
+            "description": "Requires operator_admin JWT. Run **Login Operator Admin** first."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Developer Portal (SDK keys)",
+      "description": "Obtain publishable_key + secret_key for Flutter/SDK. Token: `portalToken`.",
+      "item": [
+        {
+          "name": "Register Developer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mobile Team\",\n  \"email\": \"dev@company.com\",\n  \"password\": \"securepass123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/portal/register"
+          },
+          "response": []
+        },
+        {
+          "name": "Login Developer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const data = j.data || j;",
+                  "if (data.token) pm.environment.set('portalToken', data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"dev@company.com\",\n  \"password\": \"securepass123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/portal/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Application (Flutter)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const creds = (j.data && j.data.credentials) ? j.data.credentials : (j.credentials || {});",
+                  "if (creds.publishable_key) pm.environment.set('publishableKey', creds.publishable_key);",
+                  "if (creds.secret_key) pm.environment.set('secretKey', creds.secret_key);",
+                  "console.log('SDK keys saved to environment');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{portalToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"app_name\": \"My Flutter App\",\n  \"platform\": \"flutter\",\n  \"bundle_id\": \"com.company.myapp\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/portal/applications",
+            "description": "secret_key shown once — saved to `secretKey` env by test script."
+          },
+          "response": []
+        },
+        {
+          "name": "List Applications",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{portalToken}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/portal/applications"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "SDK — Events & Intents (Flutter)",
+      "description": "Requires publishableKey + secretKey. HMAC auto-signed by folder pre-request script.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const secret = pm.environment.get('secretKey');",
+              "const pub = pm.environment.get('publishableKey');",
+              "if (!secret || !pub) {",
+              "  console.warn('Run Developer Portal > Create Application first');",
+              "  return;",
+              "}",
+              "const body = pm.request.body ? pm.request.body.raw : '';",
+              "if (!body) return;",
+              "const sig = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+              "pm.request.headers.upsert({ key: 'X-Signature', value: sig });",
+              "pm.request.headers.upsert({ key: 'X-API-Key', value: pub });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "Ingest Events (crypto batch)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"events\": [\n    {\n      \"event_id\": \"{{$guid}}\",\n      \"event_type\": \"content_viewed\",\n      \"domain\": \"crypto\",\n      \"session_id\": \"{{$guid}}\",\n      \"screen_name\": \"asset_details\",\n      \"metadata\": { \"asset\": \"BTC\", \"duration_ms\": 4200 },\n      \"device_type\": \"mobile\",\n      \"platform\": \"flutter\",\n      \"app_version\": \"1.0.0\",\n      \"created_at\": \"2026-06-02T12:00:00Z\"\n    },\n    {\n      \"event_id\": \"{{$guid}}\",\n      \"event_type\": \"search_performed\",\n      \"domain\": \"crypto\",\n      \"session_id\": \"{{$guid}}\",\n      \"screen_name\": \"search\",\n      \"metadata\": { \"query\": \"bitcoin price\" },\n      \"device_type\": \"mobile\",\n      \"platform\": \"flutter\",\n      \"app_version\": \"1.0.0\",\n      \"created_at\": \"2026-06-02T12:01:00Z\"\n    },\n    {\n      \"event_id\": \"{{$guid}}\",\n      \"event_type\": \"screen_viewed\",\n      \"domain\": \"crypto\",\n      \"session_id\": \"{{$guid}}\",\n      \"screen_name\": \"wallet\",\n      \"metadata\": { \"tab\": \"portfolio\" },\n      \"device_type\": \"mobile\",\n      \"platform\": \"flutter\",\n      \"app_version\": \"1.0.0\",\n      \"created_at\": \"2026-06-02T12:02:00Z\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/events",
+            "description": "Returns 202. Use new UUIDs each run ({{$guid}}). Run 2–3 times before predict."
+          },
+          "response": []
+        },
+        {
+          "name": "Predict Intent",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/intents/predict",
+            "description": "Connect WebSocket first. Triggers campaign_ad + optional reward_earned."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "SDK — WebSocket",
+      "description": "In Postman: **New → WebSocket Request** (not REST).\n\nURL: `ws://localhost:8081/api/v1/ws/rewards/{{userId}}`\n\nConnect **before** Predict Intent. Listen for `type: campaign_ad` and `type: reward_earned`.",
+      "item": [
+        {
+          "name": "WebSocket URL (copy to WS client)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:8081/api/v1/ws/rewards/{{userId}}",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "8081",
+              "path": ["api", "v1", "ws", "rewards", "{{userId}}"]
+            },
+            "description": "Open as WebSocket in Postman or use wscat:\n`wscat -c ws://localhost:8081/api/v1/ws/rewards/user-demo-001`"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "E2E — Full ad delivery flow",
+      "description": "Run requests in order (Collection Runner compatible).",
+      "item": [
+        {
+          "name": "1. Login Advertiser",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.token) pm.environment.set('adPortalToken', j.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"advertiser@test.com\",\n  \"password\": \"SecurePass1!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/login"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Create Campaign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.environment.set('campaignId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"E2E Crypto Banner\",\n  \"target_intent\": \"crypto_interest\",\n  \"channel\": \"banner\",\n  \"budget\": 100\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Create Banner Creative",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.environment.set('creativeId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"banner\",\n  \"payload\": {\n    \"image_url\": \"https://via.placeholder.com/320x50.png\",\n    \"click_url\": \"https://example.com\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns/{{campaignId}}/creatives"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Activate Campaign",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ad-portal/campaigns/{{campaignId}}/activate"
+          },
+          "response": []
+        },
+        {
+          "name": "5. Login Developer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const data = j.data || j;",
+                  "if (data.token) pm.environment.set('portalToken', data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"dev@company.com\",\n  \"password\": \"securepass123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/portal/login"
+          },
+          "response": []
+        },
+        {
+          "name": "6. Create Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const creds = (j.data && j.data.credentials) ? j.data.credentials : {};",
+                  "if (creds.publishable_key) pm.environment.set('publishableKey', creds.publishable_key);",
+                  "if (creds.secret_key) pm.environment.set('secretKey', creds.secret_key);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{portalToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"app_name\": \"E2E Flutter\",\n  \"platform\": \"flutter\",\n  \"bundle_id\": \"com.skykin.e2e\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/portal/applications"
+          },
+          "response": []
+        },
+        {
+          "name": "7. Ingest Events",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const secret = pm.environment.get('secretKey');",
+                  "const pub = pm.environment.get('publishableKey');",
+                  "const body = pm.request.body.raw;",
+                  "const sig = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-Signature', value: sig });",
+                  "pm.request.headers.upsert({ key: 'X-API-Key', value: pub });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"events\": [\n    {\n      \"event_id\": \"{{$guid}}\",\n      \"event_type\": \"content_viewed\",\n      \"domain\": \"crypto\",\n      \"session_id\": \"{{$guid}}\",\n      \"screen_name\": \"btc\",\n      \"metadata\": { \"asset\": \"BTC\" },\n      \"device_type\": \"mobile\",\n      \"platform\": \"flutter\",\n      \"app_version\": \"1.0.0\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/events"
+          },
+          "response": []
+        },
+        {
+          "name": "8. Predict Intent (connect WS first)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const secret = pm.environment.get('secretKey');",
+                  "const pub = pm.environment.get('publishableKey');",
+                  "const body = pm.request.body.raw;",
+                  "const sig = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-Signature', value: sig });",
+                  "pm.request.headers.upsert({ key: 'X-API-Key', value: pub });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/intents/predict",
+            "description": "Manually connect WebSocket to ws://localhost:8081/api/v1/ws/rewards/{{userId}} before this step."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

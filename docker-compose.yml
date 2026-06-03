@@ -44,8 +44,17 @@ services:
       - ml-service
     env_file:
       - .env
+  redis:
+    image: redis:7.2-alpine
+    container_name: skykin-redis
+    command: redis-server --appendonly yes --requirepass your_secure_redis_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
 
-  # 4. ML Engine (Python)
+  # 4. ML Engine (Python) — stateless; talks to backend only via HTTP
   ml-service:
     build:
       context: ./ml
@@ -53,8 +62,11 @@ services:
     container_name: skykin_ml
     ports:
       - "8000:8000"
+    environment:
+      - MODEL_PATH=/app/models/intent_model.pkl
     depends_on:
       - db
 
 volumes:
+  redis_data:
   postgres_data:

@@ -1,8 +1,6 @@
 package model
 
-import (
-	"time"
-)
+import "time"
 
 type RewardRule struct {
 	ID         string    `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`

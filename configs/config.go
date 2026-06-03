@@ -15,6 +15,9 @@ type Config struct {
 	JwtSecret    string
 	Port         string
 	MLServiceURL string
+	RedisAddr       string // optional, e.g. redis:6379; empty uses in-memory dedup
+	AdminEmail      string
+	AdminPassword   string
 }
 
 func LoadConfig() (*Config, error) {
@@ -34,5 +37,15 @@ func LoadConfig() (*Config, error) {
 		JwtSecret:    os.Getenv("JWT_SECRET"),
 		Port:         port,
 		MLServiceURL: os.Getenv("ML_SERVICE_URL"),
+		RedisAddr:     os.Getenv("REDIS_ADDR"),
+		AdminEmail:    envOr("ADMIN_EMAIL", "admin@skykin.com"),
+		AdminPassword: envOr("ADMIN_PASSWORD", "Admin12345!"),
 	}, nil
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

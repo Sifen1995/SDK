@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"skykin-platform/configs"
 	_ "skykin-platform/docs"
-	"skykin-platform/internal/common/database"
-	"skykin-platform/internal/common/route"
-	"skykin-platform/internal/common/websocket"
+	advertiserApp "skykin-platform/internal/advertisers/application"
+	advertiserInfra "skykin-platform/internal/advertisers/infrastructure"
+	"skykin-platform/internal/platform/database"
+	"skykin-platform/internal/platform/route"
+	"skykin-platform/internal/platform/websocket"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -17,7 +20,7 @@ import (
 
 // @title           Skykin Platform API
 // @version         1.0
-// @description     Skykin SDK backend — handles developer authentication, application management, event ingestion, intent prediction, and real-time reward notifications.
+// @description     Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK event ingestion, intent prediction, campaign ad delivery via WebSocket, and reward notifications.
 
 // @host            localhost:8081
 // @BasePath        /api/v1
@@ -25,7 +28,7 @@ import (
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
-// @description Enter your JWT token as: Bearer <token>
+// @description Enter your JWT token as: Bearer <token> (developer portal or ad portal)
 
 // @securityDefinitions.apikey APIKeyAuth
 // @in header
@@ -53,6 +56,15 @@ func main() {
 		log.Fatalf("failed to run database migrations: %v", err)
 	}
 	log.Println("database migrations completed")
+
+	adRepo := advertiserInfra.NewRepository(db)
+	if err := advertiserApp.NewAuthService(adRepo, cfg).EnsureOperatorAdmin(
+		context.Background(), cfg.AdminEmail, cfg.AdminPassword, "Operator Admin", "Skykin",
+	); err != nil {
+		log.Printf("operator admin seed skipped: %v", err)
+	} else {
+		log.Printf("operator admin ready: %s", cfg.AdminEmail)
+	}
 
 	// Initialize the structural communication hub
 	hub := websocket.NewHub()

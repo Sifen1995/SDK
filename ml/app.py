@@ -1,95 +1,61 @@
-from fastapi import FastAPI
-
-
-
 """
-Skykin — Intent Prediction API
-File:    app.py
-Run:     uvicorn app:app --reload
-Docs:    http://127.0.0.1:8000/docs
+Skykin — Behavioral Intent Prediction API (stateless microservice).
+
+Receives events from the Go backend over HTTP, engineers features, predicts intent.
+No database connection — all data comes from the backend.
+
+Run: uvicorn app:app --host 0.0.0.0 --port 8000
 """
 
-import os
-import joblib
+from __future__ import annotations
+
+import sys
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Header, Depends
-from pydantic import BaseModel, field_validator
 
-# ─────────────────────────────────────────────────────────────
-#  CONFIGURATION
-# ─────────────────────────────────────────────────────────────
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field, field_validator
 
-   # move to .env / secret manager in production
-MODEL_PATH = Path(__file__).parent / "models" / "intent_model.pkl"
+ML_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ML_ROOT))
+
+from inference.model_loader import load_model
+from inference.predictor import predict_from_events
+
+artifact = load_model()
 
 VALID_EVENT_TYPES = {
-    "search",
-    "product_view",
-    "category_view",
-    "add_to_cart",
-    "remove_from_cart",
-    "signup_complete",
-    "checkout_started",
-    "checkout_complete",
-    "store_visit",
-    "ad_impression",
-    "ad_click",
-    "app_open",
+    "session_started",
+    "screen_viewed",
+    "content_viewed",
+    "search_performed",
+    "interaction_received",
+    "scroll_activity",
+    "notification_opened",
+    "campaign_impression",
+    "campaign_clicked",
+    "conversion_completed",
+    "transaction_completed",
+    "reward_claimed",
 }
 
-
-# ─────────────────────────────────────────────────────────────
-#  LOAD MODEL — once at startup, not on every request
-# ─────────────────────────────────────────────────────────────
-
-if not MODEL_PATH.exists():
-    raise RuntimeError(
-        f"Model not found at '{MODEL_PATH}'.\n"
-        "Run  python model.py  first to train and save the model."
-    )
-
-_artifact  = joblib.load(MODEL_PATH)
-_pipeline  = _artifact["pipeline"]
-_threshold = _artifact["threshold"]
-_intents   = _artifact["intents"]
-_version   = _artifact.get("model_version", "unknown")
-
-print(f"Model loaded — version {_version} | intents: {_intents} | threshold: {_threshold}")
-
-
-# ─────────────────────────────────────────────────────────────
-#  FASTAPI APP
-# ─────────────────────────────────────────────────────────────
-
 app = FastAPI(
-    title="Skykin Intent Prediction API",
-    description="Predicts user intent from a session of events and triggers rewards.",
-    version="1.0.0",
+    title="Skykin Behavioral Intent API",
+    description="Stateless intent prediction from behavioral events supplied by the backend.",
+    version="3.0.0",
 )
 
 
-# ─────────────────────────────────────────────────────────────
-#  AUTHENTICATION
-# ─────────────────────────────────────────────────────────────
-
-# def verify_api_key(x_api_key: str = Header(..., description="Your Skykin API key")):
-#     """Dependency — validates the X-API-Key header on every protected route."""
-#     if x_api_key != API_KEY:
-#         raise HTTPException(status_code=401, detail="Invalid or missing API key.")
-#     return x_api_key
-
-
-# ─────────────────────────────────────────────────────────────
-#  REQUEST / RESPONSE SCHEMAS
-# ─────────────────────────────────────────────────────────────
-
-class Event(BaseModel):
+class EventPayload(BaseModel):
     event_type: str
-    metadata:   dict = {}
+    domain: str = ""
+    screen_name: str = ""
+    metadata: dict = Field(default_factory=dict)
+    session_id: str = ""
+    created_at: str | None = None
 
     @field_validator("event_type")
     @classmethod
-    def validate_event_type(cls, v):
+    def validate_event_type(cls, v: str) -> str:
         if v not in VALID_EVENT_TYPES:
             raise ValueError(
                 f"'{v}' is not a valid event_type. "
@@ -99,126 +65,52 @@ class Event(BaseModel):
 
 
 class PredictRequest(BaseModel):
-    user_id: str
-    events:  list[Event]
-
-
-
+    user_id: str = Field(..., description="SDK external user id")
+    events: list[EventPayload] = Field(..., min_length=1)
 
 
 class PredictResponse(BaseModel):
-    user_id:         str
-    intent:          str | None
-    confidence:      float | None
-    threshold:       float
+    user_id: str
+    intent: str | None
+    confidence: float | None
+    threshold: float
     reward_triggered: bool
-    
-
-
-
-
-
-# ─────────────────────────────────────────────────────────────
-#  HELPERS
-# ─────────────────────────────────────────────────────────────
-
-def build_session_text(events: list[Event]) -> str:
-    """
-    Converts a list of Event objects into a single text string
-    for the TF-IDF vectorizer — the same transformation used
-    during training in generate_data.py.
-    """
-    tokens = []
-    for event in events:
-        tokens.append(event.event_type)
-        for value in event.metadata.values():
-            cleaned = str(value).lower().replace("_", " ").replace("&", "")
-            tokens.append(cleaned)
-    return " ".join(tokens)
-
-
-def run_prediction(events: list[Event]) -> dict:
-    """
-    Runs the ML pipeline on a session and returns intent,
-    confidence score, and whether the threshold is met.
-    """
-    session_text = build_session_text(events)
-    proba        = _pipeline.predict_proba([session_text])[0]
-    confidence   = float(proba.max())
-    intent       = _pipeline.classes_[proba.argmax()]
-
-    return {
-        "intent":            intent,
-        "confidence":        round(confidence, 4),
-        "reward_triggered":  confidence >= _threshold,
-    }
-
-
-# ─────────────────────────────────────────────────────────────
-#  ROUTES
-# ─────────────────────────────────────────────────────────────
+    top_signals: list[str] = []
 
 
 @app.get("/ping")
-def ping() -> dict[str, str]:
-    return {"status": "ok", "message": "ML service is running"}
+def ping():
+    return {"status": "ok", "model_version": artifact.model_version}
 
-@app.get("/health", tags=["System"])
-def health_check():
-    """
-    Public health check — no API key required.
-    Returns model version and loaded intents.
-    """
+
+@app.get("/health")
+def health():
     return {
-        "status":          "ok",
-        "model_version":   _version,
-        "intents":         _intents,
-        "threshold":       _threshold,
+        "status": "ok",
+        "model_version": artifact.model_version,
+        "intents": artifact.intents,
+        "threshold": artifact.threshold,
+        "feature_count": len(artifact.feature_columns),
     }
 
 
-@app.post(
-    "/predict-intent",
-    response_model=PredictResponse,
-    tags=["Prediction"],
-    # dependencies=[Depends(verify_api_key)],
-)
+@app.post("/predict-intent", response_model=PredictResponse)
 def predict_intent(body: PredictRequest):
-    """
-    Accepts a user session (list of events), runs intent
-    prediction, and returns the intent + reward if the
-    confidence meets the threshold.
-
-    Requires header:  X-API-Key: <your key>
-    """
-    if not body.events:
-        raise HTTPException(
-            status_code=422,
-            detail="The 'events' list cannot be empty."
+    if len(body.events) < 3:
+        return PredictResponse(
+            user_id=body.user_id,
+            intent=None,
+            confidence=None,
+            threshold=artifact.threshold,
+            reward_triggered=False,
+            top_signals=["insufficient_history"],
         )
 
-    result = run_prediction(body.events)
-   
-
-    
-
-    return PredictResponse(
-        user_id=          body.user_id,
-        intent=           result["intent"],
-        confidence=       result["confidence"],
-        threshold=        _threshold,
-        reward_triggered= result["reward_triggered"],
-        
-    )
+    events = [e.model_dump() for e in body.events]
+    result = predict_from_events(artifact, body.user_id, events)
+    return PredictResponse(**result)
 
 
-@app.get(
-    "/intents",
-    tags=["System"],
-    # dependencies=[Depends(verify_api_key)],
-)
+@app.get("/intents")
 def list_intents():
-    """Returns the list of intent labels the model can predict."""
-    return {"intents": _intents}
-
-
+    return {"intents": artifact.intents}

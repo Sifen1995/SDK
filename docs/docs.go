@@ -15,6 +15,328 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/ad-portal/admin/users": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Create portal user (operator admin)",
+                "parameters": [
+                    {
+                        "description": "User",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_advertisers_interfaces_http.CreateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_advertisers_interfaces_http.RegisterResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/campaigns": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Campaigns"
+                ],
+                "summary": "List campaigns",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_campaigns_interfaces_http.CampaignListResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "One campaign row includes targeting, budget caps, and creative fields per schema. Starts inactive until activated.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Campaigns"
+                ],
+                "summary": "Create campaign with embedded creative",
+                "parameters": [
+                    {
+                        "description": "Campaign + creative",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_campaigns_interfaces_http.CreateCampaignRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/campaigns/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Campaigns"
+                ],
+                "summary": "Get campaign",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/campaigns/{id}/activate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets is_active=true when validation_status is passed.",
+                "tags": [
+                    "Ad Portal - Campaigns"
+                ],
+                "summary": "Activate campaign",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/campaigns/{id}/preview": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Campaigns"
+                ],
+                "summary": "Preview campaign creative",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_campaigns_interfaces_http.CampaignPreviewResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/login": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Auth"
+                ],
+                "summary": "Login to ad portal",
+                "parameters": [
+                    {
+                        "description": "Credentials",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_advertisers_interfaces_http.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_advertisers_interfaces_http.AdPortalLoginResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Auth"
+                ],
+                "summary": "Current advertiser profile",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_advertisers_interfaces_http.MeResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/register": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Auth"
+                ],
+                "summary": "Register advertiser",
+                "parameters": [
+                    {
+                        "description": "Registration",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_advertisers_interfaces_http.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_advertisers_interfaces_http.RegisterResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/events": {
             "post": {
                 "security": [
@@ -22,7 +344,7 @@ const docTemplate = `{
                         "APIKeyAuth": []
                     }
                 ],
-                "description": "Receives an SDK event, persists it, runs ML intent prediction, and triggers rewards if the confidence threshold is met. Requires HMAC signature via X-Signature header.",
+                "description": "Accepts domain-agnostic SDK events (screen views, content views, searches, etc.). Returns 202; intent prediction runs asynchronously.",
                 "consumes": [
                     "application/json"
                 ],
@@ -32,7 +354,7 @@ const docTemplate = `{
                 "tags": [
                     "SDK - Events"
                 ],
-                "summary": "Ingest a user event",
+                "summary": "Ingest batched behavioral events",
                 "parameters": [
                     {
                         "type": "string",
@@ -41,57 +363,51 @@ const docTemplate = `{
                         "in": "header"
                     },
                     {
-                        "description": "Event payload",
+                        "description": "Batched events",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_events_dto.EventRequestDTO"
+                            "$ref": "#/definitions/internal_events_interfaces_http.IngestEventsRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_events_dto.EventResponseDTO"
-                        }
-                    },
                     "202": {
-                        "description": "Event queued — cold start or ML unavailable",
+                        "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_events_dto.EventResponseDTO"
+                            "$ref": "#/definitions/internal_events_interfaces_http.IngestEventsResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     }
                 }
             }
         },
-        "/events/batch": {
+        "/intents/predict": {
             "post": {
                 "security": [
                     {
                         "APIKeyAuth": []
                     }
                 ],
-                "description": "Receives a batch of events from the SDK (collected over 30s or on app background), persists them all, runs one ML intent prediction on the session, and returns the predicted intent and reward if triggered.",
+                "description": "Loads stored/cached events for a user, calls ML, persists intent and reward when threshold is met.",
                 "consumes": [
                     "application/json"
                 ],
@@ -99,55 +415,37 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "SDK - Events"
+                    "SDK - Intents"
                 ],
-                "summary": "Ingest batched user events",
+                "summary": "Predict user intent (sync)",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "HMAC-SHA256 signature of the request body",
-                        "name": "X-Signature",
-                        "in": "header"
-                    },
-                    {
-                        "description": "Batched events payload",
+                        "description": "User id to evaluate",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_events_dto.BatchEventRequestDTO"
+                            "$ref": "#/definitions/internal_intents_interfaces_http.PredictIntentRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
+                    "200": {
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_events_dto.BatchEventResponseDTO"
-                        }
-                    },
-                    "202": {
-                        "description": "Events stored — cold start or ML unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_events_dto.BatchEventResponseDTO"
+                            "$ref": "#/definitions/skykin-platform_internal_intents_application.PredictIntentResult"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     }
                 }
@@ -172,13 +470,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.JSONResponse"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.JSONResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     }
                 }
@@ -215,19 +513,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.JSONResponse"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.JSONResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     }
                 }
@@ -261,19 +559,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.JSONResponse"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.JSONResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     }
                 }
@@ -307,19 +605,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.JSONResponse"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.JSONResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_common_response.APIError"
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     }
                 }
@@ -327,6 +625,360 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "internal_advertisers_interfaces_http.AdPortalLoginResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/internal_advertisers_interfaces_http.PortalUserDTO"
+                }
+            }
+        },
+        "internal_advertisers_interfaces_http.CreateUserRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "password",
+                "role"
+            ],
+            "properties": {
+                "company_name": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "advertiser",
+                        "read_only_analyst",
+                        "operator_admin"
+                    ]
+                }
+            }
+        },
+        "internal_advertisers_interfaces_http.LoginRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_advertisers_interfaces_http.MeResponse": {
+            "type": "object",
+            "properties": {
+                "user": {
+                    "$ref": "#/definitions/internal_advertisers_interfaces_http.PortalUserDTO"
+                }
+            }
+        },
+        "internal_advertisers_interfaces_http.PortalUserDTO": {
+            "type": "object",
+            "properties": {
+                "api_key": {
+                    "type": "string",
+                    "example": "abc123..."
+                },
+                "company_name": {
+                    "type": "string",
+                    "example": "Acme Inc"
+                },
+                "contact_name": {
+                    "type": "string",
+                    "example": "Jane Doe"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "advertiser@test.com"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "role": {
+                    "type": "string",
+                    "example": "advertiser"
+                }
+            }
+        },
+        "internal_advertisers_interfaces_http.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "company_name",
+                "email",
+                "name",
+                "password"
+            ],
+            "properties": {
+                "company_name": {
+                    "type": "string",
+                    "example": "Acme Inc"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "advertiser@test.com"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Jane Doe"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "SecurePass1!"
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "advertiser",
+                        "read_only_analyst"
+                    ],
+                    "example": "advertiser"
+                }
+            }
+        },
+        "internal_advertisers_interfaces_http.RegisterResponse": {
+            "type": "object",
+            "properties": {
+                "user": {
+                    "$ref": "#/definitions/internal_advertisers_interfaces_http.PortalUserDTO"
+                }
+            }
+        },
+        "internal_campaigns_interfaces_http.CampaignListResponse": {
+            "type": "object",
+            "properties": {
+                "campaigns": {
+                    "type": "array",
+                    "items": {}
+                }
+            }
+        },
+        "internal_campaigns_interfaces_http.CampaignPreviewResponse": {
+            "type": "object",
+            "properties": {
+                "campaign_name": {
+                    "type": "string"
+                },
+                "channel_label": {
+                    "type": "string"
+                },
+                "format": {
+                    "type": "string"
+                },
+                "preview": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "simulator": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_campaigns_interfaces_http.CreateCampaignRequest": {
+            "type": "object",
+            "required": [
+                "application_id",
+                "creative_format",
+                "destination_url",
+                "name",
+                "target_intent"
+            ],
+            "properties": {
+                "application_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "body_text": {
+                    "type": "string",
+                    "example": "Trade crypto with zero fees today"
+                },
+                "canvas_json": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "creative_format": {
+                    "type": "string",
+                    "example": "BANNER"
+                },
+                "daily_budget_cap": {
+                    "type": "number",
+                    "example": 100
+                },
+                "destination_url": {
+                    "type": "string",
+                    "example": "https://example.com/offer"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://cdn.example.com/banner.png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Crypto Promo"
+                },
+                "target_intent": {
+                    "type": "string",
+                    "example": "crypto_interest"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Save on fees"
+                },
+                "total_budget_cap": {
+                    "type": "number",
+                    "example": 1000
+                }
+            }
+        },
+        "internal_events_interfaces_http.EventIngestResultDTO": {
+            "type": "object",
+            "properties": {
+                "event_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_events_interfaces_http.EventInput": {
+            "type": "object",
+            "required": [
+                "domain",
+                "event_id",
+                "event_type",
+                "metadata"
+            ],
+            "properties": {
+                "app_version": {
+                    "type": "string",
+                    "example": "1.2.0"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-06-01T12:00:00Z"
+                },
+                "device_type": {
+                    "type": "string",
+                    "example": "mobile"
+                },
+                "domain": {
+                    "type": "string",
+                    "example": "crypto"
+                },
+                "event_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440001"
+                },
+                "event_type": {
+                    "type": "string",
+                    "enum": [
+                        "session_started",
+                        "screen_viewed",
+                        "content_viewed",
+                        "search_performed",
+                        "interaction_received",
+                        "scroll_activity",
+                        "notification_opened",
+                        "campaign_impression",
+                        "campaign_clicked",
+                        "conversion_completed",
+                        "transaction_completed",
+                        "reward_claimed"
+                    ],
+                    "example": "content_viewed"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "platform": {
+                    "type": "string",
+                    "example": "android"
+                },
+                "screen_name": {
+                    "type": "string",
+                    "example": "asset_details"
+                },
+                "session_id": {
+                    "type": "string",
+                    "example": "660e8400-e29b-41d4-a716-446655440002"
+                }
+            }
+        },
+        "internal_events_interfaces_http.IngestEventsRequest": {
+            "type": "object",
+            "required": [
+                "events",
+                "user_id"
+            ],
+            "properties": {
+                "events": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/internal_events_interfaces_http.EventInput"
+                    }
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "user_abc_123"
+                }
+            }
+        },
+        "internal_events_interfaces_http.IngestEventsResponse": {
+            "type": "object",
+            "properties": {
+                "accepted": {
+                    "type": "boolean"
+                },
+                "prediction_queued": {
+                    "type": "boolean"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_events_interfaces_http.EventIngestResultDTO"
+                    }
+                }
+            }
+        },
+        "internal_intents_interfaces_http.PredictIntentRequest": {
+            "type": "object",
+            "required": [
+                "user_id"
+            ],
+            "properties": {
+                "user_id": {
+                    "type": "string",
+                    "example": "user_test_batch_001"
+                }
+            }
+        },
         "skykin-platform_internal_auth_dto.ApplicationCreateRequest": {
             "type": "object",
             "required": [
@@ -399,231 +1051,144 @@ const docTemplate = `{
                 }
             }
         },
-        "skykin-platform_internal_common_response.APIError": {
+        "skykin-platform_internal_campaigns_model.Campaign": {
             "type": "object",
             "properties": {
-                "code": {
-                    "description": "HTTP Status Code",
-                    "type": "integer"
-                },
-                "details": {
-                    "description": "Validation specifics or structural logs"
-                },
-                "message": {
-                    "description": "High-level safe message",
+                "advertiserID": {
                     "type": "string"
                 },
-                "status": {
-                    "description": "\"error\"",
-                    "type": "string"
-                }
-            }
-        },
-        "skykin-platform_internal_common_response.JSONResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "description": "Dynamic payload envelope"
-                },
-                "message": {
-                    "description": "Optional human-readable message",
+                "applicationID": {
                     "type": "string"
                 },
-                "status": {
-                    "description": "\"success\"",
+                "bodyText": {
                     "type": "string"
-                }
-            }
-        },
-        "skykin-platform_internal_events_dto.BatchEventItemDTO": {
-            "type": "object",
-            "required": [
-                "event_id",
-                "event_type",
-                "metadata",
-                "timestamp"
-            ],
-            "properties": {
-                "event_id": {
-                    "type": "string",
-                    "example": "evt_001"
                 },
-                "event_type": {
-                    "type": "string",
-                    "enum": [
-                        "search",
-                        "product_view",
-                        "category_view",
-                        "add_to_cart",
-                        "remove_from_cart",
-                        "signup_complete",
-                        "checkout_started",
-                        "checkout_complete",
-                        "store_visit",
-                        "ad_impression",
-                        "ad_click",
-                        "app_open"
-                    ],
-                    "example": "product_view"
-                },
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "timestamp": {
-                    "type": "string",
-                    "example": "2026-05-26T12:00:00Z"
-                }
-            }
-        },
-        "skykin-platform_internal_events_dto.BatchEventRequestDTO": {
-            "type": "object",
-            "required": [
-                "events",
-                "external_user_id"
-            ],
-            "properties": {
-                "events": {
+                "canvasJSON": {
                     "type": "array",
-                    "minItems": 1,
                     "items": {
-                        "$ref": "#/definitions/skykin-platform_internal_events_dto.BatchEventItemDTO"
+                        "type": "integer"
                     }
                 },
-                "external_user_id": {
-                    "type": "string",
-                    "example": "user_abc_123"
+                "createdAt": {
+                    "type": "string"
+                },
+                "creativeFormat": {
+                    "type": "string"
+                },
+                "dailyBudgetCap": {
+                    "type": "number"
+                },
+                "destinationURL": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "imageURL": {
+                    "type": "string"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "targetIntent": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "totalBudgetCap": {
+                    "type": "number"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "validationNotes": {
+                    "type": "string"
+                },
+                "validationStatus": {
+                    "type": "string"
                 }
             }
         },
-        "skykin-platform_internal_events_dto.BatchEventResponseDTO": {
+        "skykin-platform_internal_intents_application.PredictIntentResult": {
             "type": "object",
             "properties": {
                 "confidence": {
-                    "type": "number",
-                    "example": 0.85
-                },
-                "events_received": {
-                    "type": "integer",
-                    "example": 5
+                    "type": "number"
                 },
                 "intent": {
-                    "type": "string",
-                    "example": "coffee_interest"
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
                 },
                 "reward": {
-                    "$ref": "#/definitions/skykin-platform_internal_events_dto.RewardResponseDTO"
+                    "$ref": "#/definitions/skykin-platform_internal_intents_application.Reward"
                 },
                 "reward_triggered": {
-                    "type": "boolean",
-                    "example": true
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "top_signals": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "user_id": {
-                    "type": "string",
-                    "example": "user_abc_123"
+                    "type": "string"
                 }
             }
         },
-        "skykin-platform_internal_events_dto.EventRequestDTO": {
-            "type": "object",
-            "required": [
-                "event_id",
-                "event_type",
-                "external_user_id",
-                "metadata",
-                "timestamp"
-            ],
-            "properties": {
-                "event_id": {
-                    "type": "string",
-                    "example": "evt_001"
-                },
-                "event_type": {
-                    "type": "string",
-                    "enum": [
-                        "search",
-                        "product_view",
-                        "category_view",
-                        "add_to_cart",
-                        "remove_from_cart",
-                        "signup_complete",
-                        "checkout_started",
-                        "checkout_complete",
-                        "store_visit",
-                        "ad_impression",
-                        "ad_click",
-                        "app_open"
-                    ],
-                    "example": "product_view"
-                },
-                "external_user_id": {
-                    "type": "string",
-                    "example": "user_abc_123"
-                },
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "timestamp": {
-                    "type": "string",
-                    "example": "2026-05-26T12:00:00Z"
-                }
-            }
-        },
-        "skykin-platform_internal_events_dto.EventResponseDTO": {
-            "type": "object",
-            "properties": {
-                "confidence": {
-                    "type": "number",
-                    "example": 0.85
-                },
-                "event_id": {
-                    "type": "string",
-                    "example": "evt_001"
-                },
-                "intent": {
-                    "type": "string",
-                    "example": "coffee_interest"
-                },
-                "queued_for_analysis": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "reward": {
-                    "$ref": "#/definitions/skykin-platform_internal_events_dto.RewardResponseDTO"
-                },
-                "reward_triggered": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "user_id": {
-                    "type": "string",
-                    "example": "user_abc_123"
-                }
-            }
-        },
-        "skykin-platform_internal_events_dto.RewardResponseDTO": {
+        "skykin-platform_internal_intents_application.Reward": {
             "type": "object",
             "properties": {
                 "amount": {
-                    "type": "number",
-                    "example": 20
+                    "type": "number"
                 },
                 "currency": {
-                    "type": "string",
-                    "example": "ETB"
+                    "type": "string"
                 },
                 "message": {
-                    "type": "string",
-                    "example": "You earned 20 ETB cashback!"
+                    "type": "string"
                 },
                 "reward_id": {
-                    "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                    "type": "string"
                 },
                 "reward_type": {
-                    "type": "string",
-                    "example": "cashback"
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_platform_http.APIError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "details": {},
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_platform_http.JSONResponse": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         }
@@ -636,7 +1201,7 @@ const docTemplate = `{
             "in": "header"
         },
         "BearerAuth": {
-            "description": "Enter your JWT token as: Bearer \u003ctoken\u003e",
+            "description": "Enter your JWT token as: Bearer \u003ctoken\u003e (developer portal or ad portal)",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
@@ -651,7 +1216,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Skykin Platform API",
-	Description:      "Skykin SDK backend — handles developer authentication, application management, event ingestion, intent prediction, and real-time reward notifications.",
+	Description:      "Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK event ingestion, intent prediction, campaign ad delivery via WebSocket, and reward notifications.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

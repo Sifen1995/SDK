@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"skykin-platform/internal/common/websocket"
+	platformWS "skykin-platform/internal/platform/websocket"
 
 	"github.com/gin-gonic/gin"
 	gorilla "github.com/gorilla/websocket"
@@ -22,7 +22,7 @@ var upgrader = gorilla.Upgrader{
 	},
 }
 
-func RegisterRoutes(r *gin.RouterGroup, hub *websocket.Hub) {
+func RegisterRoutes(r *gin.RouterGroup, hub *platformWS.Hub) {
 	r.GET("/ws/rewards/:user_id", func(c *gin.Context) {
 		userID := c.Param("user_id")
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
