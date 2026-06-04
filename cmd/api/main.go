@@ -58,8 +58,9 @@ func main() {
 	log.Println("database migrations completed")
 
 	adRepo := advertiserInfra.NewRepository(db)
+	_ = adRepo.SeedRoles(context.Background())
 	if err := advertiserApp.NewAuthService(adRepo, cfg).EnsureOperatorAdmin(
-		context.Background(), cfg.AdminEmail, cfg.AdminPassword, "Operator Admin", "Skykin",
+		context.Background(), cfg.AdminEmail, cfg.AdminPassword, "Operator Admin", "",
 	); err != nil {
 		log.Printf("operator admin seed skipped: %v", err)
 	} else {

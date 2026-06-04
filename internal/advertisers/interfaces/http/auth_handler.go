@@ -32,12 +32,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
 		return
 	}
-	a, err := h.auth.Register(c.Request.Context(), req.Name, req.Email, req.Password, req.CompanyName, req.Role)
+	u, err := h.auth.Register(c.Request.Context(), req.Name, req.Email, req.Password, req.CompanyName, req.Role)
 	if err != nil {
 		platformHTTP.Error(c, http.StatusBadRequest, "registration failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"user": application.UserResponse(a)})
+	c.JSON(http.StatusCreated, gin.H{"user": application.UserResponse(u)})
 }
 
 // Login godoc
@@ -55,12 +55,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
 		return
 	}
-	token, a, err := h.auth.Login(c.Request.Context(), req.Email, req.Password)
+	token, u, err := h.auth.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		platformHTTP.Error(c, http.StatusUnauthorized, "login failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"token": token, "user": application.UserResponse(a)})
+	c.JSON(http.StatusOK, gin.H{"token": token, "user": application.UserResponse(u)})
 }
 
 // Me godoc
@@ -72,13 +72,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Failure      404  {object}  platformHTTP.APIError
 // @Router       /ad-portal/me [get]
 func (h *AuthHandler) Me(c *gin.Context) {
-	id, _ := c.Get("advertiser_id")
-	a, err := h.auth.Me(c.Request.Context(), id.(string))
+	id, _ := c.Get("portal_user_id")
+	u, err := h.auth.Me(c.Request.Context(), id.(string))
 	if err != nil {
 		platformHTTP.Error(c, http.StatusNotFound, "user not found", nil)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": application.UserResponse(a)})
+	c.JSON(http.StatusOK, gin.H{"user": application.UserResponse(u)})
 }
 
 // CreateUser godoc
@@ -97,10 +97,10 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
 		return
 	}
-	a, err := h.auth.CreateOperatorUser(c.Request.Context(), req.Name, req.Email, req.Password, req.Role, req.CompanyName)
+	u, err := h.auth.CreateOperatorUser(c.Request.Context(), req.Name, req.Email, req.Password, req.Role, req.CompanyName)
 	if err != nil {
 		platformHTTP.Error(c, http.StatusBadRequest, "create user failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"user": application.UserResponse(a)})
+	c.JSON(http.StatusCreated, gin.H{"user": application.UserResponse(u)})
 }

@@ -37,17 +37,23 @@ services:
       - DATABASE_URL=postgres://${DB_USER:-skykin_user}:${DB_PASSWORD:-password}@db:5432/${DB_NAME:-skykin_db}?sslmode=disable
       - DB_HOST=db
       - DB_PORT=5432
+      - DB_USER=${DB_USER:-skykin_user}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - DB_NAME=${DB_NAME:-skykin_db}
       - PORT=8081
       - ML_SERVICE_URL=http://ml-service:8000
+      - REDIS_ADDR=redis:6379
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-me}
     depends_on:
       - db
       - ml-service
+      - redis
     env_file:
       - .env
   redis:
     image: redis:7.2-alpine
     container_name: skykin-redis
-    command: redis-server --appendonly yes --requirepass your_secure_redis_password
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:

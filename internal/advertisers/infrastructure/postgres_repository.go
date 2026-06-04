@@ -16,28 +16,58 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) Create(ctx context.Context, a *model.Advertiser) error {
+func (r *Repository) GetRoleBySlug(ctx context.Context, slug string) (*model.Role, error) {
+	var role model.Role
+	if err := r.db.WithContext(ctx).Where("slug = ?", slug).First(&role).Error; err != nil {
+		return nil, err
+	}
+	return &role, nil
+}
+
+func (r *Repository) CreateAdvertiser(ctx context.Context, a *model.Advertiser) error {
 	return r.db.WithContext(ctx).Create(a).Error
 }
 
-func (r *Repository) GetByEmail(ctx context.Context, email string) (*model.Advertiser, error) {
-	var a model.Advertiser
-	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&a).Error; err != nil {
-		return nil, err
-	}
-	return &a, nil
+func (r *Repository) CreatePortalUser(ctx context.Context, u *model.PortalUser) error {
+	return r.db.WithContext(ctx).Create(u).Error
 }
 
-func (r *Repository) GetByID(ctx context.Context, id string) (*model.Advertiser, error) {
-	var a model.Advertiser
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&a).Error; err != nil {
+func (r *Repository) GetPortalUserByEmail(ctx context.Context, email string) (*model.PortalUser, error) {
+	var u model.PortalUser
+	err := r.db.WithContext(ctx).
+		Preload("Role").
+		Preload("Advertiser").
+		Where("email = ?", email).
+		First(&u).Error
+	if err != nil {
 		return nil, err
 	}
-	return &a, nil
+	return &u, nil
 }
 
-func (r *Repository) APIKeyExists(ctx context.Context, key string) (bool, error) {
-	var n int64
-	err := r.db.WithContext(ctx).Model(&model.Advertiser{}).Where("api_key = ?", key).Count(&n).Error
-	return n > 0, err
+func (r *Repository) GetPortalUserByID(ctx context.Context, id string) (*model.PortalUser, error) {
+	var u model.PortalUser
+	err := r.db.WithContext(ctx).
+		Preload("Role").
+		Preload("Advertiser").
+		Where("id = ?", id).
+		First(&u).Error
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *Repository) SeedRoles(ctx context.Context) error {
+	roles := []model.Role{
+		{Slug: "operator_admin", DisplayName: "Operator Admin"},
+		{Slug: "advertiser", DisplayName: "Advertiser"},
+		{Slug: "read_only_analyst", DisplayName: "Read-Only Analyst"},
+	}
+	for _, role := range roles {
+		if err := r.db.WithContext(ctx).Where("slug = ?", role.Slug).FirstOrCreate(&role).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

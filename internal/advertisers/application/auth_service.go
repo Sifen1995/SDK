@@ -2,8 +2,6 @@ package application
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -27,68 +25,47 @@ func NewAuthService(repo *infrastructure.Repository, cfg *configs.Config) *AuthS
 }
 
 type portalClaims struct {
+	PortalUserID string `json:"portal_user_id"`
 	AdvertiserID string `json:"advertiser_id"`
 	Role         string `json:"role"`
 	Email        string `json:"email"`
 	jwt.RegisteredClaims
 }
 
-func (s *AuthService) Register(ctx context.Context, contactName, email, password, company, role string) (*model.Advertiser, error) {
-	if role == "" {
-		role = domain.RoleAdvertiser
+func (s *AuthService) Register(ctx context.Context, name, email, password, company, roleSlug string) (*model.PortalUser, error) {
+	if roleSlug == "" {
+		roleSlug = domain.RoleAdvertiser
 	}
-	if role != domain.RoleAdvertiser && role != domain.RoleReadOnlyAnalyst {
+	if roleSlug != domain.RoleAdvertiser && roleSlug != domain.RoleReadOnlyAnalyst {
 		return nil, errors.New("registration only allowed for advertiser or read_only_analyst roles")
 	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-
-	apiKey, err := s.generateAPIKey(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	a := &model.Advertiser{
-		CompanyName:  company,
-		Email:        email,
-		PasswordHash: string(hash),
-		APIKey:       apiKey,
-		Role:         role,
-		ContactName:  contactName,
-		IsActive:     true,
-	}
-	if err := s.repo.Create(ctx, a); err != nil {
-		return nil, err
-	}
-	return a, nil
+	return s.createPortalUser(ctx, name, email, password, company, roleSlug)
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (string, *model.Advertiser, error) {
-	a, err := s.repo.GetByEmail(ctx, email)
+func (s *AuthService) Login(ctx context.Context, email, password string) (string, *model.PortalUser, error) {
+	u, err := s.repo.GetPortalUserByEmail(ctx, email)
 	if err != nil {
 		return "", nil, errors.New("invalid credentials")
 	}
-	if !a.IsActive {
+	if !u.IsActive {
 		return "", nil, errors.New("account is disabled")
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(a.PasswordHash), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
 		return "", nil, errors.New("invalid credentials")
 	}
-	token, err := s.signToken(a)
+	token, err := s.signToken(u)
 	if err != nil {
 		return "", nil, err
 	}
-	return token, a, nil
+	return token, u, nil
 }
 
-func (s *AuthService) signToken(a *model.Advertiser) (string, error) {
+func (s *AuthService) signToken(u *model.PortalUser) (string, error) {
 	claims := portalClaims{
-		AdvertiserID: a.ID,
-		Role:         a.Role,
-		Email:        a.Email,
+		PortalUserID: u.ID,
+		AdvertiserID: u.AccountAdvertiserID(),
+		Role:         u.RoleSlug(),
+		Email:        u.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -112,87 +89,99 @@ func ParsePortalToken(cfg *configs.Config, tokenStr string) (*portalClaims, erro
 	return claims, nil
 }
 
-func (s *AuthService) EnsureOperatorAdmin(ctx context.Context, email, password, contactName, company string) error {
-	_, err := s.repo.GetByEmail(ctx, email)
+func (s *AuthService) EnsureOperatorAdmin(ctx context.Context, email, password, name, company string) error {
+	_, err := s.repo.GetPortalUserByEmail(ctx, email)
 	if err == nil {
 		return nil
+	}
+	role, err := s.repo.GetRoleBySlug(ctx, domain.RoleOperatorAdmin)
+	if err != nil {
+		return err
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
-	apiKey, err := s.generateAPIKey(ctx)
-	if err != nil {
-		return err
-	}
-	return s.repo.Create(ctx, &model.Advertiser{
-		CompanyName:  company,
+	u := &model.PortalUser{
 		Email:        email,
 		PasswordHash: string(hash),
-		APIKey:       apiKey,
-		Role:         domain.RoleOperatorAdmin,
-		ContactName:  contactName,
+		Name:         name,
+		RoleID:       role.ID,
 		IsActive:     true,
-	})
-}
-
-func (s *AuthService) Me(ctx context.Context, userID string) (*model.Advertiser, error) {
-	return s.repo.GetByID(ctx, userID)
-}
-
-func UserResponse(a *model.Advertiser) map[string]any {
-	return map[string]any{
-		"id":            a.ID,
-		"company_name":  a.CompanyName,
-		"email":         a.Email,
-		"contact_name":  a.ContactName,
-		"role":          a.Role,
-		"api_key":       a.APIKey,
-		"is_active":     a.IsActive,
 	}
+	return s.repo.CreatePortalUser(ctx, u)
 }
 
-func (s *AuthService) CreateOperatorUser(ctx context.Context, contactName, email, password, role, company string) (*model.Advertiser, error) {
-	if role != domain.RoleAdvertiser && role != domain.RoleReadOnlyAnalyst && role != domain.RoleOperatorAdmin {
+func (s *AuthService) Me(ctx context.Context, portalUserID string) (*model.PortalUser, error) {
+	return s.repo.GetPortalUserByID(ctx, portalUserID)
+}
+
+func UserResponse(u *model.PortalUser) map[string]any {
+	resp := map[string]any{
+		"id":            u.ID,
+		"email":         u.Email,
+		"name":          u.Name,
+		"role":          u.RoleSlug(),
+		"role_id":       u.RoleID,
+		"advertiser_id": u.AccountAdvertiserID(),
+		"is_active":     u.IsActive,
+	}
+	if u.Advertiser != nil {
+		resp["company_name"] = u.Advertiser.CompanyName
+	}
+	return resp
+}
+
+func (s *AuthService) CreateOperatorUser(ctx context.Context, name, email, password, roleSlug, company string) (*model.PortalUser, error) {
+	if roleSlug != domain.RoleAdvertiser && roleSlug != domain.RoleReadOnlyAnalyst && roleSlug != domain.RoleOperatorAdmin {
+		return nil, fmt.Errorf("invalid role")
+	}
+	if roleSlug == domain.RoleOperatorAdmin {
+		role, err := s.repo.GetRoleBySlug(ctx, roleSlug)
+		if err != nil {
+			return nil, err
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, err
+		}
+		u := &model.PortalUser{
+			Email: email, PasswordHash: string(hash), Name: name, RoleID: role.ID, IsActive: true,
+		}
+		if err := s.repo.CreatePortalUser(ctx, u); err != nil {
+			return nil, err
+		}
+		return s.repo.GetPortalUserByID(ctx, u.ID)
+	}
+	return s.createPortalUser(ctx, name, email, password, company, roleSlug)
+}
+
+func (s *AuthService) createPortalUser(ctx context.Context, name, email, password, company, roleSlug string) (*model.PortalUser, error) {
+	if company == "" {
+		return nil, errors.New("company_name is required")
+	}
+	role, err := s.repo.GetRoleBySlug(ctx, roleSlug)
+	if err != nil {
 		return nil, fmt.Errorf("invalid role")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
-	apiKey, err := s.generateAPIKey(ctx)
-	if err != nil {
+	adv := &model.Advertiser{CompanyName: company}
+	if err := s.repo.CreateAdvertiser(ctx, adv); err != nil {
 		return nil, err
 	}
-	a := &model.Advertiser{
-		CompanyName:  company,
+	u := &model.PortalUser{
 		Email:        email,
 		PasswordHash: string(hash),
-		APIKey:       apiKey,
-		Role:         role,
-		ContactName:  contactName,
+		Name:         name,
+		RoleID:       role.ID,
+		AdvertiserID: &adv.ID,
 		IsActive:     true,
 	}
-	if err := s.repo.Create(ctx, a); err != nil {
+	if err := s.repo.CreatePortalUser(ctx, u); err != nil {
 		return nil, err
 	}
-	return a, nil
-}
-
-func (s *AuthService) generateAPIKey(ctx context.Context) (string, error) {
-	for i := 0; i < 5; i++ {
-		b := make([]byte, 32)
-		if _, err := rand.Read(b); err != nil {
-			return "", err
-		}
-		key := hex.EncodeToString(b)
-		exists, err := s.repo.APIKeyExists(ctx, key)
-		if err != nil {
-			return "", err
-		}
-		if !exists {
-			return key, nil
-		}
-	}
-	return "", errors.New("failed to generate unique api key")
+	return s.repo.GetPortalUserByID(ctx, u.ID)
 }

@@ -40,6 +40,9 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 	if !domain.CanWrite(role) {
 		return nil, errors.New("forbidden")
 	}
+	if strings.TrimSpace(advertiserID) == "" {
+		return nil, errors.New("account has no advertiser company; operator admins cannot create campaigns directly")
+	}
 	format, err := NormalizeCreativeFormat(in.CreativeFormat)
 	if err != nil {
 		return nil, err

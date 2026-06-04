@@ -31,6 +31,7 @@ func AdPortalAuthMiddleware(cfg *configs.Config) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		c.Set("portal_user_id", claims.PortalUserID)
 		c.Set("advertiser_id", claims.AdvertiserID)
 		c.Set("portal_role", claims.Role)
 		c.Set("portal_email", claims.Email)
@@ -77,4 +78,11 @@ func RequirePortalRead() gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// AccountAdvertiserID returns the company scope for campaign APIs (from JWT advertiser_id).
+func AccountAdvertiserID(c *gin.Context) string {
+	id, _ := c.Get("advertiser_id")
+	s, _ := id.(string)
+	return s
 }

@@ -32,9 +32,10 @@ This document is for **frontend (React/Next.js campaign portal)** and **Flutter/
 
 **Health check:** `GET {{baseUrl}}/ping` → `{ "status": "ok" }`
 
-**Run stack:**
+**Run stack (Docker only — do not run `make run` while this is up):**
 ```bash
-docker compose up --build
+make up
+# or: docker compose up -d --build
 ```
 Ensure `.env` includes `JWT_SECRET` (required for all JWT flows).
 
@@ -533,6 +534,7 @@ WebSocket URL: `ws://<host>:8081/api/v1/ws/rewards/$userId` — parse JSON by `t
 
 | Issue | Fix |
 |-------|-----|
+| `registration failed` + `null value in column "email" of relation "advertisers"` | Old DB schema: restart API after pull (runs schema align), or run `internal/platform/database/migrations/20260604120000_align_ad_portal_schema.sql` |
 | `401 login failed` | Check email/password; ensure `JWT_SECRET` is set |
 | `403 read-only access` | Analyst role cannot POST campaigns/creatives |
 | `activation failed` | Add a creative with `validation_status: passed` |

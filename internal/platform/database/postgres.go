@@ -58,15 +58,31 @@ func Migrate(db *gorm.DB) error {
 		&authmodel.Developer{},
 		&authmodel.Application{},
 		&authmodel.APIKey{},
+		&advertisermodel.Role{},
 		&advertisermodel.Advertiser{},
+		&advertisermodel.PortalUser{},
 		&campaignmodel.Campaign{},
 		&campaignmodel.DeliveryLog{},
 	); err != nil {
 		return err
 	}
 
+	alignAdPortalSchema(db)
+	seedPortalRoles(db)
 	seedRewardRules(db)
 	return nil
+}
+
+func seedPortalRoles(db *gorm.DB) {
+	roles := []advertisermodel.Role{
+		{Slug: "operator_admin", DisplayName: "Operator Admin"},
+		{Slug: "advertiser", DisplayName: "Advertiser"},
+		{Slug: "read_only_analyst", DisplayName: "Read-Only Analyst"},
+	}
+	for _, role := range roles {
+		db.Where("slug = ?", role.Slug).FirstOrCreate(&role)
+	}
+	log.Println("portal roles seeded")
 }
 
 func seedRewardRules(db *gorm.DB) {

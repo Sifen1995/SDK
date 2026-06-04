@@ -6,7 +6,7 @@ This document explains **why** the code is split into two modules and **how** da
 
 | Module | Responsibility | Database tables |
 |--------|----------------|-----------------|
-| **`internal/advertisers`** | Portal **identity**: register, login, JWT, roles, `api_key` | `advertisers` |
+| **`internal/advertisers`** | Portal **identity**: register, login, JWT; `roles` + `portal_users` + company `advertisers` | `roles`, `advertisers`, `portal_users` |
 | **`internal/campaigns`** | **Campaign CRUD**, validation, activation, ad matching, delivery logs, WebSocket push | `campaigns`, `campaign_delivery_logs` |
 
 HTTP routes are mounted together under `/api/v1/ad-portal` for convenience, but **packages stay separate** so frontend auth and campaign features can evolve independently.
@@ -29,7 +29,9 @@ Earlier MVP code lived only under `advertisers/` (including `portal_users`, `cre
 
 Run: `internal/platform/database/migrations/20260603120000_advertisers_campaigns.sql`
 
-- **`advertisers`** — company, email, password, `api_key`, plus portal fields `role`, `contact_name`, `is_active`
+- **`roles`** — `operator_admin`, `advertiser`, `read_only_analyst` (seeded)
+- **`advertisers`** — company record only (`company_name`); no password or API key
+- **`portal_users`** — email, password, `name`, `role_id` → `roles`, optional `advertiser_id` → company scope
 - **`campaigns`** — one row = one ad unit (creative fields embedded: `title`, `body_text`, `image_url`, `destination_url`, `canvas_json`, `creative_format`, budgets, `is_active`)
 - **`campaign_delivery_logs`** — `DISPATCHED`, `RENDERED`, `CLICKED`, `CONVERTED`
 
@@ -47,7 +49,7 @@ sequenceDiagram
     participant WS as WebSocket
 
     UI->>AD: POST /ad-portal/register
-    AD->>AD: INSERT advertisers (+ api_key)
+    AD->>AD: INSERT advertisers (company) + portal_users (role_id)
 
     UI->>AD: POST /ad-portal/login
     AD-->>UI: JWT (advertiser_id, role)
@@ -71,7 +73,8 @@ sequenceDiagram
 ### 1. Advertiser auth (`advertisers` module)
 
 - Register → row in **`advertisers`**
-- Login → JWT with `advertiser_id` + `role` (`advertiser`, `read_only_analyst`, `operator_admin`)
+- Login → JWT with `portal_user_id`, `advertiser_id` (company scope), `role` slug from `roles` table
+- SDK API keys remain in the **developer portal** (`/api/v1/portal`), not on advertisers
 - Roles enforced in middleware (`internal/platform/middleware/ad_portal_auth.go`) using `advertisers/domain/roles.go`
 
 ### 2. Campaign creation (`campaigns` module)

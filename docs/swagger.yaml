@@ -47,14 +47,11 @@ definitions:
     type: object
   internal_advertisers_interfaces_http.PortalUserDTO:
     properties:
-      api_key:
-        example: abc123...
+      advertiser_id:
+        example: 770e8400-e29b-41d4-a716-446655440002
         type: string
       company_name:
         example: Acme Inc
-        type: string
-      contact_name:
-        example: Jane Doe
         type: string
       email:
         example: advertiser@test.com
@@ -65,8 +62,14 @@ definitions:
       is_active:
         example: true
         type: boolean
+      name:
+        example: Jane Doe
+        type: string
       role:
         example: advertiser
+        type: string
+      role_id:
+        example: 660e8400-e29b-41d4-a716-446655440001
         type: string
     type: object
   internal_advertisers_interfaces_http.RegisterRequest:

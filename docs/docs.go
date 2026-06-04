@@ -694,17 +694,13 @@ const docTemplate = `{
         "internal_advertisers_interfaces_http.PortalUserDTO": {
             "type": "object",
             "properties": {
-                "api_key": {
+                "advertiser_id": {
                     "type": "string",
-                    "example": "abc123..."
+                    "example": "770e8400-e29b-41d4-a716-446655440002"
                 },
                 "company_name": {
                     "type": "string",
                     "example": "Acme Inc"
-                },
-                "contact_name": {
-                    "type": "string",
-                    "example": "Jane Doe"
                 },
                 "email": {
                     "type": "string",
@@ -718,9 +714,17 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
+                "name": {
+                    "type": "string",
+                    "example": "Jane Doe"
+                },
                 "role": {
                     "type": "string",
                     "example": "advertiser"
+                },
+                "role_id": {
+                    "type": "string",
+                    "example": "660e8400-e29b-41d4-a716-446655440001"
                 }
             }
         },

@@ -52,19 +52,30 @@ skykin-platform/
 - Docker & Docker Compose
 - PostgreSQL
 
-### Running Locally
+### Running with Docker (recommended — Option A)
 
-1. Setup your `.env` file at the root.
-2. Run the application:
+Use **only Docker** for the API on port **8081**. Do not run `make run` at the same time (port conflict).
+
+1. Copy/configure `.env` (must include `JWT_SECRET`).
+2. Start everything:
    ```bash
-   make run
+   make up
    ```
+3. Verify:
+   ```bash
+   make ping
+   make register-test
+   ```
+4. API base URL: **http://localhost:8081** (Swagger: `/swagger/index.html`)
 
-### Running with Docker
+Stop: `make down` — View logs: `make logs`
 
-Run all services (Database, Backend API, and ML Microservice) using docker-compose:
+### Running locally (optional)
+
+Only if Docker backend is stopped (`make down`):
+
 ```bash
-make docker-up
+make run
 ```
 
 ### API testing (Postman)
