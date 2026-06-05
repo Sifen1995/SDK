@@ -25,12 +25,10 @@ func NewCampaignService(repo *infrastructure.Repository) *CampaignService {
 type CreateCampaignInput struct {
 	Name           string
 	TargetIntent   string
-	ApplicationID  string
 	CreativeFormat string
 	Title          string
 	BodyText       string
 	ImageURL       string
-	DestinationURL string
 	CanvasJSON     map[string]any
 	DailyBudgetCap float64
 	TotalBudgetCap float64
@@ -56,12 +54,10 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 		AdvertiserID:   advertiserID,
 		Name:           in.Name,
 		TargetIntent:   in.TargetIntent,
-		ApplicationID:  strings.TrimSpace(in.ApplicationID),
 		CreativeFormat: format,
 		Title:          in.Title,
 		BodyText:       in.BodyText,
 		ImageURL:       in.ImageURL,
-		DestinationURL: in.DestinationURL,
 		CanvasJSON:     canvas,
 		DailyBudgetCap: in.DailyBudgetCap,
 		TotalBudgetCap: in.TotalBudgetCap,

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"skykin-platform/internal/events/domain"
+	intentdomain "skykin-platform/internal/intents/domain"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
 	intentModel "skykin-platform/internal/intents/model"
 	"skykin-platform/internal/platform/messaging"
@@ -49,7 +50,7 @@ type PredictIntentUseCase struct {
 	eventRepo  domain.EventRepository
 	userRepo   usersInfra.UserRepository
 	mlClient   *intentsInfra.MLClient
-	intentRepo intentsInfra.IntentRepository
+	intentRepo intentdomain.IntentRepository
 	rewardRepo rewardsInfra.RewardRepository
 	adDelivery *campaignApp.AdDeliveryService
 	redis      *platformredis.RedisClient
@@ -61,7 +62,7 @@ func NewPredictIntentUseCase(
 	eventRepo domain.EventRepository,
 	userRepo usersInfra.UserRepository,
 	mlClient *intentsInfra.MLClient,
-	intentRepo intentsInfra.IntentRepository,
+	intentRepo intentdomain.IntentRepository,
 	rewardRepo rewardsInfra.RewardRepository,
 	adDelivery *campaignApp.AdDeliveryService,
 	redisClient *platformredis.RedisClient,
@@ -251,22 +252,18 @@ func (uc *PredictIntentUseCase) deliverCampaignAd(ctx context.Context, externalU
 	if uc.adDelivery == nil || uc.bus == nil {
 		return
 	}
-	applicationID := ""
 	sessionID := ""
 	if len(history) > 0 {
-		latest := history[0]
-		applicationID = latest.ApplicationID
-		sessionID = latest.SessionID
+		sessionID = history[0].SessionID
 	}
-	ad, err := uc.adDelivery.BuildAdForIntent(ctx, intentName, applicationID)
+	ad, err := uc.adDelivery.BuildAdForIntent(ctx, intentName)
 	if err != nil {
-		uc.logger.Info("no campaign ad for intent", "user_id", externalUserID, "intent", intentName, "application_id", applicationID)
+		uc.logger.Info("no campaign ad for intent", "user_id", externalUserID, "intent", intentName)
 		return
 	}
 	payload := map[string]any{
 		"type":             ad.Type,
 		"intent":           ad.Intent,
-		"application_id":   ad.ApplicationID,
 		"campaign_id":      ad.CampaignID,
 		"campaign_name":    ad.CampaignName,
 		"creative_format":  ad.CreativeFormat,

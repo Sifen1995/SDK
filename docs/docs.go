@@ -88,7 +88,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "One campaign row includes targeting, budget caps, and creative fields per schema. Starts inactive until activated.",
+                "description": "One campaign row includes targeting, budget caps, and creative fields. Batch targeting matches users with stored intent predictions every 5 minutes. Starts inactive until activated.",
                 "consumes": [
                     "application/json"
                 ],
@@ -805,17 +805,11 @@ const docTemplate = `{
         "internal_campaigns_interfaces_http.CreateCampaignRequest": {
             "type": "object",
             "required": [
-                "application_id",
                 "creative_format",
-                "destination_url",
                 "name",
                 "target_intent"
             ],
             "properties": {
-                "application_id": {
-                    "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
-                },
                 "body_text": {
                     "type": "string",
                     "example": "Trade crypto with zero fees today"
@@ -832,10 +826,6 @@ const docTemplate = `{
                     "type": "number",
                     "example": 100
                 },
-                "destination_url": {
-                    "type": "string",
-                    "example": "https://example.com/offer"
-                },
                 "image_url": {
                     "type": "string",
                     "example": "https://cdn.example.com/banner.png"
@@ -846,7 +836,7 @@ const docTemplate = `{
                 },
                 "target_intent": {
                     "type": "string",
-                    "example": "crypto_interest"
+                    "example": "fashion_interest"
                 },
                 "title": {
                     "type": "string",
@@ -1061,9 +1051,6 @@ const docTemplate = `{
                 "advertiserID": {
                     "type": "string"
                 },
-                "applicationID": {
-                    "type": "string"
-                },
                 "bodyText": {
                     "type": "string"
                 },
@@ -1081,9 +1068,6 @@ const docTemplate = `{
                 },
                 "dailyBudgetCap": {
                     "type": "number"
-                },
-                "destinationURL": {
-                    "type": "string"
                 },
                 "id": {
                     "type": "string"

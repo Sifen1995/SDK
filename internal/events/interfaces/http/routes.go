@@ -22,8 +22,10 @@ type Module struct {
 }
 
 // NewModule constructs the events module with dependency injection.
-func NewModule(db *gorm.DB, cfg *configs.Config) *Module {
-	bus := messaging.NewBus()
+func NewModule(db *gorm.DB, cfg *configs.Config, bus *messaging.Bus) *Module {
+	if bus == nil {
+		bus = messaging.NewBus()
+	}
 
 	repo := eventsInfra.NewPostgresRepository(db)
 	userRepo := usersInfra.NewUserRepository(db)

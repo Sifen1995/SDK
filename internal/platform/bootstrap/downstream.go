@@ -8,6 +8,7 @@ import (
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignConsumers "skykin-platform/internal/campaigns/consumers"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	deliveryConsumers "skykin-platform/internal/delivery/consumers"
 	eventsInfra "skykin-platform/internal/events/infrastructure"
 	intentsApp "skykin-platform/internal/intents/application"
 	intentsConsumers "skykin-platform/internal/intents/consumers"
@@ -66,6 +67,7 @@ func RegisterDownstreamConsumers(db *gorm.DB, cfg *configs.Config, bus *messagin
 	intentsConsumers.NewPredictIntentConsumer(predictUC, redisClient).Register(bus)
 	wsConsumers.NewRewardCreatedConsumer(bus, hub).Register()
 	campaignConsumers.NewCampaignAdConsumer(hub).Register(bus)
+	deliveryConsumers.NewDispatchConsumer(db, adDelivery, hub).Register(bus)
 
 	return &Downstream{Predict: predictUC}
 }

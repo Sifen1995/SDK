@@ -6,6 +6,7 @@ import (
 	"skykin-platform/configs"
 	advertisermodel "skykin-platform/internal/advertisers/model"
 	campaignmodel "skykin-platform/internal/campaigns/model"
+	deliverymodel "skykin-platform/internal/delivery/model"
 	authmodel "skykin-platform/internal/auth/model"
 	eventpersistence "skykin-platform/internal/events/infrastructure/persistence"
 	intentmodel "skykin-platform/internal/intents/model"
@@ -63,6 +64,7 @@ func Migrate(db *gorm.DB) error {
 		&advertisermodel.PortalUser{},
 		&campaignmodel.Campaign{},
 		&campaignmodel.DeliveryLog{},
+		&deliverymodel.DeliveryJob{},
 	); err != nil {
 		return err
 	}

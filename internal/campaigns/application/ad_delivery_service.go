@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"skykin-platform/internal/campaigns/infrastructure"
 	"skykin-platform/internal/campaigns/model"
@@ -20,17 +19,15 @@ func NewAdDeliveryService(repo *infrastructure.Repository) *AdDeliveryService {
 type AdPayload struct {
 	Type           string         `json:"type"`
 	Intent         string         `json:"intent"`
-	ApplicationID  string         `json:"application_id"`
 	CampaignID     string         `json:"campaign_id"`
 	CampaignName   string         `json:"campaign_name"`
 	CreativeFormat string         `json:"creative_format"`
 	Content        map[string]any `json:"content"`
 }
 
-func (s *AdDeliveryService) BuildAdForIntent(ctx context.Context, intent, applicationID string) (*AdPayload, error) {
-	applicationID = strings.TrimSpace(applicationID)
+func (s *AdDeliveryService) BuildAdForIntent(ctx context.Context, intent string) (*AdPayload, error) {
 	for _, format := range []string{"BANNER", "SMS_PLUS", "PUSH_PLUS"} {
-		c, err := s.repo.FindActiveForIntent(ctx, intent, applicationID, format)
+		c, err := s.repo.FindActiveForIntent(ctx, intent, format)
 		if err != nil {
 			continue
 		}
@@ -41,7 +38,6 @@ func (s *AdDeliveryService) BuildAdForIntent(ctx context.Context, intent, applic
 		return &AdPayload{
 			Type:           "campaign_ad",
 			Intent:         intent,
-			ApplicationID:  c.ApplicationID,
 			CampaignID:     c.ID,
 			CampaignName:   c.Name,
 			CreativeFormat: c.CreativeFormat,

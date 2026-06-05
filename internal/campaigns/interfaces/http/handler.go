@@ -19,7 +19,7 @@ func NewHandler(svc *application.CampaignService) *Handler {
 
 // CreateCampaign godoc
 // @Summary      Create campaign with embedded creative
-// @Description  One campaign row includes targeting, budget caps, and creative fields per schema. Starts inactive until activated.
+// @Description  One campaign row includes targeting, budget caps, and creative fields. Batch targeting matches users with stored intent predictions every 5 minutes. Starts inactive until activated.
 // @Tags         Ad Portal - Campaigns
 // @Accept       json
 // @Produce      json
@@ -38,9 +38,9 @@ func (h *Handler) CreateCampaign(c *gin.Context) {
 	aid, _ := c.Get("advertiser_id")
 	role, _ := c.Get("portal_role")
 	camp, err := h.svc.Create(c.Request.Context(), aid.(string), role.(string), application.CreateCampaignInput{
-		Name: req.Name, TargetIntent: req.TargetIntent, ApplicationID: req.ApplicationID,
+		Name: req.Name, TargetIntent: req.TargetIntent,
 		CreativeFormat: req.CreativeFormat, Title: req.Title, BodyText: req.BodyText,
-		ImageURL: req.ImageURL, DestinationURL: req.DestinationURL, CanvasJSON: req.CanvasJSON,
+		ImageURL: req.ImageURL, CanvasJSON: req.CanvasJSON,
 		DailyBudgetCap: req.DailyBudgetCap, TotalBudgetCap: req.TotalBudgetCap,
 	})
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 	eventHTTP "skykin-platform/internal/events/interfaces/http"
 	intentHTTP "skykin-platform/internal/intents/interfaces/http"
 	"skykin-platform/internal/platform/bootstrap"
+	"skykin-platform/internal/platform/messaging"
 	platformMiddleware "skykin-platform/internal/platform/middleware"
 	platformWS "skykin-platform/internal/platform/websocket"
 	wsRoutes "skykin-platform/internal/websocket/routes"
@@ -20,7 +21,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS.Hub) {
+func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS.Hub, bus *messaging.Bus) {
 	r.Use(platformMiddleware.CORS())
 	r.Use(gin.Logger())
 	r.Use(platformMiddleware.GlobalRecovery())
@@ -35,7 +36,7 @@ func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS
 		cfg,
 	)
 
-	eventsModule := eventHTTP.NewModule(db, cfg)
+	eventsModule := eventHTTP.NewModule(db, cfg, bus)
 	downstream := bootstrap.RegisterDownstreamConsumers(db, cfg, eventsModule.Bus, hub)
 	intentHandler := intentHTTP.NewHandler(downstream.Predict)
 

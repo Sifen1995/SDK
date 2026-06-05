@@ -2,10 +2,7 @@ package application
 
 import (
 	"fmt"
-	"net/http"
-	"net/url"
 	"strings"
-	"time"
 
 	"skykin-platform/internal/campaigns/infrastructure"
 	"skykin-platform/internal/campaigns/model"
@@ -30,13 +27,6 @@ func NormalizeCreativeFormat(raw string) (string, error) {
 }
 
 func ValidateCampaign(c *model.Campaign) ValidationResult {
-	if strings.TrimSpace(c.DestinationURL) == "" {
-		return ValidationResult{Status: "failed", Notes: "destination_url is required"}
-	}
-	if !reachableURL(c.DestinationURL) {
-		return ValidationResult{Status: "warning", Notes: "destination_url is not reachable"}
-	}
-
 	switch c.CreativeFormat {
 	case "BANNER":
 		if strings.TrimSpace(c.ImageURL) == "" {
@@ -59,27 +49,6 @@ func ValidateCampaign(c *model.Campaign) ValidationResult {
 	}
 
 	return ValidationResult{Status: "passed"}
-}
-
-func reachableURL(raw string) bool {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return false
-	}
-	client := &http.Client{Timeout: 3 * time.Second}
-	req, err := http.NewRequest(http.MethodHead, raw, nil)
-	if err != nil {
-		return false
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		resp, err = client.Get(raw)
-		if err != nil {
-			return false
-		}
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode >= 200 && resp.StatusCode < 400
 }
 
 func ChannelLabel(format string) string {

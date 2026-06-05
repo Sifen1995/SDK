@@ -126,9 +126,6 @@ definitions:
     type: object
   internal_campaigns_interfaces_http.CreateCampaignRequest:
     properties:
-      application_id:
-        example: 550e8400-e29b-41d4-a716-446655440000
-        type: string
       body_text:
         example: Trade crypto with zero fees today
         type: string
@@ -141,9 +138,6 @@ definitions:
       daily_budget_cap:
         example: 100
         type: number
-      destination_url:
-        example: https://example.com/offer
-        type: string
       image_url:
         example: https://cdn.example.com/banner.png
         type: string
@@ -151,7 +145,7 @@ definitions:
         example: Crypto Promo
         type: string
       target_intent:
-        example: crypto_interest
+        example: fashion_interest
         type: string
       title:
         example: Save on fees
@@ -160,9 +154,7 @@ definitions:
         example: 1000
         type: number
     required:
-    - application_id
     - creative_format
-    - destination_url
     - name
     - target_intent
     type: object
@@ -315,8 +307,6 @@ definitions:
     properties:
       advertiserID:
         type: string
-      applicationID:
-        type: string
       bodyText:
         type: string
       canvasJSON:
@@ -329,8 +319,6 @@ definitions:
         type: string
       dailyBudgetCap:
         type: number
-      destinationURL:
-        type: string
       id:
         type: string
       imageURL:
@@ -458,7 +446,8 @@ paths:
       consumes:
       - application/json
       description: One campaign row includes targeting, budget caps, and creative
-        fields per schema. Starts inactive until activated.
+        fields. Batch targeting matches users with stored intent predictions every
+        5 minutes. Starts inactive until activated.
       parameters:
       - description: Campaign + creative
         in: body

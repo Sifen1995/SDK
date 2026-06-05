@@ -142,17 +142,21 @@ Requires: **advertiser** or **operator_admin**
 {
   "name": "Crypto Promo",
   "target_intent": "crypto_interest",
-  "channel": "banner",
-  "budget": 1000
+  "creative_format": "BANNER",
+  "title": "Save on fees",
+  "body_text": "Trade crypto with zero fees today",
+  "image_url": "https://cdn.example.com/banner.png",
+  "daily_budget_cap": 100,
+  "total_budget_cap": 1000
 }
 ```
 
 | Field | Values |
 |-------|--------|
 | `target_intent` | ML intent slug, e.g. `crypto_interest`, `fashion_interest`, `food_interest`, `gaming_interest`, `fintech_interest`, `education_interest`, `general_interest` |
-| `channel` | `banner` \| `sms_plus` \| `push` |
+| `creative_format` | `BANNER` \| `SMS_PLUS` \| `PUSH_PLUS` |
 
-**201:** Campaign object with `id`, `status: "draft"`, etc.
+**201:** Campaign object (`ID`, `IsActive: false`, `ValidationStatus`, embedded creative fields). No separate creatives API.
 
 #### List campaigns
 `GET {{baseUrl}}/api/v1/ad-portal/campaigns`
@@ -449,19 +453,108 @@ Render by `type`: `campaign_ad` → banner / SMS+ / push UI; `reward_earned` →
 ### A — Campaign portal (frontend dev)
 
 1. **Register** or **Login** → `adPortalToken` saved  
-2. **Create campaign** → `campaignId` saved (`target_intent: crypto_interest`, `channel: banner`)  
-3. **Create creative** (passed validation) → `creativeId` saved  
-4. **Activate campaign**  
-5. **Preview creative** (optional UI check)
+2. **Create campaign** (creative embedded in one request) → save `ID` from response as `campaignId`  
+3. **Activate campaign** (`validation_status` must be `passed`)  
+4. **Preview campaign** (optional UI check)
 
-### B — SDK + ad delivery (Flutter dev)
+**Create campaign body (no `application_id`):**
+```json
+{
+  "name": "Fashion Batch",
+  "target_intent": "fashion_interest",
+  "creative_format": "BANNER",
+  "title": "Style",
+  "body_text": "New looks",
+  "image_url": "https://via.placeholder.com/320x50",
+  "daily_budget_cap": 100,
+  "total_budget_cap": 500
+}
+```
+
+> **Note:** Campaign responses use GORM field names (`ID`, `TargetIntent`, `IsActive`). Use `ID` as `campaignId` in path variables.
+
+### B — SDK + real-time ad delivery (single user predict)
 
 1. **Developer Login** → `portalToken`  
 2. **Create application** → `publishableKey`, `secretKey`  
 3. Open **WebSocket** `ws://localhost:8081/api/v1/ws/rewards/{{userId}}`  
-4. **Ingest events** (3–5 crypto events, unique `event_id`s)  
-5. **Predict intent**  
+4. **Ingest events** (3–5 events in a matching domain, unique `event_id`s)  
+5. **Predict intent** for that `userId`  
 6. Confirm WebSocket receives `campaign_ad` (and optionally `reward_earned`)
+
+### C — Batch campaign targeting (periodic job)
+
+The backend runs a **targeting job** every **5 minutes** (plus once immediately on startup). It finds all users with a stored intent prediction matching an **active** campaign’s `target_intent` (confidence ≥ 0.70, last 24h) and delivers the ad to each user who has not already received that campaign.
+
+**Postman cannot observe the job directly** — verify via WebSocket + database.
+
+#### Step 1 — Ad portal: create and activate
+
+1. `POST /api/v1/ad-portal/register` or `login` → Bearer token  
+2. `POST /api/v1/ad-portal/campaigns` with `target_intent: "fashion_interest"` (see body above)  
+3. Copy response `ID` → `{{campaignId}}`  
+4. `POST /api/v1/ad-portal/campaigns/{{campaignId}}/activate`  
+   - Response should show `"IsActive": true`, `"ValidationStatus": "passed"`
+
+#### Step 2 — Seed intent predictions for multiple users
+
+Each matched user needs a row in `intents` (from SDK **predict** calls or direct SQL for local testing).
+
+**Option A — SDK predict (recommended):** For each test user (`user_abc_123`, `user_test_001`, …):
+
+1. Ingest fashion-related events (`domain: "fashion"` or similar) with unique `event_id`s  
+2. `POST /api/v1/intents/predict` with `{ "user_id": "user_abc_123" }`  
+3. Repeat for other users
+
+**Option B — SQL seed (pgAdmin / `docker exec`):**
+```sql
+INSERT INTO intents (user_id, intent_name, confidence, created_at)
+SELECT id, 'fashion_interest', 0.85, NOW()
+FROM users
+WHERE external_user_id IN ('user_abc_123', 'user_test_001', 'user_coffee_lover_99');
+```
+
+#### Step 3 — Connect WebSockets before the job runs
+
+Open one WebSocket per user **before** the targeting tick:
+
+`ws://localhost:8081/api/v1/ws/rewards/user_abc_123`  
+`ws://localhost:8081/api/v1/ws/rewards/user_test_001`  
+…
+
+If users are offline when the job runs, delivery rows are still created but logs show `notification skipped`.
+
+#### Step 4 — Trigger or wait for the job
+
+- **On API restart:** job runs immediately after consumers register  
+- **While running:** next tick every 5 minutes (`targeting job tick` in backend logs)
+
+Restart Docker to force an immediate run:
+```bash
+docker compose restart backend
+```
+
+#### Step 5 — Verify delivery
+
+**Database:**
+```sql
+SELECT user_id, campaign_id, created_at FROM delivery_jobs ORDER BY created_at DESC;
+```
+Expect one row per user per campaign (re-runs skip users already delivered).
+
+**WebSocket:** Each connected user should receive:
+```json
+{
+  "type": "campaign_ad",
+  "intent": "fashion_interest",
+  "campaign_id": "...",
+  "campaign_name": "Fashion Batch",
+  "creative_format": "BANNER",
+  "content": { "title": "...", "body_text": "...", "image_url": "..." }
+}
+```
+
+**Backend logs:** `[WS] user <external_user_id> is offline` means the job matched but no socket was open.
 
 ---
 

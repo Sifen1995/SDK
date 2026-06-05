@@ -12,12 +12,10 @@ type Campaign struct {
 	AdvertiserID   string         `gorm:"type:uuid;not null;index"`
 	Name           string         `gorm:"type:varchar(255);not null"`
 	TargetIntent   string         `gorm:"type:varchar(100);not null;index"`
-	ApplicationID  string         `gorm:"type:varchar(255);not null;index"`
 	CreativeFormat string         `gorm:"type:varchar(50);not null"`
 	Title          string         `gorm:"type:varchar(255)"`
 	BodyText       string         `gorm:"type:text"`
 	ImageURL       string         `gorm:"type:text"`
-	DestinationURL string         `gorm:"type:text;not null"`
 	CanvasJSON     datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'"`
 	DailyBudgetCap float64        `gorm:"type:numeric(12,2);not null;default:0"`
 	TotalBudgetCap float64        `gorm:"type:numeric(12,2);not null;default:0"`

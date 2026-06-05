@@ -4,12 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
+	"time"
+
 	"skykin-platform/configs"
 	_ "skykin-platform/docs"
 	advertiserApp "skykin-platform/internal/advertisers/application"
 	advertiserInfra "skykin-platform/internal/advertisers/infrastructure"
+	"skykin-platform/internal/platform/bootstrap"
 	"skykin-platform/internal/platform/database"
+	"skykin-platform/internal/platform/messaging"
 	"skykin-platform/internal/platform/route"
 	"skykin-platform/internal/platform/websocket"
 
@@ -67,8 +72,8 @@ func main() {
 		log.Printf("operator admin ready: %s", cfg.AdminEmail)
 	}
 
-	// Initialize the structural communication hub
 	hub := websocket.NewHub()
+	bus := messaging.NewBus()
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Ready to build!"})
@@ -76,7 +81,8 @@ func main() {
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	route.InitRouter(r, db, cfg, hub)
+	route.InitRouter(r, db, cfg, hub, bus)
+	bootstrap.StartTargetingJob(db, bus, slog.Default(), 5*time.Minute)
 
 	// Fire up the HTTP engine instance
 	serverAddress := fmt.Sprintf("0.0.0.0:%s", cfg.Port)

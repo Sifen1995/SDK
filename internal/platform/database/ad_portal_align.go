@@ -48,5 +48,7 @@ func alignAdPortalSchema(db *gorm.DB) {
 
 	// company_name NOT NULL (ignore if already set)
 	_ = db.Exec(`ALTER TABLE advertisers ALTER COLUMN company_name SET NOT NULL`).Error
+	_ = db.Exec(`ALTER TABLE campaigns DROP COLUMN IF EXISTS application_id`).Error
+	_ = db.Exec(`ALTER TABLE campaigns DROP COLUMN IF EXISTS destination_url`).Error
 	log.Println("ad portal schema aligned (advertisers = company only)")
 }

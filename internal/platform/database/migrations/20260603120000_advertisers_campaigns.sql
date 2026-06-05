@@ -51,7 +51,6 @@ CREATE TABLE campaigns (
     advertiser_id UUID NOT NULL REFERENCES advertisers(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     target_intent VARCHAR(100) NOT NULL,
-    application_id VARCHAR(255) NOT NULL,
     creative_format VARCHAR(50) NOT NULL,
     CONSTRAINT chk_campaign_creative_format CHECK (creative_format IN ('BANNER', 'PUSH_PLUS', 'SMS_PLUS')),
     title VARCHAR(255),
@@ -68,7 +67,7 @@ CREATE TABLE campaigns (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_campaigns_intent_app ON campaigns(target_intent, application_id) WHERE is_active = true;
+CREATE INDEX idx_campaigns_intent_active ON campaigns(target_intent) WHERE is_active = true;
 CREATE INDEX idx_campaigns_advertiser ON campaigns(advertiser_id);
 
 -- 5. DELIVERY LOGS

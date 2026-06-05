@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	campaigndomain "skykin-platform/internal/campaigns/domain"
 	"skykin-platform/internal/campaigns/model"
 
 	"gorm.io/gorm"
@@ -16,6 +17,17 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
+}
+
+var _ campaigndomain.CampaignRepository = (*Repository)(nil)
+
+func (r *Repository) ListActive(ctx context.Context) ([]model.Campaign, error) {
+	var list []model.Campaign
+	err := r.db.WithContext(ctx).
+		Where("is_active = ? AND validation_status = ?", true, "passed").
+		Order("created_at desc").
+		Find(&list).Error
+	return list, err
 }
 
 func (r *Repository) Create(ctx context.Context, c *model.Campaign) error {
@@ -46,14 +58,11 @@ func (r *Repository) Update(ctx context.Context, c *model.Campaign) error {
 	return r.db.WithContext(ctx).Save(c).Error
 }
 
-// FindActiveForIntent returns the newest active campaign matching intent, app, and format.
-func (r *Repository) FindActiveForIntent(ctx context.Context, targetIntent, applicationID, creativeFormat string) (*model.Campaign, error) {
+// FindActiveForIntent returns the newest active campaign matching intent and format.
+func (r *Repository) FindActiveForIntent(ctx context.Context, targetIntent, creativeFormat string) (*model.Campaign, error) {
 	var c model.Campaign
 	q := r.db.WithContext(ctx).
 		Where("target_intent = ? AND is_active = ? AND validation_status = ?", targetIntent, true, "passed")
-	if applicationID != "" {
-		q = q.Where("application_id = ?", applicationID)
-	}
 	if creativeFormat != "" {
 		q = q.Where("creative_format = ?", creativeFormat)
 	}
@@ -85,12 +94,11 @@ func CampaignAdContent(c *model.Campaign) (map[string]any, error) {
 		return nil, fmt.Errorf("canvas_json: %w", err)
 	}
 	content := map[string]any{
-		"title":            c.Title,
-		"body_text":        c.BodyText,
-		"image_url":        c.ImageURL,
-		"destination_url":  c.DestinationURL,
-		"creative_format":  c.CreativeFormat,
-		"canvas_json":      canvas,
+		"title":           c.Title,
+		"body_text":       c.BodyText,
+		"image_url":       c.ImageURL,
+		"creative_format": c.CreativeFormat,
+		"canvas_json":     canvas,
 	}
 	return content, nil
 }
