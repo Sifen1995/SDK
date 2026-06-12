@@ -3,8 +3,12 @@ package database
 import (
 	"fmt"
 	"log"
+	"time"
+
 	"skykin-platform/configs"
 	advertisermodel "skykin-platform/internal/advertisers/model"
+	audiencemodel "skykin-platform/internal/audience/model"
+	billingmodel "skykin-platform/internal/billing/model"
 	campaignmodel "skykin-platform/internal/campaigns/model"
 	deliverymodel "skykin-platform/internal/delivery/model"
 	authmodel "skykin-platform/internal/auth/model"
@@ -14,6 +18,7 @@ import (
 	usermodel "skykin-platform/internal/users/model"
 
 	gormpg "gorm.io/driver/postgres"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -65,6 +70,14 @@ func Migrate(db *gorm.DB) error {
 		&campaignmodel.Campaign{},
 		&campaignmodel.DeliveryLog{},
 		&deliverymodel.DeliveryJob{},
+		&billingmodel.Channel{},
+		&billingmodel.SubscriptionPlan{},
+		&billingmodel.AdvertiserSubscription{},
+		&billingmodel.BillingRate{},
+		&billingmodel.BillingEvent{},
+		&billingmodel.Invoice{},
+		&audiencemodel.AudienceSegment{},
+		&audiencemodel.SegmentPurchase{},
 	); err != nil {
 		return err
 	}
@@ -72,6 +85,9 @@ func Migrate(db *gorm.DB) error {
 	alignAdPortalSchema(db)
 	seedPortalRoles(db)
 	seedRewardRules(db)
+	seedBillingCatalog(db)
+	seedAudienceSegments(db)
+	backfillStarterSubscriptions(db)
 	return nil
 }
 
@@ -102,5 +118,93 @@ func seedRewardRules(db *gorm.DB) {
 		db.Where("intent_name = ?", rule.IntentName).FirstOrCreate(&rule)
 	}
 	log.Println("reward rules seeded")
+}
+
+// seedBillingCatalog ensures channels and subscription plans exist (idempotent).
+func seedBillingCatalog(db *gorm.DB) {
+	channels := []billingmodel.Channel{
+		{Code: "IN_APP_BANNER", Name: "In-App Banner", Description: "Banner ads shown inside host apps"},
+		{Code: "PUSH", Name: "Push Notification", Description: "Push notification delivery"},
+		{Code: "SMS_PLUS", Name: "SMS+", Description: "Rich SMS with image and CTA", IsPremium: true},
+		{Code: "NATIVE_FEED", Name: "Native Feed", Description: "Native in-feed ad units"},
+	}
+	for _, ch := range channels {
+		db.Where("code = ?", ch.Code).FirstOrCreate(&ch)
+	}
+
+	plans := []billingmodel.SubscriptionPlan{
+		{Name: "Starter", MonthlyFeeETB: 5000, MaxActiveCampaigns: 3, MaxDailyBudgetETB: 500, IncludedImpressions: 10000},
+		{Name: "Growth", MonthlyFeeETB: 15000, MaxActiveCampaigns: 10, MaxDailyBudgetETB: 2000, IncludedImpressions: 50000, SMSPlusEnabled: true, AudiencemartEnabled: true, CPCDiscountPct: 5},
+		{Name: "Enterprise", MonthlyFeeETB: 50000, MaxActiveCampaigns: 100, MaxDailyBudgetETB: 10000, IncludedImpressions: 200000, SMSPlusEnabled: true, AudiencemartEnabled: true, CPCDiscountPct: 15},
+	}
+	for _, p := range plans {
+		db.Where("name = ?", p.Name).FirstOrCreate(&p)
+	}
+	log.Println("billing catalog seeded")
+}
+
+// seedAudienceSegments inserts catalog Audiencemart cohorts (idempotent by name).
+func seedAudienceSegments(db *gorm.DB) {
+	now := time.Now().UTC()
+	segments := []audiencemodel.AudienceSegment{
+		{
+			Name: "Fashion Enthusiasts", Description: "Users showing strong fashion and lifestyle purchase intent",
+			TopIntentSignals: datatypes.JSON(`["fashion_interest"]`), ApproximateSize: 12500, EstimatedCPM: 4.50,
+			AvailableFrom: now, IsActive: true,
+		},
+		{
+			Name: "Crypto & Fintech", Description: "Users interested in crypto trading and fintech products",
+			TopIntentSignals: datatypes.JSON(`["crypto_interest","fintech_interest"]`), ApproximateSize: 8200, EstimatedCPM: 6.00,
+			AvailableFrom: now, IsActive: true,
+		},
+		{
+			Name: "Food & Dining", Description: "Food delivery and restaurant discovery intent",
+			TopIntentSignals: datatypes.JSON(`["food_interest"]`), ApproximateSize: 15000, EstimatedCPM: 3.25,
+			AvailableFrom: now, IsActive: true,
+		},
+		{
+			Name: "Mobile Gamers", Description: "Gaming and in-app engagement intent",
+			TopIntentSignals: datatypes.JSON(`["gaming_interest"]`), ApproximateSize: 21000, EstimatedCPM: 2.75,
+			AvailableFrom: now, IsActive: true,
+		},
+		{
+			Name: "Lifelong Learners", Description: "Education and upskilling intent",
+			TopIntentSignals: datatypes.JSON(`["education_interest"]`), ApproximateSize: 9800, EstimatedCPM: 3.80,
+			AvailableFrom: now, IsActive: true,
+		},
+		{
+			Name: "Broad Reach", Description: "General engagement across mixed verticals",
+			TopIntentSignals: datatypes.JSON(`["general_interest","fashion_interest","food_interest"]`), ApproximateSize: 45000, EstimatedCPM: 1.50,
+			AvailableFrom: now, IsActive: true,
+		},
+	}
+	for _, seg := range segments {
+		db.Where("name = ?", seg.Name).FirstOrCreate(&seg)
+	}
+	log.Println("audience segments seeded")
+}
+
+// backfillStarterSubscriptions assigns Starter to advertisers created before billing went live.
+func backfillStarterSubscriptions(db *gorm.DB) {
+	var advertisers []struct{ ID string }
+	db.Table("advertisers").Select("id").Scan(&advertisers)
+	var starter billingmodel.SubscriptionPlan
+	if err := db.Where("name = ?", "Starter").First(&starter).Error; err != nil {
+		return
+	}
+	now := time.Now().UTC()
+	end := now.AddDate(0, 1, 0)
+	for _, a := range advertisers {
+		var count int64
+		db.Model(&billingmodel.AdvertiserSubscription{}).Where("advertiser_id = ?", a.ID).Count(&count)
+		if count > 0 {
+			continue
+		}
+		db.Create(&billingmodel.AdvertiserSubscription{
+			AdvertiserID: a.ID, PlanID: starter.ID, Status: "active",
+			CurrentPeriodStart: now, CurrentPeriodEnd: end,
+		})
+	}
+	log.Println("starter subscriptions backfilled")
 }
 

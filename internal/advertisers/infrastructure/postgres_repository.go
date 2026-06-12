@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 
 	"skykin-platform/internal/advertisers/model"
 
@@ -70,4 +71,34 @@ func (r *Repository) SeedRoles(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// CreateAdvertiserAndPortalUser creates or finds an advertiser by company name
+// and creates the given portal user within a single DB transaction. This
+// prevents orphaned advertisers when user creation fails and avoids creating
+// duplicate advertiser rows for the same company name.
+func (r *Repository) CreateAdvertiserAndPortalUser(ctx context.Context, adv *model.Advertiser, u *model.PortalUser) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing model.Advertiser
+		if err := tx.Where("company_name = ?", adv.CompanyName).First(&existing).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				// create new advertiser
+				if err := tx.Create(adv).Error; err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		} else {
+			// reuse existing advertiser id
+			adv.ID = existing.ID
+		}
+
+		// ensure portal user references advertiser id
+		u.AdvertiserID = &adv.ID
+		if err := tx.Create(u).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }

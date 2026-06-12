@@ -5,6 +5,11 @@ import (
 	advertiserApp "skykin-platform/internal/advertisers/application"
 	advertiserHTTP "skykin-platform/internal/advertisers/interfaces/http"
 	advertiserInfra "skykin-platform/internal/advertisers/infrastructure"
+	audienceApp "skykin-platform/internal/audience/application"
+	audienceHTTP "skykin-platform/internal/audience/interfaces/http"
+	audienceInfra "skykin-platform/internal/audience/infrastructure"
+	billingApp "skykin-platform/internal/billing/application"
+	billingInfra "skykin-platform/internal/billing/infrastructure"
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignHTTP "skykin-platform/internal/campaigns/interfaces/http"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
@@ -30,9 +35,21 @@ func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS
 
 	adRepo := advertiserInfra.NewRepository(db)
 	campaignRepo := campaignInfra.NewRepository(db)
+	subRepo := billingInfra.NewSubscriptionRepository(db)
+	channelRepo := billingInfra.NewChannelRepository(db)
+	segmentRepo := audienceInfra.NewSegmentRepository(db)
+
+	subEnforcer := billingApp.NewSubscriptionEnforcer(subRepo, channelRepo, campaignRepo)
+	audiencePurchases := audienceApp.NewPurchaseService(segmentRepo)
+	audienceList := audienceApp.NewListService(segmentRepo, subRepo)
+	starterSubs := billingApp.NewStarterSubscriptionService(subRepo)
+
+	campaignSvc := campaignApp.NewCampaignService(campaignRepo, subEnforcer, audiencePurchases, channelRepo)
+
 	advertiserHTTP.RegisterRoutes(r,
-		advertiserHTTP.NewAuthHandler(advertiserApp.NewAuthService(adRepo, cfg)),
-		campaignHTTP.NewHandler(campaignApp.NewCampaignService(campaignRepo)),
+		advertiserHTTP.NewAuthHandler(advertiserApp.NewAuthService(adRepo, cfg, starterSubs)),
+		campaignHTTP.NewHandler(campaignSvc),
+		audienceHTTP.NewHandler(audienceList),
 		cfg,
 	)
 

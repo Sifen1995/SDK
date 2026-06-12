@@ -262,12 +262,13 @@ func (uc *PredictIntentUseCase) deliverCampaignAd(ctx context.Context, externalU
 		return
 	}
 	payload := map[string]any{
-		"type":             ad.Type,
-		"intent":           ad.Intent,
-		"campaign_id":      ad.CampaignID,
-		"campaign_name":    ad.CampaignName,
-		"creative_format":  ad.CreativeFormat,
-		"content":          ad.Content,
+		"type":            ad.Type,
+		"intent":          ad.Intent,
+		"campaign_id":     ad.CampaignID,
+		"campaign_name":   ad.CampaignName,
+		"channel_code":    ad.ChannelCode,
+		"creative_format": ad.ChannelCode,
+		"content":         ad.Content,
 	}
 	uc.bus.Publish(messaging.Event{
 		Name: campaignEvents.TopicCampaignAdDelivered,
@@ -284,7 +285,7 @@ func (uc *PredictIntentUseCase) deliverCampaignAd(ctx context.Context, externalU
 		sessionID = "unknown"
 	}
 	_ = uc.adDelivery.LogDispatched(ctx, ad.CampaignID, internalUserID, sessionID)
-	uc.logger.Info("campaign ad queued", "user_id", externalUserID, "intent", intentName, "format", ad.CreativeFormat)
+	uc.logger.Info("campaign ad queued", "user_id", externalUserID, "intent", intentName, "channel", ad.ChannelCode)
 }
 
 func reverse(input []domain.Event) []domain.Event {

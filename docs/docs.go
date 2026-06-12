@@ -59,6 +59,37 @@ const docTemplate = `{
                 }
             }
         },
+        "/ad-portal/audience/segments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns Audiencemart catalog filtered by the advertiser subscription plan. Starter plan returns an empty list with audiencemart_enabled=false.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Audience"
+                ],
+                "summary": "List purchasable audience segments",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_audience_application.ListSegmentsResult"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/campaigns": {
             "get": {
                 "security": [
@@ -88,7 +119,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "One campaign row includes targeting, budget caps, and creative fields. Batch targeting matches users with stored intent predictions every 5 minutes. Starts inactive until activated.",
+                "description": "Validates subscription plan limits, channel tier, and optional Audiencemart segment purchase. Starts inactive until activated.",
                 "consumes": [
                     "application/json"
                 ],
@@ -805,46 +836,78 @@ const docTemplate = `{
         "internal_campaigns_interfaces_http.CreateCampaignRequest": {
             "type": "object",
             "required": [
-                "creative_format",
+                "billing_model",
+                "body_text",
+                "channel_id",
+                "daily_budget_cap",
+                "destination_url",
+                "frequency_cap_per_day",
                 "name",
-                "target_intent"
+                "target_intent",
+                "total_budget_cap"
             ],
             "properties": {
-                "body_text": {
+                "billing_model": {
+                    "description": "Financial \u0026 Operational Controls",
                     "type": "string",
-                    "example": "Trade crypto with zero fees today"
+                    "enum": [
+                        "CPM",
+                        "CPC",
+                        "CPI",
+                        "CPA",
+                        "REV_SHARE"
+                    ]
+                },
+                "body_text": {
+                    "type": "string"
                 },
                 "canvas_json": {
+                    "description": "CanvasJSON takes raw interactive layout maps from the SMS+ builder UI",
                     "type": "object",
                     "additionalProperties": true
                 },
-                "creative_format": {
-                    "type": "string",
-                    "example": "BANNER"
+                "channel_id": {
+                    "type": "string"
                 },
                 "daily_budget_cap": {
-                    "type": "number",
-                    "example": 100
+                    "type": "number"
+                },
+                "destination_url": {
+                    "type": "string"
+                },
+                "frequency_cap_per_day": {
+                    "type": "integer",
+                    "minimum": 1
                 },
                 "image_url": {
-                    "type": "string",
-                    "example": "https://cdn.example.com/banner.png"
+                    "type": "string"
                 },
                 "name": {
                     "type": "string",
-                    "example": "Crypto Promo"
+                    "maxLength": 255,
+                    "minLength": 3
+                },
+                "scheduled_end_at": {
+                    "type": "string"
+                },
+                "scheduled_start_at": {
+                    "description": "Scheduling Options (RFC3339 formatted strings)",
+                    "type": "string"
+                },
+                "segment_id": {
+                    "description": "SegmentID is optional (nil means target by intent only via the free tier)",
+                    "type": "string"
                 },
                 "target_intent": {
-                    "type": "string",
-                    "example": "fashion_interest"
+                    "type": "string"
                 },
                 "title": {
+                    "description": "Creative Asset Payloads",
                     "type": "string",
-                    "example": "Save on fees"
+                    "maxLength": 255
                 },
                 "total_budget_cap": {
-                    "type": "number",
-                    "example": 1000
+                    "type": "number"
                 }
             }
         },
@@ -973,6 +1036,56 @@ const docTemplate = `{
                 }
             }
         },
+        "skykin-platform_internal_audience_application.ListSegmentsResult": {
+            "type": "object",
+            "properties": {
+                "audiencemart_enabled": {
+                    "type": "boolean"
+                },
+                "plan_name": {
+                    "type": "string"
+                },
+                "segments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_audience_application.SegmentDTO"
+                    }
+                }
+            }
+        },
+        "skykin-platform_internal_audience_application.SegmentDTO": {
+            "type": "object",
+            "properties": {
+                "approximate_size": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "estimated_cpm": {
+                    "type": "number"
+                },
+                "estimated_price_etb": {
+                    "description": "MVP: estimated_cpm × impression bundle / 1000",
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "purchasable": {
+                    "type": "boolean"
+                },
+                "top_intent_signals": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "skykin-platform_internal_auth_dto.ApplicationCreateRequest": {
             "type": "object",
             "required": [
@@ -1051,8 +1164,14 @@ const docTemplate = `{
                 "advertiserID": {
                     "type": "string"
                 },
+                "billingModel": {
+                    "type": "string"
+                },
                 "bodyText": {
                     "type": "string"
+                },
+                "budgetSpent": {
+                    "type": "number"
                 },
                 "canvasJSON": {
                     "type": "array",
@@ -1060,14 +1179,21 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
-                "createdAt": {
+                "channelID": {
+                    "description": "ChannelID references channels.id (IN_APP_BANNER, PUSH, SMS_PLUS, …).",
                     "type": "string"
                 },
-                "creativeFormat": {
+                "createdAt": {
                     "type": "string"
                 },
                 "dailyBudgetCap": {
                     "type": "number"
+                },
+                "destinationURL": {
+                    "type": "string"
+                },
+                "frequencyCapPerDay": {
+                    "type": "integer"
                 },
                 "id": {
                     "type": "string"
@@ -1079,6 +1205,16 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "scheduledEndAt": {
+                    "type": "string"
+                },
+                "scheduledStartAt": {
+                    "type": "string"
+                },
+                "segmentID": {
+                    "description": "SegmentID is optional; nil = free intent-only targeting via the targeting job.",
                     "type": "string"
                 },
                 "targetIntent": {

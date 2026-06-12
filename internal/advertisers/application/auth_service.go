@@ -15,13 +15,19 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type AuthService struct {
-	repo *infrastructure.Repository
-	cfg  *configs.Config
+// StarterAssigner assigns a default subscription plan to new advertiser companies.
+type StarterAssigner interface {
+	AssignStarter(ctx context.Context, advertiserID string) error
 }
 
-func NewAuthService(repo *infrastructure.Repository, cfg *configs.Config) *AuthService {
-	return &AuthService{repo: repo, cfg: cfg}
+type AuthService struct {
+	repo    *infrastructure.Repository
+	cfg     *configs.Config
+	starter StarterAssigner
+}
+
+func NewAuthService(repo *infrastructure.Repository, cfg *configs.Config, starter StarterAssigner) *AuthService {
+	return &AuthService{repo: repo, cfg: cfg, starter: starter}
 }
 
 type portalClaims struct {
@@ -169,19 +175,23 @@ func (s *AuthService) createPortalUser(ctx context.Context, name, email, passwor
 		return nil, err
 	}
 	adv := &model.Advertiser{CompanyName: company}
-	if err := s.repo.CreateAdvertiser(ctx, adv); err != nil {
-		return nil, err
-	}
 	u := &model.PortalUser{
 		Email:        email,
 		PasswordHash: string(hash),
 		Name:         name,
 		RoleID:       role.ID,
-		AdvertiserID: &adv.ID,
 		IsActive:     true,
 	}
-	if err := s.repo.CreatePortalUser(ctx, u); err != nil {
+
+	// Create advertiser (or reuse existing by company name) and portal user
+	// inside a single DB transaction to avoid orphaned advertisers and
+	// duplicate advertiser rows.
+	if err := s.repo.CreateAdvertiserAndPortalUser(ctx, adv, u); err != nil {
 		return nil, err
+	}
+	// Assign Starter plan so campaign creation passes subscription gate on first login.
+	if s.starter != nil && adv.ID != "" {
+		_ = s.starter.AssignStarter(ctx, adv.ID)
 	}
 	return s.repo.GetPortalUserByID(ctx, u.ID)
 }

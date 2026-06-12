@@ -64,7 +64,7 @@ func main() {
 
 	adRepo := advertiserInfra.NewRepository(db)
 	_ = adRepo.SeedRoles(context.Background())
-	if err := advertiserApp.NewAuthService(adRepo, cfg).EnsureOperatorAdmin(
+	if err := advertiserApp.NewAuthService(adRepo, cfg, nil).EnsureOperatorAdmin(
 		context.Background(), cfg.AdminEmail, cfg.AdminPassword, "Operator Admin", "",
 	); err != nil {
 		log.Printf("operator admin seed skipped: %v", err)

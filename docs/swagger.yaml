@@ -126,37 +126,64 @@ definitions:
     type: object
   internal_campaigns_interfaces_http.CreateCampaignRequest:
     properties:
+      billing_model:
+        description: Financial & Operational Controls
+        enum:
+        - CPM
+        - CPC
+        - CPI
+        - CPA
+        - REV_SHARE
+        type: string
       body_text:
-        example: Trade crypto with zero fees today
         type: string
       canvas_json:
         additionalProperties: true
+        description: CanvasJSON takes raw interactive layout maps from the SMS+ builder
+          UI
         type: object
-      creative_format:
-        example: BANNER
+      channel_id:
         type: string
       daily_budget_cap:
-        example: 100
         type: number
+      destination_url:
+        type: string
+      frequency_cap_per_day:
+        minimum: 1
+        type: integer
       image_url:
-        example: https://cdn.example.com/banner.png
         type: string
       name:
-        example: Crypto Promo
+        maxLength: 255
+        minLength: 3
+        type: string
+      scheduled_end_at:
+        type: string
+      scheduled_start_at:
+        description: Scheduling Options (RFC3339 formatted strings)
+        type: string
+      segment_id:
+        description: SegmentID is optional (nil means target by intent only via the
+          free tier)
         type: string
       target_intent:
-        example: fashion_interest
         type: string
       title:
-        example: Save on fees
+        description: Creative Asset Payloads
+        maxLength: 255
         type: string
       total_budget_cap:
-        example: 1000
         type: number
     required:
-    - creative_format
+    - billing_model
+    - body_text
+    - channel_id
+    - daily_budget_cap
+    - destination_url
+    - frequency_cap_per_day
     - name
     - target_intent
+    - total_budget_cap
     type: object
   internal_events_interfaces_http.EventIngestResultDTO:
     properties:
@@ -249,6 +276,39 @@ definitions:
     required:
     - user_id
     type: object
+  skykin-platform_internal_audience_application.ListSegmentsResult:
+    properties:
+      audiencemart_enabled:
+        type: boolean
+      plan_name:
+        type: string
+      segments:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_audience_application.SegmentDTO'
+        type: array
+    type: object
+  skykin-platform_internal_audience_application.SegmentDTO:
+    properties:
+      approximate_size:
+        type: integer
+      description:
+        type: string
+      estimated_cpm:
+        type: number
+      estimated_price_etb:
+        description: 'MVP: estimated_cpm × impression bundle / 1000'
+        type: number
+      id:
+        type: string
+      name:
+        type: string
+      purchasable:
+        type: boolean
+      top_intent_signals:
+        items:
+          type: string
+        type: array
+    type: object
   skykin-platform_internal_auth_dto.ApplicationCreateRequest:
     properties:
       app_name:
@@ -307,18 +367,28 @@ definitions:
     properties:
       advertiserID:
         type: string
+      billingModel:
+        type: string
       bodyText:
         type: string
+      budgetSpent:
+        type: number
       canvasJSON:
         items:
           type: integer
         type: array
-      createdAt:
+      channelID:
+        description: ChannelID references channels.id (IN_APP_BANNER, PUSH, SMS_PLUS,
+          …).
         type: string
-      creativeFormat:
+      createdAt:
         type: string
       dailyBudgetCap:
         type: number
+      destinationURL:
+        type: string
+      frequencyCapPerDay:
+        type: integer
       id:
         type: string
       imageURL:
@@ -326,6 +396,14 @@ definitions:
       isActive:
         type: boolean
       name:
+        type: string
+      scheduledEndAt:
+        type: string
+      scheduledStartAt:
+        type: string
+      segmentID:
+        description: SegmentID is optional; nil = free intent-only targeting via the
+          targeting job.
         type: string
       targetIntent:
         type: string
@@ -428,6 +506,26 @@ paths:
       summary: Create portal user (operator admin)
       tags:
       - Ad Portal - Admin
+  /ad-portal/audience/segments:
+    get:
+      description: Returns Audiencemart catalog filtered by the advertiser subscription
+        plan. Starter plan returns an empty list with audiencemart_enabled=false.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_audience_application.ListSegmentsResult'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: List purchasable audience segments
+      tags:
+      - Ad Portal - Audience
   /ad-portal/campaigns:
     get:
       produces:
@@ -445,9 +543,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: One campaign row includes targeting, budget caps, and creative
-        fields. Batch targeting matches users with stored intent predictions every
-        5 minutes. Starts inactive until activated.
+      description: Validates subscription plan limits, channel tier, and optional
+        Audiencemart segment purchase. Starts inactive until activated.
       parameters:
       - description: Campaign + creative
         in: body

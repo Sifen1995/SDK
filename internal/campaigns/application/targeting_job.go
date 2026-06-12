@@ -3,9 +3,12 @@ package application
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
+	audienceapp "skykin-platform/internal/audience/application"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
+	billingdomain "skykin-platform/internal/billing/domain"
 	"skykin-platform/internal/campaigns/model"
 	deliverydomain "skykin-platform/internal/delivery/domain"
 	intentdomain "skykin-platform/internal/intents/domain"
@@ -16,7 +19,6 @@ import (
 
 const (
 	eventCampaignMatched   = "CampaignMatched"
-	defaultFrequencyCap    = 3
 	defaultMinConfidence   = 0.70
 	intentLookbackDuration = 24 * time.Hour
 )
@@ -25,6 +27,8 @@ type TargetingJob struct {
 	campaignRepo campaigndomain.CampaignRepository
 	intentRepo   intentdomain.IntentRepository
 	deliveryRepo deliverydomain.DeliveryRepository
+	channels     billingdomain.ChannelRepository
+	segmentMatch *audienceapp.TargetingResolver
 	bus          *messaging.Bus
 	logger       *slog.Logger
 }
@@ -33,6 +37,8 @@ func NewTargetingJob(
 	campaignRepo campaigndomain.CampaignRepository,
 	intentRepo intentdomain.IntentRepository,
 	deliveryRepo deliverydomain.DeliveryRepository,
+	channels billingdomain.ChannelRepository,
+	segmentMatch *audienceapp.TargetingResolver,
 	bus *messaging.Bus,
 	logger *slog.Logger,
 ) *TargetingJob {
@@ -40,6 +46,8 @@ func NewTargetingJob(
 		campaignRepo: campaignRepo,
 		intentRepo:   intentRepo,
 		deliveryRepo: deliveryRepo,
+		channels:     channels,
+		segmentMatch: segmentMatch,
 		bus:          bus,
 		logger:       logger,
 	}
@@ -58,22 +66,49 @@ func (j *TargetingJob) Run(ctx context.Context) {
 }
 
 func (j *TargetingJob) matchCampaign(ctx context.Context, campaign *model.Campaign, since time.Time) {
-	userIDs, err := j.intentRepo.FindUsersWithIntent(ctx, campaign.TargetIntent, defaultMinConfidence, since)
+	if !j.isWithinSchedule(campaign, time.Now().UTC()) {
+		return
+	}
+
+	userIDs, err := j.segmentMatch.ResolveUserIDs(ctx, campaign, j.intentRepo, defaultMinConfidence, since)
 	if err != nil {
-		j.logger.Error("find users with intent failed", "campaign_id", campaign.ID, "error", err)
+		j.logger.Error("resolve targeting users failed", "campaign_id", campaign.ID, "error", err)
 		return
 	}
 	campaignID, err := uuid.Parse(campaign.ID)
 	if err != nil {
 		return
 	}
-	cap := defaultFrequencyCap
+	cap := campaign.FrequencyCapPerDay
+	if cap <= 0 {
+		cap = 3
+	}
+	channelCode := j.resolveChannelCode(ctx, campaign.ChannelID)
 	for _, userID := range userIDs {
-		j.tryMatchUser(ctx, userID, campaignID, campaign, cap)
+		j.tryMatchUser(ctx, userID, campaignID, campaign, cap, channelCode)
 	}
 }
 
-func (j *TargetingJob) tryMatchUser(ctx context.Context, userID, campaignID uuid.UUID, campaign *model.Campaign, cap int) {
+// isWithinSchedule skips campaigns outside their scheduled window (nil bounds = no limit).
+func (j *TargetingJob) isWithinSchedule(c *model.Campaign, now time.Time) bool {
+	if c.ScheduledStartAt != nil && now.Before(*c.ScheduledStartAt) {
+		return false
+	}
+	if c.ScheduledEndAt != nil && now.After(*c.ScheduledEndAt) {
+		return false
+	}
+	return true
+}
+
+func (j *TargetingJob) resolveChannelCode(ctx context.Context, channelID string) string {
+	ch, err := j.channels.GetByID(ctx, channelID)
+	if err != nil {
+		return "banner"
+	}
+	return channelCodeForBus(ch.Code)
+}
+
+func (j *TargetingJob) tryMatchUser(ctx context.Context, userID, campaignID uuid.UUID, campaign *model.Campaign, cap int, channel string) {
 	delivered, err := j.deliveryRepo.WasDelivered(ctx, userID, campaignID)
 	if err != nil || delivered {
 		return
@@ -89,18 +124,20 @@ func (j *TargetingJob) tryMatchUser(ctx context.Context, userID, campaignID uuid
 			"user_id":     userID,
 			"campaign_id": campaignID,
 			"creative_id": campaign.ID,
-			"channel":     channelForFormat(campaign.CreativeFormat),
+			"channel":     channel,
 			"intent":      campaign.TargetIntent,
 		},
 	})
 }
 
-func channelForFormat(format string) string {
-	switch format {
+func channelCodeForBus(code string) string {
+	switch strings.ToUpper(code) {
 	case "SMS_PLUS":
 		return "sms_plus"
-	case "PUSH_PLUS":
+	case "PUSH":
 		return "push"
+	case "NATIVE_FEED":
+		return "native_feed"
 	default:
 		return "banner"
 	}

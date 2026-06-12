@@ -7,97 +7,149 @@ import (
 	"strings"
 	"time"
 
-	"skykin-platform/internal/advertisers/domain"
+	advertiserdomain "skykin-platform/internal/advertisers/domain"
+	audienceapp "skykin-platform/internal/audience/application"
+	billingapp "skykin-platform/internal/billing/application"
+	billingdomain "skykin-platform/internal/billing/domain"
 	"skykin-platform/internal/campaigns/infrastructure"
 	"skykin-platform/internal/campaigns/model"
 
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
+// CampaignService orchestrates campaign CRUD with subscription and audience checks.
 type CampaignService struct {
-	repo *infrastructure.Repository
+	repo         *infrastructure.Repository
+	subscriptions *billingapp.SubscriptionEnforcer
+	audience     *audienceapp.PurchaseService
+	channels     billingdomain.ChannelRepository
 }
 
-func NewCampaignService(repo *infrastructure.Repository) *CampaignService {
-	return &CampaignService{repo: repo}
+func NewCampaignService(
+	repo *infrastructure.Repository,
+	subscriptions *billingapp.SubscriptionEnforcer,
+	audience *audienceapp.PurchaseService,
+	channels billingdomain.ChannelRepository,
+) *CampaignService {
+	return &CampaignService{
+		repo:          repo,
+		subscriptions: subscriptions,
+		audience:      audience,
+		channels:      channels,
+	}
 }
 
-type CreateCampaignInput struct {
-	Name           string
-	TargetIntent   string
-	CreativeFormat string
-	Title          string
-	BodyText       string
-	ImageURL       string
-	CanvasJSON     map[string]any
-	DailyBudgetCap float64
-	TotalBudgetCap float64
-}
-
-func (s *CampaignService) Create(ctx context.Context, advertiserID, role string, in CreateCampaignInput) (*model.Campaign, error) {
-	if !domain.CanWrite(role) {
+// Create validates subscription entitlements, campaign fields, and optionally records a segment purchase.
+func (s *CampaignService) Create(ctx context.Context, advertiserID, role string, cmd CreateCampaignCommand) (*model.Campaign, error) {
+	if !advertiserdomain.CanWrite(role) {
 		return nil, errors.New("forbidden")
 	}
 	if strings.TrimSpace(advertiserID) == "" {
 		return nil, errors.New("account has no advertiser company; operator admins cannot create campaigns directly")
 	}
-	format, err := NormalizeCreativeFormat(in.CreativeFormat)
+
+	wantsSegment := cmd.SegmentID != nil && strings.TrimSpace(*cmd.SegmentID) != ""
+
+	// 1. Subscription gate — plan limits, channel tier, Audiencemart access.
+	subCtx, err := s.subscriptions.AssertCanCreateCampaign(ctx, advertiserID, cmd.ChannelID, cmd.DailyBudgetCap, wantsSegment)
 	if err != nil {
 		return nil, err
 	}
+
+	// 2. Load channel for creative validation rules.
+	channel, err := s.channels.GetByID(ctx, cmd.ChannelID)
+	if err != nil {
+		return nil, errors.New("channel not found")
+	}
+
+	// 3. Audience segment quote (when segment_id provided).
+	var purchaseQuote *audienceapp.PurchaseQuote
+	if wantsSegment {
+		if err := s.audience.ValidateTargetIntent(ctx, *cmd.SegmentID, cmd.TargetIntent); err != nil {
+			return nil, err
+		}
+		purchaseQuote, err = s.audience.PreparePurchase(ctx, advertiserID, *cmd.SegmentID, subCtx.Plan)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	canvas := datatypes.JSON([]byte("{}"))
-	if in.CanvasJSON != nil {
-		raw, _ := json.Marshal(in.CanvasJSON)
+	if cmd.CanvasJSON != nil {
+		raw, _ := json.Marshal(cmd.CanvasJSON)
 		canvas = datatypes.JSON(raw)
 	}
-	c := &model.Campaign{
-		AdvertiserID:   advertiserID,
-		Name:           in.Name,
-		TargetIntent:   in.TargetIntent,
-		CreativeFormat: format,
-		Title:          in.Title,
-		BodyText:       in.BodyText,
-		ImageURL:       in.ImageURL,
-		CanvasJSON:     canvas,
-		DailyBudgetCap: in.DailyBudgetCap,
-		TotalBudgetCap: in.TotalBudgetCap,
-		IsActive:       false,
+
+	segmentID := cmd.SegmentID
+	if segmentID != nil && strings.TrimSpace(*segmentID) == "" {
+		segmentID = nil
 	}
-	vr := ValidateCampaign(c)
+
+	c := &model.Campaign{
+		AdvertiserID:       advertiserID,
+		Name:               cmd.Name,
+		TargetIntent:       cmd.TargetIntent,
+		ChannelID:          cmd.ChannelID,
+		SegmentID:          segmentID,
+		Title:              cmd.Title,
+		BodyText:           cmd.BodyText,
+		ImageURL:           cmd.ImageURL,
+		DestinationURL:     cmd.DestinationURL,
+		CanvasJSON:         canvas,
+		BillingModel:       cmd.BillingModel,
+		DailyBudgetCap:     cmd.DailyBudgetCap,
+		TotalBudgetCap:     cmd.TotalBudgetCap,
+		FrequencyCapPerDay: cmd.FrequencyCapPerDay,
+		ScheduledStartAt:   cmd.ScheduledStartAt,
+		ScheduledEndAt:     cmd.ScheduledEndAt,
+		IsActive:           false,
+	}
+
+	// 4. Creative validation by channel code.
+	vr := ValidateCampaign(c, channel.Code)
 	c.ValidationStatus = vr.Status
 	c.ValidationNotes = vr.Notes
-	if err := s.repo.Create(ctx, c); err != nil {
+
+	// 5. Persist campaign + segment purchase atomically.
+	err = s.repo.Transaction(ctx, func(tx *gorm.DB) error {
+		if err := s.repo.CreateTx(ctx, tx, c); err != nil {
+			return err
+		}
+		return s.audience.ConfirmPurchaseTx(ctx, tx, purchaseQuote, c.ID)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
 func (s *CampaignService) List(ctx context.Context, advertiserID, role string) ([]model.Campaign, error) {
-	if !domain.CanRead(role) {
+	if !advertiserdomain.CanRead(role) {
 		return nil, errors.New("forbidden")
 	}
-	if role == domain.RoleOperatorAdmin {
+	if role == advertiserdomain.RoleOperatorAdmin {
 		return s.repo.ListAll(ctx)
 	}
 	return s.repo.ListByAdvertiser(ctx, advertiserID)
 }
 
 func (s *CampaignService) Get(ctx context.Context, advertiserID, role, id string) (*model.Campaign, error) {
-	if !domain.CanRead(role) {
+	if !advertiserdomain.CanRead(role) {
 		return nil, errors.New("forbidden")
 	}
 	c, err := s.repo.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if role != domain.RoleOperatorAdmin && c.AdvertiserID != advertiserID {
+	if role != advertiserdomain.RoleOperatorAdmin && c.AdvertiserID != advertiserID {
 		return nil, errors.New("forbidden")
 	}
 	return c, nil
 }
 
 func (s *CampaignService) Activate(ctx context.Context, advertiserID, role, id string) (*model.Campaign, error) {
-	if !domain.CanWrite(role) {
+	if !advertiserdomain.CanWrite(role) {
 		return nil, errors.New("forbidden")
 	}
 	c, err := s.Get(ctx, advertiserID, role, id)
@@ -120,5 +172,9 @@ func (s *CampaignService) Preview(ctx context.Context, advertiserID, role, id st
 	if err != nil {
 		return nil, err
 	}
-	return PreviewCampaign(c), nil
+	ch, err := s.channels.GetByID(ctx, c.ChannelID)
+	if err != nil {
+		return nil, errors.New("channel not found for preview")
+	}
+	return PreviewCampaign(c, ch.Code), nil
 }

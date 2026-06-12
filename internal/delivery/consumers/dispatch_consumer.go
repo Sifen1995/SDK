@@ -57,7 +57,8 @@ func (c *DispatchConsumer) handle(e messaging.Event) {
 	}
 	_ = c.hub.NotifyUser(user.ExternalUserID, map[string]any{
 		"type": ad.Type, "intent": ad.Intent, "campaign_id": ad.CampaignID,
-		"campaign_name": ad.CampaignName, "creative_format": ad.CreativeFormat, "content": ad.Content,
+		"campaign_name": ad.CampaignName, "channel_code": ad.ChannelCode,
+		"creative_format": ad.ChannelCode, "content": ad.Content,
 	})
 }
 

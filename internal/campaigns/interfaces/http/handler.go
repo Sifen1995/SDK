@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"skykin-platform/internal/campaigns/application"
 	platformHTTP "skykin-platform/internal/platform/http"
@@ -19,7 +20,7 @@ func NewHandler(svc *application.CampaignService) *Handler {
 
 // CreateCampaign godoc
 // @Summary      Create campaign with embedded creative
-// @Description  One campaign row includes targeting, budget caps, and creative fields. Batch targeting matches users with stored intent predictions every 5 minutes. Starts inactive until activated.
+// @Description  Validates subscription plan limits, channel tier, and optional Audiencemart segment purchase. Starts inactive until activated.
 // @Tags         Ad Portal - Campaigns
 // @Accept       json
 // @Produce      json
@@ -37,17 +38,46 @@ func (h *Handler) CreateCampaign(c *gin.Context) {
 	}
 	aid, _ := c.Get("advertiser_id")
 	role, _ := c.Get("portal_role")
-	camp, err := h.svc.Create(c.Request.Context(), aid.(string), role.(string), application.CreateCampaignInput{
-		Name: req.Name, TargetIntent: req.TargetIntent,
-		CreativeFormat: req.CreativeFormat, Title: req.Title, BodyText: req.BodyText,
-		ImageURL: req.ImageURL, CanvasJSON: req.CanvasJSON,
-		DailyBudgetCap: req.DailyBudgetCap, TotalBudgetCap: req.TotalBudgetCap,
-	})
+	camp, err := h.svc.Create(c.Request.Context(), aid.(string), role.(string), toCreateCommand(req))
 	if err != nil {
-		platformHTTP.Error(c, http.StatusBadRequest, "create failed", err.Error())
+		status := http.StatusBadRequest
+		if isSubscriptionError(err) {
+			status = http.StatusForbidden
+		}
+		platformHTTP.Error(c, status, "create failed", err.Error())
 		return
 	}
 	c.JSON(http.StatusCreated, camp)
+}
+
+// toCreateCommand maps HTTP DTO → application command (keeps layers decoupled).
+func toCreateCommand(req CreateCampaignRequest) application.CreateCampaignCommand {
+	return application.CreateCampaignCommand{
+		Name:               req.Name,
+		TargetIntent:       req.TargetIntent,
+		ChannelID:          req.ChannelID,
+		SegmentID:          req.SegmentID,
+		Title:              req.Title,
+		BodyText:           req.BodyText,
+		ImageURL:           req.ImageURL,
+		DestinationURL:     req.DestinationURL,
+		CanvasJSON:         req.CanvasJSON,
+		BillingModel:       req.BillingModel,
+		DailyBudgetCap:     req.DailyBudgetCap,
+		TotalBudgetCap:     req.TotalBudgetCap,
+		FrequencyCapPerDay: req.FrequencyCapPerDay,
+		ScheduledStartAt:   req.ScheduledStartAt,
+		ScheduledEndAt:     req.ScheduledEndAt,
+	}
+}
+
+// isSubscriptionError returns true for plan-limit and entitlement failures (→ HTTP 403).
+func isSubscriptionError(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "subscription") ||
+		strings.Contains(msg, "plan ") ||
+		strings.Contains(msg, "audiencemart") ||
+		strings.Contains(msg, "premium channel")
 }
 
 // ListCampaigns godoc
