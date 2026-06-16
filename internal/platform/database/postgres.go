@@ -87,7 +87,6 @@ func Migrate(db *gorm.DB) error {
 	seedRewardRules(db)
 	seedBillingCatalog(db)
 	seedAudienceSegments(db)
-	backfillStarterSubscriptions(db)
 	return nil
 }
 
@@ -182,29 +181,5 @@ func seedAudienceSegments(db *gorm.DB) {
 		db.Where("name = ?", seg.Name).FirstOrCreate(&seg)
 	}
 	log.Println("audience segments seeded")
-}
-
-// backfillStarterSubscriptions assigns Starter to advertisers created before billing went live.
-func backfillStarterSubscriptions(db *gorm.DB) {
-	var advertisers []struct{ ID string }
-	db.Table("advertisers").Select("id").Scan(&advertisers)
-	var starter billingmodel.SubscriptionPlan
-	if err := db.Where("name = ?", "Starter").First(&starter).Error; err != nil {
-		return
-	}
-	now := time.Now().UTC()
-	end := now.AddDate(0, 1, 0)
-	for _, a := range advertisers {
-		var count int64
-		db.Model(&billingmodel.AdvertiserSubscription{}).Where("advertiser_id = ?", a.ID).Count(&count)
-		if count > 0 {
-			continue
-		}
-		db.Create(&billingmodel.AdvertiserSubscription{
-			AdvertiserID: a.ID, PlanID: starter.ID, Status: "active",
-			CurrentPeriodStart: now, CurrentPeriodEnd: end,
-		})
-	}
-	log.Println("starter subscriptions backfilled")
 }
 

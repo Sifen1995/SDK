@@ -11,6 +11,7 @@ import (
 	audienceapp "skykin-platform/internal/audience/application"
 	billingapp "skykin-platform/internal/billing/application"
 	billingdomain "skykin-platform/internal/billing/domain"
+	campaigndomain "skykin-platform/internal/campaigns/domain"
 	"skykin-platform/internal/campaigns/infrastructure"
 	"skykin-platform/internal/campaigns/model"
 
@@ -104,6 +105,7 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 		ScheduledStartAt:   cmd.ScheduledStartAt,
 		ScheduledEndAt:     cmd.ScheduledEndAt,
 		IsActive:           false,
+		ModerationStatus:   campaigndomain.ModerationPending,
 	}
 
 	// 4. Creative validation by channel code.

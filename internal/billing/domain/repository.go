@@ -13,18 +13,19 @@ type SubscriptionContext struct {
 	Plan           model.SubscriptionPlan
 }
 
-// SubscriptionRepository loads advertiser plans and creates starter subscriptions.
+// SubscriptionRepository loads advertiser plans and manages subscriptions.
 type SubscriptionRepository interface {
 	GetActiveByAdvertiser(ctx context.Context, advertiserID string) (*model.AdvertiserSubscription, error)
+	GetPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error)
 	GetPlanByName(ctx context.Context, name string) (*model.SubscriptionPlan, error)
+	ListActivePlans(ctx context.Context) ([]model.SubscriptionPlan, error)
 	CreateSubscription(ctx context.Context, sub *model.AdvertiserSubscription) error
-	// EnsureStarterForAdvertiser assigns Starter when the advertiser has no subscription yet.
-	EnsureStarterForAdvertiser(ctx context.Context, advertiserID string) error
 }
 
 // ChannelRepository loads delivery channels for entitlement checks.
 type ChannelRepository interface {
 	GetByID(ctx context.Context, id string) (*model.Channel, error)
+	ListActive(ctx context.Context) ([]model.Channel, error)
 }
 
 // CampaignQuotaReader counts campaigns for plan limit enforcement.
@@ -32,8 +33,8 @@ type CampaignQuotaReader interface {
 	CountActiveByAdvertiser(ctx context.Context, advertiserID string) (int, error)
 }
 
-// StarterPeriod defines the first billing cycle length for new advertisers.
-func StarterPeriod(now time.Time) (start, end time.Time) {
+// SubscriptionPeriod defines the first billing cycle length for a new subscription.
+func SubscriptionPeriod(now time.Time) (start, end time.Time) {
 	start = now.UTC()
 	end = start.AddDate(0, 1, 0)
 	return start, end

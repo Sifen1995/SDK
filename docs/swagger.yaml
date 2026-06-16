@@ -1,5 +1,26 @@
 basePath: /api/v1
 definitions:
+  internal_admin_interfaces_http.CampaignListResponse:
+    properties:
+      campaigns:
+        items: {}
+        type: array
+      count:
+        type: integer
+    type: object
+  internal_admin_interfaces_http.ValidateCampaignRequest:
+    properties:
+      action:
+        enum:
+        - approve
+        - reject
+        type: string
+      notes:
+        maxLength: 2000
+        type: string
+    required:
+    - action
+    type: object
   internal_advertisers_interfaces_http.AdPortalLoginResponse:
     properties:
       token:
@@ -103,6 +124,54 @@ definitions:
     properties:
       user:
         $ref: '#/definitions/internal_advertisers_interfaces_http.PortalUserDTO'
+    type: object
+  internal_analytics_interfaces_http.AdvertiserListResponse:
+    properties:
+      advertisers:
+        items: {}
+        type: array
+      count:
+        type: integer
+    type: object
+  internal_analytics_interfaces_http.CampaignListResponse:
+    properties:
+      campaigns:
+        items: {}
+        type: array
+      count:
+        type: integer
+    type: object
+  internal_billing_interfaces_http.ChannelListResponse:
+    properties:
+      channels:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_billing_application.ChannelDTO'
+        type: array
+      count:
+        type: integer
+    type: object
+  internal_billing_interfaces_http.PlanListResponse:
+    properties:
+      count:
+        type: integer
+      plans:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_billing_application.PlanDTO'
+        type: array
+    type: object
+  internal_billing_interfaces_http.SubscribeRequest:
+    properties:
+      plan_id:
+        type: string
+    required:
+    - plan_id
+    type: object
+  internal_billing_interfaces_http.SubscriptionStatusResponse:
+    properties:
+      subscribed:
+        type: boolean
+      subscription:
+        $ref: '#/definitions/skykin-platform_internal_billing_application.SubscriptionDTO'
     type: object
   internal_campaigns_interfaces_http.CampaignListResponse:
     properties:
@@ -276,6 +345,144 @@ definitions:
     required:
     - user_id
     type: object
+  skykin-platform_internal_analytics_domain.CampaignDetail:
+    properties:
+      advertiser_id:
+        type: string
+      budget_spent:
+        type: number
+      campaign_id:
+        type: string
+      company_name:
+        type: string
+      daily_budget_cap:
+        type: number
+      delivery_count:
+        type: integer
+      funnel:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_analytics_domain.FunnelStep'
+        type: array
+      is_active:
+        type: boolean
+      moderation_status:
+        type: string
+      name:
+        type: string
+      target_intent:
+        type: string
+      unique_users:
+        type: integer
+      validation_status:
+        type: string
+    type: object
+  skykin-platform_internal_analytics_domain.CampaignPerformance:
+    properties:
+      advertiser_id:
+        type: string
+      budget_spent:
+        type: number
+      campaign_id:
+        type: string
+      company_name:
+        type: string
+      daily_budget_cap:
+        type: number
+      delivery_count:
+        type: integer
+      is_active:
+        type: boolean
+      moderation_status:
+        type: string
+      name:
+        type: string
+      target_intent:
+        type: string
+      unique_users:
+        type: integer
+      validation_status:
+        type: string
+    type: object
+  skykin-platform_internal_analytics_domain.DeliveryAnalytics:
+    properties:
+      funnel_platform:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_analytics_domain.FunnelStep'
+        type: array
+      last_30_days:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_analytics_domain.DeliveryTrendPoint'
+        type: array
+      top_campaigns:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_analytics_domain.CampaignPerformance'
+        type: array
+      total_deliveries:
+        type: integer
+    type: object
+  skykin-platform_internal_analytics_domain.DeliveryTrendPoint:
+    properties:
+      count:
+        type: integer
+      day:
+        type: string
+    type: object
+  skykin-platform_internal_analytics_domain.FunnelStep:
+    properties:
+      count:
+        type: integer
+      status:
+        type: string
+    type: object
+  skykin-platform_internal_analytics_domain.OverviewStats:
+    properties:
+      active_campaigns:
+        type: integer
+      active_subscriptions:
+        type: integer
+      deliveries_last_7d:
+        type: integer
+      deliveries_last_24h:
+        type: integer
+      estimated_mrr_etb:
+        type: number
+      pending_moderation:
+        type: integer
+      segment_revenue_total_etb:
+        type: number
+      total_advertisers:
+        type: integer
+      total_campaigns:
+        type: integer
+      total_deliveries:
+        type: integer
+      unique_users_reached:
+        type: integer
+    type: object
+  skykin-platform_internal_analytics_domain.PlanCount:
+    properties:
+      count:
+        type: integer
+      plan_name:
+        type: string
+    type: object
+  skykin-platform_internal_analytics_domain.RevenueOverview:
+    properties:
+      billing_events_total_etb:
+        type: number
+      billing_events_unbilled:
+        type: integer
+      estimated_mrr_etb:
+        type: number
+      segment_revenue_30d_etb:
+        type: number
+      segment_revenue_total_etb:
+        type: number
+      subscriptions_by_plan:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_analytics_domain.PlanCount'
+        type: array
+    type: object
   skykin-platform_internal_audience_application.ListSegmentsResult:
     properties:
       audiencemart_enabled:
@@ -363,6 +570,55 @@ definitions:
     - name
     - password
     type: object
+  skykin-platform_internal_billing_application.ChannelDTO:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_premium:
+        type: boolean
+      name:
+        type: string
+    type: object
+  skykin-platform_internal_billing_application.PlanDTO:
+    properties:
+      audiencemart_enabled:
+        type: boolean
+      cpc_discount_pct:
+        type: number
+      id:
+        type: string
+      included_impressions:
+        type: integer
+      max_active_campaigns:
+        type: integer
+      max_daily_budget_etb:
+        type: number
+      monthly_fee_etb:
+        type: number
+      name:
+        type: string
+      sms_plus_enabled:
+        type: boolean
+    type: object
+  skykin-platform_internal_billing_application.SubscriptionDTO:
+    properties:
+      current_period_end:
+        type: string
+      current_period_start:
+        type: string
+      id:
+        type: string
+      impressions_used:
+        type: integer
+      plan:
+        $ref: '#/definitions/skykin-platform_internal_billing_application.PlanDTO'
+      status:
+        type: string
+    type: object
   skykin-platform_internal_campaigns_model.Campaign:
     properties:
       advertiserID:
@@ -395,6 +651,16 @@ definitions:
         type: string
       isActive:
         type: boolean
+      moderatedAt:
+        type: string
+      moderatedBy:
+        description: portal_users.id of the operator
+        type: string
+      moderationNotes:
+        type: string
+      moderationStatus:
+        description: ModerationStatus is set by operator_admin (pending → approved/rejected).
+        type: string
       name:
         type: string
       scheduledEndAt:
@@ -479,6 +745,177 @@ info:
   title: Skykin Platform API
   version: "1.0"
 paths:
+  /ad-portal/admin/analytics/advertisers:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_analytics_interfaces_http.AdvertiserListResponse'
+      security:
+      - BearerAuth: []
+      summary: Per-advertiser operational summary
+      tags:
+      - Ad Portal - Admin Analytics
+  /ad-portal/admin/analytics/campaigns:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_analytics_interfaces_http.CampaignListResponse'
+      security:
+      - BearerAuth: []
+      summary: Campaign performance table
+      tags:
+      - Ad Portal - Admin Analytics
+  /ad-portal/admin/analytics/campaigns/{id}:
+    get:
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_analytics_domain.CampaignDetail'
+      security:
+      - BearerAuth: []
+      summary: Single campaign analytics drill-down
+      tags:
+      - Ad Portal - Admin Analytics
+  /ad-portal/admin/analytics/delivery:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_analytics_domain.DeliveryAnalytics'
+      security:
+      - BearerAuth: []
+      summary: Delivery volume and funnel analytics
+      tags:
+      - Ad Portal - Admin Analytics
+  /ad-portal/admin/analytics/overview:
+    get:
+      description: 'KPI snapshot: advertisers, campaigns, deliveries, subscriptions,
+        MRR estimate, segment revenue.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_analytics_domain.OverviewStats'
+      security:
+      - BearerAuth: []
+      summary: Platform analytics overview
+      tags:
+      - Ad Portal - Admin Analytics
+  /ad-portal/admin/analytics/revenue:
+    get:
+      description: MRR estimate, segment purchase revenue, billing events (admin only).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_analytics_domain.RevenueOverview'
+      security:
+      - BearerAuth: []
+      summary: Revenue and subscription analytics
+      tags:
+      - Ad Portal - Admin Analytics
+  /ad-portal/admin/campaigns/{id}/activate:
+    post:
+      description: Sets is_active=true. Campaign must have moderation_status=approved
+        and validation_status=passed.
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_campaigns_model.Campaign'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Activate an approved campaign (go live)
+      tags:
+      - Ad Portal - Admin
+  /ad-portal/admin/campaigns/{id}/validate:
+    post:
+      consumes:
+      - application/json
+      description: Approve runs creative validation against the campaign channel and
+        sets moderation_status=approved. Reject sets moderation_status=rejected.
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: approve or reject
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_admin_interfaces_http.ValidateCampaignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_campaigns_model.Campaign'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Approve or reject a pending campaign
+      tags:
+      - Ad Portal - Admin
+  /ad-portal/admin/campaigns/pending:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_admin_interfaces_http.CampaignListResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: List campaigns pending operator validation
+      tags:
+      - Ad Portal - Admin
   /ad-portal/admin/users:
     post:
       consumes:
@@ -631,6 +1068,22 @@ paths:
       summary: Preview campaign creative
       tags:
       - Ad Portal - Campaigns
+  /ad-portal/channels:
+    get:
+      description: Returns active delivery channels (IN_APP_BANNER, PUSH, SMS_PLUS,
+        etc.) for campaign creation.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_billing_interfaces_http.ChannelListResponse'
+      security:
+      - BearerAuth: []
+      summary: List delivery channels
+      tags:
+      - Ad Portal - Billing
   /ad-portal/login:
     post:
       consumes:
@@ -674,6 +1127,22 @@ paths:
       summary: Current advertiser profile
       tags:
       - Ad Portal - Auth
+  /ad-portal/plans:
+    get:
+      description: Returns available plans for advertisers to choose before creating
+        campaigns.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_billing_interfaces_http.PlanListResponse'
+      security:
+      - BearerAuth: []
+      summary: List subscription plans
+      tags:
+      - Ad Portal - Billing
   /ad-portal/register:
     post:
       consumes:
@@ -699,6 +1168,54 @@ paths:
       summary: Register advertiser
       tags:
       - Ad Portal - Auth
+  /ad-portal/subscription:
+    get:
+      description: Returns the advertiser active subscription, or subscribed=false
+        when none.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_billing_interfaces_http.SubscriptionStatusResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current subscription
+      tags:
+      - Ad Portal - Billing
+    post:
+      consumes:
+      - application/json
+      description: Creates an active subscription for the advertiser. Required before
+        campaign creation.
+      parameters:
+      - description: Plan selection
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_billing_interfaces_http.SubscribeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_billing_interfaces_http.SubscriptionStatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Subscribe to a plan
+      tags:
+      - Ad Portal - Billing
   /events:
     post:
       consumes:

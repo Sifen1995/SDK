@@ -2,6 +2,11 @@ package route
 
 import (
 	"skykin-platform/configs"
+	analyticsApp "skykin-platform/internal/analytics/application"
+	analyticsHTTP "skykin-platform/internal/analytics/interfaces/http"
+	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
+	adminApp "skykin-platform/internal/admin/application"
+	adminHTTP "skykin-platform/internal/admin/interfaces/http"
 	advertiserApp "skykin-platform/internal/advertisers/application"
 	advertiserHTTP "skykin-platform/internal/advertisers/interfaces/http"
 	advertiserInfra "skykin-platform/internal/advertisers/infrastructure"
@@ -9,6 +14,7 @@ import (
 	audienceHTTP "skykin-platform/internal/audience/interfaces/http"
 	audienceInfra "skykin-platform/internal/audience/infrastructure"
 	billingApp "skykin-platform/internal/billing/application"
+	billingHTTP "skykin-platform/internal/billing/interfaces/http"
 	billingInfra "skykin-platform/internal/billing/infrastructure"
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignHTTP "skykin-platform/internal/campaigns/interfaces/http"
@@ -42,14 +48,19 @@ func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS
 	subEnforcer := billingApp.NewSubscriptionEnforcer(subRepo, channelRepo, campaignRepo)
 	audiencePurchases := audienceApp.NewPurchaseService(segmentRepo)
 	audienceList := audienceApp.NewListService(segmentRepo, subRepo)
-	starterSubs := billingApp.NewStarterSubscriptionService(subRepo)
+	subscriptionSvc := billingApp.NewSubscriptionService(subRepo, channelRepo)
 
 	campaignSvc := campaignApp.NewCampaignService(campaignRepo, subEnforcer, audiencePurchases, channelRepo)
+	adminModeration := adminApp.NewCampaignModerationService(campaignRepo, channelRepo)
+	analyticsSvc := analyticsApp.NewService(analyticsInfra.NewRepository(db))
 
 	advertiserHTTP.RegisterRoutes(r,
-		advertiserHTTP.NewAuthHandler(advertiserApp.NewAuthService(adRepo, cfg, starterSubs)),
+		advertiserHTTP.NewAuthHandler(advertiserApp.NewAuthService(adRepo, cfg)),
 		campaignHTTP.NewHandler(campaignSvc),
 		audienceHTTP.NewHandler(audienceList),
+		billingHTTP.NewHandler(subscriptionSvc),
+		adminHTTP.NewCampaignHandler(adminModeration),
+		analyticsHTTP.NewHandler(analyticsSvc),
 		cfg,
 	)
 

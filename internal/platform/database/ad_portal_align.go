@@ -49,6 +49,12 @@ func alignAdPortalSchema(db *gorm.DB) {
 	// company_name NOT NULL (ignore if already set)
 	_ = db.Exec(`ALTER TABLE advertisers ALTER COLUMN company_name SET NOT NULL`).Error
 	_ = db.Exec(`ALTER TABLE campaigns DROP COLUMN IF EXISTS application_id`).Error
-	_ = db.Exec(`ALTER TABLE campaigns DROP COLUMN IF EXISTS destination_url`).Error
+	_ = db.Exec(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS destination_url TEXT`).Error
+	_ = db.Exec(`ALTER TABLE campaigns DROP COLUMN IF EXISTS creative_format`).Error
+	_ = db.Exec(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(20) NOT NULL DEFAULT 'pending'`).Error
+	_ = db.Exec(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS moderation_notes TEXT`).Error
+	_ = db.Exec(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS moderated_at TIMESTAMPTZ`).Error
+	_ = db.Exec(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS moderated_by UUID`).Error
+	_ = db.Exec(`UPDATE campaigns SET moderation_status = 'approved' WHERE is_active = true AND moderation_status = 'pending'`).Error
 	log.Println("ad portal schema aligned (advertisers = company only)")
 }

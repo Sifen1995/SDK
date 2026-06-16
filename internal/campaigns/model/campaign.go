@@ -39,6 +39,12 @@ type Campaign struct {
 	ValidationStatus string `gorm:"type:varchar(20);not null;default:'pending'"`
 	ValidationNotes  string `gorm:"type:text"`
 
+	// ModerationStatus is set by operator_admin (pending → approved/rejected).
+	ModerationStatus string     `gorm:"type:varchar(20);not null;default:'pending';index"`
+	ModerationNotes  string     `gorm:"type:text"`
+	ModeratedAt      *time.Time `gorm:"index"`
+	ModeratedBy      *string    `gorm:"type:uuid"` // portal_users.id of the operator
+
 	CreatedAt time.Time `gorm:"not null;default:now()"`
 	UpdatedAt time.Time `gorm:"not null;default:now()"`
 }

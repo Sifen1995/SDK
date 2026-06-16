@@ -44,7 +44,7 @@ func NewListService(segments audiencedomain.SegmentRepository, subs billingdomai
 func (s *ListService) ListForAdvertiser(ctx context.Context, advertiserID string) (*ListSegmentsResult, error) {
 	sub, err := s.subs.GetActiveByAdvertiser(ctx, advertiserID)
 	if err != nil {
-		return nil, errors.New("no active subscription")
+		return nil, errors.New("no active subscription; subscribe to a plan first")
 	}
 	result := &ListSegmentsResult{
 		PlanName:            sub.Plan.Name,

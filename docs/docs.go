@@ -15,6 +15,283 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/ad-portal/admin/analytics/advertisers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Analytics"
+                ],
+                "summary": "Per-advertiser operational summary",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_analytics_interfaces_http.AdvertiserListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/analytics/campaigns": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Analytics"
+                ],
+                "summary": "Campaign performance table",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_analytics_interfaces_http.CampaignListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/analytics/campaigns/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Analytics"
+                ],
+                "summary": "Single campaign analytics drill-down",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_analytics_domain.CampaignDetail"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/analytics/delivery": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Analytics"
+                ],
+                "summary": "Delivery volume and funnel analytics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_analytics_domain.DeliveryAnalytics"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/analytics/overview": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "KPI snapshot: advertisers, campaigns, deliveries, subscriptions, MRR estimate, segment revenue.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Analytics"
+                ],
+                "summary": "Platform analytics overview",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_analytics_domain.OverviewStats"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/analytics/revenue": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "MRR estimate, segment purchase revenue, billing events (admin only).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Analytics"
+                ],
+                "summary": "Revenue and subscription analytics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_analytics_domain.RevenueOverview"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/campaigns/pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "List campaigns pending operator validation",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.CampaignListResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/campaigns/{id}/activate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets is_active=true. Campaign must have moderation_status=approved and validation_status=passed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Activate an approved campaign (go live)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/campaigns/{id}/validate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Approve runs creative validation against the campaign channel and sets moderation_status=approved. Reject sets moderation_status=rejected.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Approve or reject a pending campaign",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "approve or reject",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.ValidateCampaignRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/admin/users": {
             "post": {
                 "security": [
@@ -260,6 +537,31 @@ const docTemplate = `{
                 }
             }
         },
+        "/ad-portal/channels": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns active delivery channels (IN_APP_BANNER, PUSH, SMS_PLUS, etc.) for campaign creation.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Billing"
+                ],
+                "summary": "List delivery channels",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_billing_interfaces_http.ChannelListResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/login": {
             "post": {
                 "consumes": [
@@ -329,6 +631,31 @@ const docTemplate = `{
                 }
             }
         },
+        "/ad-portal/plans": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns available plans for advertisers to choose before creating campaigns.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Billing"
+                ],
+                "summary": "List subscription plans",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_billing_interfaces_http.PlanListResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/register": {
             "post": {
                 "consumes": [
@@ -361,6 +688,80 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/subscription": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the advertiser active subscription, or subscribed=false when none.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Billing"
+                ],
+                "summary": "Get current subscription",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_billing_interfaces_http.SubscriptionStatusResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates an active subscription for the advertiser. Required before campaign creation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Billing"
+                ],
+                "summary": "Subscribe to a plan",
+                "parameters": [
+                    {
+                        "description": "Plan selection",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_billing_interfaces_http.SubscribeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_billing_interfaces_http.SubscriptionStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -656,6 +1057,37 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "internal_admin_interfaces_http.CampaignListResponse": {
+            "type": "object",
+            "properties": {
+                "campaigns": {
+                    "type": "array",
+                    "items": {}
+                },
+                "count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_admin_interfaces_http.ValidateCampaignRequest": {
+            "type": "object",
+            "required": [
+                "action"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "approve",
+                        "reject"
+                    ]
+                },
+                "notes": {
+                    "type": "string",
+                    "maxLength": 2000
+                }
+            }
+        },
         "internal_advertisers_interfaces_http.AdPortalLoginResponse": {
             "type": "object",
             "properties": {
@@ -800,6 +1232,80 @@ const docTemplate = `{
             "properties": {
                 "user": {
                     "$ref": "#/definitions/internal_advertisers_interfaces_http.PortalUserDTO"
+                }
+            }
+        },
+        "internal_analytics_interfaces_http.AdvertiserListResponse": {
+            "type": "object",
+            "properties": {
+                "advertisers": {
+                    "type": "array",
+                    "items": {}
+                },
+                "count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_analytics_interfaces_http.CampaignListResponse": {
+            "type": "object",
+            "properties": {
+                "campaigns": {
+                    "type": "array",
+                    "items": {}
+                },
+                "count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_billing_interfaces_http.ChannelListResponse": {
+            "type": "object",
+            "properties": {
+                "channels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_billing_application.ChannelDTO"
+                    }
+                },
+                "count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_billing_interfaces_http.PlanListResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "plans": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_billing_application.PlanDTO"
+                    }
+                }
+            }
+        },
+        "internal_billing_interfaces_http.SubscribeRequest": {
+            "type": "object",
+            "required": [
+                "plan_id"
+            ],
+            "properties": {
+                "plan_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_billing_interfaces_http.SubscriptionStatusResponse": {
+            "type": "object",
+            "properties": {
+                "subscribed": {
+                    "type": "boolean"
+                },
+                "subscription": {
+                    "$ref": "#/definitions/skykin-platform_internal_billing_application.SubscriptionDTO"
                 }
             }
         },
@@ -1036,6 +1542,217 @@ const docTemplate = `{
                 }
             }
         },
+        "skykin-platform_internal_analytics_domain.CampaignDetail": {
+            "type": "object",
+            "properties": {
+                "advertiser_id": {
+                    "type": "string"
+                },
+                "budget_spent": {
+                    "type": "number"
+                },
+                "campaign_id": {
+                    "type": "string"
+                },
+                "company_name": {
+                    "type": "string"
+                },
+                "daily_budget_cap": {
+                    "type": "number"
+                },
+                "delivery_count": {
+                    "type": "integer"
+                },
+                "funnel": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_analytics_domain.FunnelStep"
+                    }
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "moderation_status": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "target_intent": {
+                    "type": "string"
+                },
+                "unique_users": {
+                    "type": "integer"
+                },
+                "validation_status": {
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_analytics_domain.CampaignPerformance": {
+            "type": "object",
+            "properties": {
+                "advertiser_id": {
+                    "type": "string"
+                },
+                "budget_spent": {
+                    "type": "number"
+                },
+                "campaign_id": {
+                    "type": "string"
+                },
+                "company_name": {
+                    "type": "string"
+                },
+                "daily_budget_cap": {
+                    "type": "number"
+                },
+                "delivery_count": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "moderation_status": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "target_intent": {
+                    "type": "string"
+                },
+                "unique_users": {
+                    "type": "integer"
+                },
+                "validation_status": {
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_analytics_domain.DeliveryAnalytics": {
+            "type": "object",
+            "properties": {
+                "funnel_platform": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_analytics_domain.FunnelStep"
+                    }
+                },
+                "last_30_days": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_analytics_domain.DeliveryTrendPoint"
+                    }
+                },
+                "top_campaigns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_analytics_domain.CampaignPerformance"
+                    }
+                },
+                "total_deliveries": {
+                    "type": "integer"
+                }
+            }
+        },
+        "skykin-platform_internal_analytics_domain.DeliveryTrendPoint": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "day": {
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_analytics_domain.FunnelStep": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_analytics_domain.OverviewStats": {
+            "type": "object",
+            "properties": {
+                "active_campaigns": {
+                    "type": "integer"
+                },
+                "active_subscriptions": {
+                    "type": "integer"
+                },
+                "deliveries_last_24h": {
+                    "type": "integer"
+                },
+                "deliveries_last_7d": {
+                    "type": "integer"
+                },
+                "estimated_mrr_etb": {
+                    "type": "number"
+                },
+                "pending_moderation": {
+                    "type": "integer"
+                },
+                "segment_revenue_total_etb": {
+                    "type": "number"
+                },
+                "total_advertisers": {
+                    "type": "integer"
+                },
+                "total_campaigns": {
+                    "type": "integer"
+                },
+                "total_deliveries": {
+                    "type": "integer"
+                },
+                "unique_users_reached": {
+                    "type": "integer"
+                }
+            }
+        },
+        "skykin-platform_internal_analytics_domain.PlanCount": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "plan_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_analytics_domain.RevenueOverview": {
+            "type": "object",
+            "properties": {
+                "billing_events_total_etb": {
+                    "type": "number"
+                },
+                "billing_events_unbilled": {
+                    "type": "integer"
+                },
+                "estimated_mrr_etb": {
+                    "type": "number"
+                },
+                "segment_revenue_30d_etb": {
+                    "type": "number"
+                },
+                "segment_revenue_total_etb": {
+                    "type": "number"
+                },
+                "subscriptions_by_plan": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_analytics_domain.PlanCount"
+                    }
+                }
+            }
+        },
         "skykin-platform_internal_audience_application.ListSegmentsResult": {
             "type": "object",
             "properties": {
@@ -1158,6 +1875,81 @@ const docTemplate = `{
                 }
             }
         },
+        "skykin-platform_internal_billing_application.ChannelDTO": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_premium": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_billing_application.PlanDTO": {
+            "type": "object",
+            "properties": {
+                "audiencemart_enabled": {
+                    "type": "boolean"
+                },
+                "cpc_discount_pct": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "included_impressions": {
+                    "type": "integer"
+                },
+                "max_active_campaigns": {
+                    "type": "integer"
+                },
+                "max_daily_budget_etb": {
+                    "type": "number"
+                },
+                "monthly_fee_etb": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sms_plus_enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "skykin-platform_internal_billing_application.SubscriptionDTO": {
+            "type": "object",
+            "properties": {
+                "current_period_end": {
+                    "type": "string"
+                },
+                "current_period_start": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "impressions_used": {
+                    "type": "integer"
+                },
+                "plan": {
+                    "$ref": "#/definitions/skykin-platform_internal_billing_application.PlanDTO"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "skykin-platform_internal_campaigns_model.Campaign": {
             "type": "object",
             "properties": {
@@ -1203,6 +1995,20 @@ const docTemplate = `{
                 },
                 "isActive": {
                     "type": "boolean"
+                },
+                "moderatedAt": {
+                    "type": "string"
+                },
+                "moderatedBy": {
+                    "description": "portal_users.id of the operator",
+                    "type": "string"
+                },
+                "moderationNotes": {
+                    "type": "string"
+                },
+                "moderationStatus": {
+                    "description": "ModerationStatus is set by operator_admin (pending → approved/rejected).",
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
