@@ -3,8 +3,12 @@ import type {
   CampaignPreview,
   CreateCampaignRequest,
   CreateUserRequest,
+  DeliveryChannel,
+  Plan,
   PortalUser,
   RegisterRequest,
+  SegmentsCatalog,
+  SubscriptionStatus,
 } from '../types';
 import { campaignsFromList, normalizeCampaign } from './campaignUtils';
 
@@ -75,13 +79,36 @@ export const api = {
     });
   },
 
+  listPlans() {
+    return request<{ plans: Plan[]; count: number }>('/plans').then(res => res.plans ?? []);
+  },
+
+  listChannels() {
+    return request<{ channels: DeliveryChannel[]; count: number }>('/channels').then(res => res.channels ?? []);
+  },
+
+  getSubscription() {
+    return request<SubscriptionStatus>('/subscription');
+  },
+
+  subscribe(planId: string) {
+    return request<SubscriptionStatus>('/subscription', {
+      method: 'POST',
+      body: JSON.stringify({ plan_id: planId }),
+    });
+  },
+
+  listSegments() {
+    return request<SegmentsCatalog>('/audience/segments');
+  },
+
   listCampaigns(offset: number = 0, limit: number = 10) {
     const query = new URLSearchParams();
     if (offset > 0) query.set('offset', offset.toString());
     if (limit > 0) query.set('limit', limit.toString());
     const qs = query.toString() ? `?${query.toString()}` : '';
 
-    return request<{ campaigns: unknown[], total?: number }>(`/campaigns${qs}`).then(res => ({
+    return request<{ campaigns: unknown[]; total?: number }>(`/campaigns${qs}`).then(res => ({
       campaigns: campaignsFromList(res),
       total: res.total,
     }));
@@ -93,16 +120,13 @@ export const api = {
   },
 
   async createCampaign(data: CreateCampaignRequest): Promise<Campaign> {
+    const payload = { ...data };
+    if (!payload.segment_id) {
+      delete payload.segment_id;
+    }
     const raw = await request<Record<string, unknown>>('/campaigns', {
       method: 'POST',
-      body: JSON.stringify(data),
-    });
-    return normalizeCampaign(raw);
-  },
-
-  async activateCampaign(id: string): Promise<Campaign> {
-    const raw = await request<Record<string, unknown>>(`/campaigns/${id}/activate`, {
-      method: 'POST',
+      body: JSON.stringify(payload),
     });
     return normalizeCampaign(raw);
   },

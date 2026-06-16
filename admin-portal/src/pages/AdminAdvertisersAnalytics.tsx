@@ -14,6 +14,7 @@ import {
 } from '../lib/chartTheme';
 import { fmtEtb, fmtNum } from '../lib/format';
 import FilterBar, { FilterSearch, FilterSelect } from '../components/FilterBar';
+import OffsetPagination, { paginateSlice, PAGE_SIZE } from '../components/Pagination';
 
 export default function AdminAdvertisersAnalytics() {
   const [data, setData] = useState<AdvertiserSummary[]>([]);
@@ -22,6 +23,7 @@ export default function AdminAdvertisersAnalytics() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [tablePage, setTablePage] = useState(1);
 
   useEffect(() => {
     api.analyticsAdvertisers()
@@ -41,6 +43,15 @@ export default function AdminAdvertisersAnalytics() {
       return adv.company_name.toLowerCase().includes(q) || adv.advertiser_id.toLowerCase().includes(q);
     });
   }, [data, search, statusFilter]);
+
+  useEffect(() => {
+    setTablePage(1);
+  }, [search, statusFilter]);
+
+  const tableRows = useMemo(
+    () => paginateSlice(filtered, tablePage, PAGE_SIZE),
+    [filtered, tablePage],
+  );
 
   const statusOptions = useMemo(() => {
     const statuses = [...new Set(data.map(a => a.subscription_status || 'none'))];
@@ -138,7 +149,7 @@ export default function AdminAdvertisersAnalytics() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
-              {filtered.map(adv => (
+              {tableRows.map(adv => (
                 <tr key={adv.advertiser_id} className="hover:bg-[var(--bg-subtle)] transition">
                   <td className="p-4">
                     <p className="font-medium text-primary">{adv.company_name}</p>
@@ -176,6 +187,7 @@ export default function AdminAdvertisersAnalytics() {
             </tbody>
           </table>
         </div>
+        <OffsetPagination page={tablePage} totalItems={filtered.length} onPageChange={setTablePage} />
       </div>
     </div>
   );

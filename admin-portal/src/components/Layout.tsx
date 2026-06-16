@@ -35,7 +35,7 @@ export default function AdminLayout() {
     {
       title: 'Management',
       items: [
-        { name: 'Pending Approvals', path: '/campaigns/pending', icon: '⚡' },
+        { name: 'Campaign Moderation', path: '/campaigns/pending', icon: '⚡' },
         { name: 'Operator Team', path: '/users', icon: '🛡️' },
       ],
     },
@@ -48,24 +48,25 @@ export default function AdminLayout() {
   );
 
   return (
-    <div className="min-h-screen flex bg-[#f8f9fa] dark:bg-[#0f0e13]">
-      <aside className="w-64 bg-[#2b193d] dark:bg-[#1a0f2e] text-white flex flex-col shrink-0 shadow-xl">
-        <div className="p-6">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center font-bold text-white shadow-inner">
-              ◆
+    <div className="admin-shell min-h-screen flex">
+      <aside className="admin-sidebar w-64 flex flex-col shrink-0">
+        <div className="p-6 border-b border-[var(--sidebar-border)]">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="admin-sidebar-logo">◆</div>
+            <div>
+              <span className="font-bold text-base tracking-tight text-[var(--sidebar-text)]">Skykin Admin</span>
+              <p className="text-[10px] uppercase tracking-wider text-[var(--sidebar-muted)] mt-0.5">Operator console</p>
             </div>
-            <span className="font-bold text-lg tracking-tight text-white">Skykin Admin</span>
           </Link>
         </div>
 
-        <nav className="flex-1 px-4 space-y-6 mt-2 overflow-y-auto pb-6">
+        <nav className="flex-1 px-3 py-5 space-y-6 overflow-y-auto">
           {navCategories.map((category, idx) => (
             <div key={idx}>
-              <h3 className="px-4 text-xs font-bold text-white/50 uppercase tracking-wider mb-2">
+              <h3 className="px-3 text-[10px] font-bold text-[var(--sidebar-muted)] uppercase tracking-wider mb-2">
                 {category.title}
               </h3>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {category.items.map(item => {
                   const isActive = item.exact
                     ? location.pathname === item.path
@@ -74,13 +75,9 @@ export default function AdminLayout() {
                     <Link
                       key={item.path}
                       to={item.path}
-                      className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-xl transition ${
-                        isActive
-                          ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10'
-                          : 'text-white/70 hover:bg-white/5 hover:text-white'
-                      }`}
+                      className={`admin-nav-link ${isActive ? 'admin-nav-link-active' : ''}`}
                     >
-                      <span className="text-base">{item.icon}</span>
+                      <span className="text-base opacity-90">{item.icon}</span>
                       {item.name}
                     </Link>
                   );
@@ -90,25 +87,22 @@ export default function AdminLayout() {
           ))}
         </nav>
 
-        <div className="p-4 mt-auto border-t border-white/10 shrink-0">
-          <div className="px-4 py-3 mb-2">
-            <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-            <p className="text-xs text-white/50 truncate">{user?.email}</p>
+        <div className="p-4 border-t border-[var(--sidebar-border)] shrink-0">
+          <div className="px-3 py-2 mb-2 rounded-lg bg-[var(--sidebar-hover)]">
+            <p className="text-sm font-medium text-[var(--sidebar-text)] truncate">{user?.name}</p>
+            <p className="text-xs text-[var(--sidebar-muted)] truncate">{user?.email}</p>
           </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white/70 hover:bg-white/5 hover:text-white transition"
-          >
+          <button type="button" onClick={logout} className="admin-nav-link w-full justify-center">
             Sign out
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[var(--bg-subtle)]">
         <header className="admin-topbar h-16 flex items-center justify-between px-6 lg:px-8 shrink-0">
           <div>
             <h2 className="text-base font-semibold text-primary">{currentItem?.name || 'Admin Area'}</h2>
-            <p className="text-xs text-muted hidden sm:block">Operator administration console</p>
+            <p className="text-xs text-muted hidden sm:block">Platform administration</p>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle variant="header" />

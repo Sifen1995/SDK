@@ -15,6 +15,7 @@ import {
 } from '../lib/chartTheme';
 import { fmtMoney, fmtNum } from '../lib/format';
 import FilterBar, { FilterSearch, FilterSelect } from '../components/FilterBar';
+import OffsetPagination, { paginateSlice, PAGE_SIZE } from '../components/Pagination';
 
 export default function AdminCampaignsAnalytics() {
   const [data, setData] = useState<CampaignPerformance[]>([]);
@@ -24,6 +25,7 @@ export default function AdminCampaignsAnalytics() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [moderationFilter, setModerationFilter] = useState('all');
+  const [tablePage, setTablePage] = useState(1);
 
   useEffect(() => {
     api.analyticsCampaigns()
@@ -49,6 +51,15 @@ export default function AdminCampaignsAnalytics() {
       );
     });
   }, [data, search, statusFilter, moderationFilter]);
+
+  useEffect(() => {
+    setTablePage(1);
+  }, [search, statusFilter, moderationFilter]);
+
+  const tableRows = useMemo(
+    () => paginateSlice(filtered, tablePage, PAGE_SIZE),
+    [filtered, tablePage],
+  );
 
   const moderationOptions = useMemo(() => {
     const statuses = [...new Set(data.map(c => c.moderation_status).filter(Boolean))];
@@ -166,7 +177,7 @@ export default function AdminCampaignsAnalytics() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
-              {filtered.map(c => (
+              {tableRows.map(c => (
                 <tr key={c.campaign_id} className="hover:bg-[var(--bg-subtle)] transition">
                   <td className="p-4">
                     <Link to={`/campaigns/${c.campaign_id}`} className="font-medium text-brand-500 hover:text-brand-400 block">
@@ -210,6 +221,7 @@ export default function AdminCampaignsAnalytics() {
             </tbody>
           </table>
         </div>
+        <OffsetPagination page={tablePage} totalItems={filtered.length} onPageChange={setTablePage} />
       </div>
     </div>
   );

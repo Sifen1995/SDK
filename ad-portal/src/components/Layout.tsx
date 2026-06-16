@@ -1,10 +1,12 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import RoleBadge from './RoleBadge';
 import ThemeToggle from './ThemeToggle';
 
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
+  const { subscribed, subscription } = useSubscription();
   const navigate = useNavigate();
 
   function handleLogout() {
@@ -34,6 +36,12 @@ export default function Layout() {
           {user && (
             <nav className="hidden md:flex items-center gap-1">
               <NavLink to="/" end className={navClass}>Campaigns</NavLink>
+              <NavLink to="/subscription" className={navClass}>
+                Subscription
+                {user && !subscribed && (
+                  <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" title="Action needed" />
+                )}
+              </NavLink>
               <NavLink to="/profile" className={navClass}>Profile</NavLink>
               {isAdmin && <NavLink to="/team" className={navClass}>Team</NavLink>}
             </nav>
@@ -46,7 +54,14 @@ export default function Layout() {
               <>
                 <div className="hidden sm:block text-right">
                   <p className="text-sm font-medium text-primary truncate max-w-[140px]">{user.name}</p>
-                  <RoleBadge role={user.role} size="sm" />
+                  <div className="flex items-center justify-end gap-2">
+                    <RoleBadge role={user.role} size="sm" />
+                    {subscribed && subscription && (
+                      <span className="text-[10px] text-brand-600 dark:text-brand-400 font-medium">
+                        {subscription.plan.name}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <button
                   type="button"

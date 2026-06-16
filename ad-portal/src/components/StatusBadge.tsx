@@ -1,4 +1,4 @@
-import { validationTone } from '../lib/campaignUtils';
+import { validationTone, moderationTone } from '../lib/campaignUtils';
 
 const toneClass: Record<string, string> = {
   success: 'badge-success',
@@ -20,6 +20,10 @@ export default function StatusBadge({
       {label}
     </span>
   );
+}
+
+export function ModerationBadge({ status }: { status: string }) {
+  return <StatusBadge label={status} tone={moderationTone(status)} />;
 }
 
 export function ValidationBadge({ status }: { status: string }) {

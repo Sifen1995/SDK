@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -27,54 +28,81 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-[75vh] flex items-center justify-center">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="logo-mark mx-auto mb-4 h-14 w-14 rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg">
-            Sk
-          </div>
-          <h1 className="text-3xl font-bold text-primary">Welcome back</h1>
-          <p className="text-muted mt-2">Sign in to manage your ad campaigns</p>
+    <div className="auth-page">
+      <div className="hidden lg:flex lg:w-[48%] auth-hero flex-col justify-between p-12">
+        <div className="auth-hero-content">
+          <div className="auth-logo-mark mb-8">Sk</div>
+          <h1 className="text-4xl font-bold leading-tight mb-4 text-white">Skykin Ad Portal</h1>
+          <p className="text-lg text-white/85 max-w-md leading-relaxed">
+            Launch intent-driven campaigns, reach the right audience segments, and track performance across the Skykin network.
+          </p>
+        </div>
+        <div className="auth-hero-content flex flex-wrap gap-3">
+          <span className="auth-pill">🎯 Intent targeting</span>
+          <span className="auth-pill">📊 Audiencemart segments</span>
+          <span className="auth-pill">🚀 Multi-channel delivery</span>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col min-h-screen">
+        <div className="flex justify-end p-6">
+          <ThemeToggle variant="header" />
         </div>
 
-        <form onSubmit={handleSubmit} className="card p-8 space-y-5">
-          {error && <div className="alert-error">{error}</div>}
+        <div className="flex-1 flex items-center justify-center px-6 pb-12">
+          <div className="w-full max-w-md">
+            <div className="lg:hidden text-center mb-8">
+              <div className="auth-logo-mark mx-auto mb-4">Sk</div>
+              <h1 className="text-3xl font-bold text-primary">Skykin Ad Portal</h1>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1.5">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="field-input"
-              placeholder="you@company.com"
-            />
+            <div className="mb-8 hidden lg:block">
+              <h2 className="text-2xl font-bold text-primary">Welcome back</h2>
+              <p className="text-muted mt-2">Sign in to manage your campaigns and subscription.</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="auth-card space-y-5">
+              {error && <div className="alert-error">{error}</div>}
+
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1.5">Work email</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="field-input"
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1.5">Password</label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="field-input"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                />
+              </div>
+
+              <button type="submit" disabled={loading} className="btn-primary w-full py-3">
+                {loading ? 'Signing in…' : 'Sign in'}
+              </button>
+
+              <p className="text-center text-sm text-muted pt-1">
+                New advertiser?{' '}
+                <Link to="/register" className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">
+                  Create account
+                </Link>
+              </p>
+            </form>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1.5">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="field-input"
-              placeholder="••••••••"
-            />
-          </div>
-
-          <button type="submit" disabled={loading} className="btn-primary w-full py-3">
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-
-          <p className="text-center text-sm text-muted">
-            New advertiser?{' '}
-            <Link to="/register" className="text-primary font-medium hover:underline">
-              Create account
-            </Link>
-          </p>
-        </form>
+        </div>
       </div>
     </div>
   );

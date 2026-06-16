@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import RoleBadge from '../components/RoleBadge';
+import { formatDate, formatEtb } from '../lib/campaignUtils';
 import { ROLE_META } from '../types';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
+  const { subscribed, subscription } = useSubscription();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -25,24 +29,22 @@ export default function Profile() {
   }, [refreshUser]);
 
   if (loading) {
-    return <p className="text-gray-500">Loading profile…</p>;
+    return <p className="text-muted">Loading profile…</p>;
   }
 
   if (!user) {
-    return <p className="text-red-600">{error || 'Not signed in'}</p>;
+    return <p className="text-red-600 dark:text-red-400">{error || 'Not signed in'}</p>;
   }
 
   const meta = ROLE_META[user.role];
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-      <p className="text-gray-500 mt-1">Your advertiser portal account details</p>
+      <h1 className="text-2xl font-bold text-primary">Profile</h1>
+      <p className="text-muted mt-1">Your advertiser portal account details</p>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 text-sm">
-          {error}
-        </div>
+        <div className="alert-warning mt-4">{error}</div>
       )}
 
       <div className="card mt-8 overflow-hidden">
@@ -61,43 +63,64 @@ export default function Profile() {
           </div>
         </div>
 
-        <dl className="divide-y divide-gray-100 px-6">
+        <dl className="divide-y divide-[var(--border)] px-6">
           <div className="py-4 grid grid-cols-3 gap-4">
-            <dt className="text-sm font-medium text-gray-500">Company</dt>
-            <dd className="text-sm text-gray-900 col-span-2">{user.company_name || '—'}</dd>
+            <dt className="text-sm font-medium text-muted">Company</dt>
+            <dd className="text-sm text-primary col-span-2">{user.company_name || '—'}</dd>
           </div>
           <div className="py-4 grid grid-cols-3 gap-4">
-            <dt className="text-sm font-medium text-gray-500">Role</dt>
-            <dd className="text-sm text-gray-900 col-span-2">
-              <span className="font-medium">{meta.label}</span>
-              <p className="text-gray-500 mt-1">{meta.description}</p>
+            <dt className="text-sm font-medium text-muted">Subscription</dt>
+            <dd className="text-sm text-primary col-span-2">
+              {subscribed && subscription ? (
+                <>
+                  <span className="font-medium">{subscription.plan.name}</span>
+                  <span className="text-muted"> · {formatEtb(subscription.plan.monthly_fee_etb)}/mo</span>
+                  <p className="text-muted text-xs mt-1">
+                    Renews {formatDate(subscription.current_period_end)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <span className="text-muted">Not subscribed</span>
+                  <Link to="/subscription" className="block text-brand-600 hover:underline text-xs mt-1">
+                    Choose a plan →
+                  </Link>
+                </>
+              )}
             </dd>
           </div>
           <div className="py-4 grid grid-cols-3 gap-4">
-            <dt className="text-sm font-medium text-gray-500">Advertiser ID</dt>
-            <dd className="text-sm text-gray-900 col-span-2 font-mono text-xs break-all">{user.advertiser_id}</dd>
+            <dt className="text-sm font-medium text-muted">Role</dt>
+            <dd className="text-sm text-primary col-span-2">
+              <span className="font-medium">{meta.label}</span>
+              <p className="text-muted mt-1">{meta.description}</p>
+            </dd>
           </div>
           <div className="py-4 grid grid-cols-3 gap-4">
-            <dt className="text-sm font-medium text-gray-500">Account status</dt>
+            <dt className="text-sm font-medium text-muted">Advertiser ID</dt>
+            <dd className="text-sm text-primary col-span-2 font-mono text-xs break-all">{user.advertiser_id}</dd>
+          </div>
+          <div className="py-4 grid grid-cols-3 gap-4">
+            <dt className="text-sm font-medium text-muted">Account status</dt>
             <dd className="text-sm col-span-2">
-              <span className={user.is_active ? 'text-emerald-600 font-medium' : 'text-red-600 font-medium'}>
+              <span className={user.is_active ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
                 {user.is_active ? 'Active' : 'Inactive'}
               </span>
             </dd>
           </div>
           <div className="py-4 grid grid-cols-3 gap-4">
-            <dt className="text-sm font-medium text-gray-500">Permissions</dt>
-            <dd className="text-sm text-gray-900 col-span-2">
+            <dt className="text-sm font-medium text-muted">Permissions</dt>
+            <dd className="text-sm text-primary col-span-2">
               {meta.canWrite ? (
-                <ul className="list-disc list-inside text-gray-600 space-y-1">
-                  <li>Create and edit campaigns</li>
-                  <li>Activate validated campaigns</li>
+                <ul className="list-disc list-inside text-muted space-y-1">
+                  <li>Create campaigns (requires subscription)</li>
                   <li>Preview creatives</li>
+                  <li>Campaigns go live after operator moderation</li>
                 </ul>
               ) : (
-                <ul className="list-disc list-inside text-gray-600 space-y-1">
+                <ul className="list-disc list-inside text-muted space-y-1">
                   <li>View campaigns and previews</li>
-                  <li>Read-only access — no create or activate</li>
+                  <li>Read-only access</li>
                 </ul>
               )}
             </dd>

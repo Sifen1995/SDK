@@ -34,6 +34,11 @@ export interface Campaign {
   isActive: boolean;
   validationStatus: string;
   validationNotes: string;
+  moderationStatus: string;
+  moderationNotes: string;
+  channelId: string;
+  channelCode: string;
+  billingModel: string;
   createdAt: string;
   updatedAt: string;
 }

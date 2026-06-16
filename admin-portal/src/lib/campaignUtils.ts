@@ -30,6 +30,11 @@ export function normalizeCampaign(raw: Record<string, unknown>): Campaign {
     isActive: Boolean(raw.IsActive ?? raw.is_active ?? raw.isActive ?? false),
     validationStatus: String(raw.ValidationStatus ?? raw.validation_status ?? raw.validationStatus ?? 'pending'),
     validationNotes: String(raw.ValidationNotes ?? raw.validation_notes ?? raw.validationNotes ?? ''),
+    moderationStatus: String(raw.ModerationStatus ?? raw.moderation_status ?? raw.moderationStatus ?? 'pending'),
+    moderationNotes: String(raw.ModerationNotes ?? raw.moderation_notes ?? raw.moderationNotes ?? ''),
+    channelId: String(raw.ChannelID ?? raw.channel_id ?? raw.channelId ?? ''),
+    channelCode: String(raw.ChannelCode ?? raw.channel_code ?? raw.channelCode ?? ''),
+    billingModel: String(raw.BillingModel ?? raw.billing_model ?? raw.billingModel ?? ''),
     createdAt: String(raw.CreatedAt ?? raw.created_at ?? raw.createdAt ?? ''),
     updatedAt: String(raw.UpdatedAt ?? raw.updated_at ?? raw.updatedAt ?? ''),
   };
@@ -56,6 +61,19 @@ export function validationTone(status: string): 'success' | 'warning' | 'danger'
     case 'passed':
       return 'success';
     case 'failed':
+      return 'danger';
+    case 'pending':
+      return 'warning';
+    default:
+      return 'neutral';
+  }
+}
+
+export function moderationTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
+  switch (status) {
+    case 'approved':
+      return 'success';
+    case 'rejected':
       return 'danger';
     case 'pending':
       return 'warning';

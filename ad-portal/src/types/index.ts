@@ -11,22 +11,80 @@ export interface PortalUser {
   is_active: boolean;
 }
 
+export interface Plan {
+  id: string;
+  name: string;
+  monthly_fee_etb: number;
+  max_active_campaigns: number;
+  max_daily_budget_etb: number;
+  included_impressions: number;
+  sms_plus_enabled: boolean;
+  audiencemart_enabled: boolean;
+  cpc_discount_pct: number;
+}
+
+export interface Subscription {
+  id: string;
+  plan: Plan;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  impressions_used: number;
+}
+
+export interface SubscriptionStatus {
+  subscribed: boolean;
+  subscription: Subscription | null;
+}
+
+export interface DeliveryChannel {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  is_premium: boolean;
+}
+
+export interface AudienceSegment {
+  id: string;
+  name: string;
+  description: string;
+  top_intent_signals: string[];
+  approximate_size: number;
+  estimated_cpm: number;
+  estimated_price_etb: number;
+  purchasable: boolean;
+}
+
+export interface SegmentsCatalog {
+  plan_name: string;
+  audiencemart_enabled: boolean;
+  segments: AudienceSegment[];
+}
+
 export interface Campaign {
   id: string;
   advertiserId: string;
   name: string;
   targetIntent: string;
-  creativeFormat: string;
+  channelId: string;
+  channelCode: string;
+  segmentId: string | null;
   title: string;
   bodyText: string;
   imageUrl: string;
   destinationUrl: string;
   canvasJson: Record<string, unknown>;
+  billingModel: string;
   dailyBudgetCap: number;
   totalBudgetCap: number;
+  budgetSpent: number;
+  frequencyCapPerDay: number;
   isActive: boolean;
   validationStatus: string;
   validationNotes: string;
+  moderationStatus: string;
+  moderationNotes: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,14 +92,17 @@ export interface Campaign {
 export interface CreateCampaignRequest {
   name: string;
   target_intent: string;
-  creative_format: string;
+  channel_id: string;
+  segment_id?: string | null;
   title?: string;
-  body_text?: string;
+  body_text: string;
   image_url?: string;
   destination_url: string;
   canvas_json?: Record<string, unknown>;
-  daily_budget_cap?: number;
-  total_budget_cap?: number;
+  billing_model: string;
+  daily_budget_cap: number;
+  total_budget_cap: number;
+  frequency_cap_per_day: number;
 }
 
 export interface CampaignPreview {
@@ -75,6 +136,14 @@ export interface CreateUserRequest {
   role: PortalRole;
 }
 
+export const BILLING_MODELS = [
+  { value: 'CPC', label: 'CPC', description: 'Cost per click' },
+  { value: 'CPM', label: 'CPM', description: 'Cost per 1,000 impressions' },
+  { value: 'CPI', label: 'CPI', description: 'Cost per install' },
+  { value: 'CPA', label: 'CPA', description: 'Cost per action' },
+  { value: 'REV_SHARE', label: 'Rev share', description: 'Revenue share model' },
+] as const;
+
 export const TARGET_INTENTS = [
   { value: 'crypto_interest', label: 'Crypto interest' },
   { value: 'fashion_interest', label: 'Fashion interest' },
@@ -85,22 +154,16 @@ export const TARGET_INTENTS = [
   { value: 'general_interest', label: 'General interest' },
 ] as const;
 
-export const CREATIVE_FORMATS = [
-  { value: 'BANNER', label: 'In-App Banner', description: 'Image banner with optional title overlay' },
-  { value: 'PUSH_PLUS', label: 'Push+ Notification', description: 'Rich push with title (1–50) and body (1–120)' },
-  { value: 'SMS_PLUS', label: 'SMS+ Canvas', description: 'Interactive canvas with title (1–40) and body (1–160)' },
-] as const;
-
 export const ROLE_META: Record<PortalRole, { label: string; description: string; canWrite: boolean; selfRegister: boolean }> = {
   advertiser: {
     label: 'Advertiser',
-    description: 'Create, activate, and manage campaigns for your company.',
+    description: 'Create and manage campaigns for your company.',
     canWrite: true,
     selfRegister: true,
   },
   read_only_analyst: {
     label: 'Read-only Analyst',
-    description: 'View campaigns and previews. Cannot create or activate campaigns.',
+    description: 'View campaigns and previews. Cannot create campaigns.',
     canWrite: false,
     selfRegister: true,
   },
@@ -118,4 +181,12 @@ export function canWriteCampaigns(role: PortalRole): boolean {
 
 export function isOperatorAdmin(role: PortalRole): boolean {
   return role === 'operator_admin';
+}
+
+export function channelNeedsImage(code: string): boolean {
+  return code === 'IN_APP_BANNER' || code === 'NATIVE_FEED';
+}
+
+export function channelNeedsRichCopy(code: string): boolean {
+  return code === 'PUSH' || code === 'SMS_PLUS';
 }
