@@ -1,5 +1,26 @@
 basePath: /api/v1
 definitions:
+  internal_admin_interfaces_http.CampaignListResponse:
+    properties:
+      campaigns:
+        items: {}
+        type: array
+      count:
+        type: integer
+    type: object
+  internal_admin_interfaces_http.ValidateCampaignRequest:
+    properties:
+      action:
+        enum:
+        - approve
+        - reject
+        type: string
+      notes:
+        maxLength: 2000
+        type: string
+    required:
+    - action
+    type: object
   internal_advertisers_interfaces_http.AdPortalLoginResponse:
     properties:
       token:
@@ -395,6 +416,16 @@ definitions:
         type: string
       isActive:
         type: boolean
+      moderatedAt:
+        type: string
+      moderatedBy:
+        description: portal_users.id of the operator
+        type: string
+      moderationNotes:
+        type: string
+      moderationStatus:
+        description: ModerationStatus is set by operator_admin (pending → approved/rejected).
+        type: string
       name:
         type: string
       scheduledEndAt:
@@ -479,6 +510,84 @@ info:
   title: Skykin Platform API
   version: "1.0"
 paths:
+  /ad-portal/admin/campaigns/{id}/activate:
+    post:
+      description: Sets is_active=true. Campaign must have moderation_status=approved
+        and validation_status=passed.
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_campaigns_model.Campaign'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Activate an approved campaign (go live)
+      tags:
+      - Ad Portal - Admin
+  /ad-portal/admin/campaigns/{id}/validate:
+    post:
+      consumes:
+      - application/json
+      description: Approve runs creative validation against the campaign channel and
+        sets moderation_status=approved. Reject sets moderation_status=rejected.
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: approve or reject
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_admin_interfaces_http.ValidateCampaignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_campaigns_model.Campaign'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Approve or reject a pending campaign
+      tags:
+      - Ad Portal - Admin
+  /ad-portal/admin/campaigns/pending:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_admin_interfaces_http.CampaignListResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: List campaigns pending operator validation
+      tags:
+      - Ad Portal - Admin
   /ad-portal/admin/users:
     post:
       consumes:

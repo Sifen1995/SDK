@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	billingmodel "skykin-platform/internal/billing/model"
 	audiencedomain "skykin-platform/internal/audience/domain"
 	"skykin-platform/internal/audience/model"
+	billingmodel "skykin-platform/internal/billing/model"
 
 	"gorm.io/gorm"
 )
@@ -38,11 +38,7 @@ func NewPurchaseService(segments audiencedomain.SegmentRepository) *PurchaseServ
 }
 
 // PreparePurchase validates the segment is available and the plan allows Audiencemart.
-func (s *PurchaseService) PreparePurchase(
-	ctx context.Context,
-	advertiserID, segmentID string,
-	plan billingmodel.SubscriptionPlan,
-) (*PurchaseQuote, error) {
+func (s *PurchaseService) PreparePurchase(ctx context.Context, advertiserID, segmentID string, plan billingmodel.SubscriptionPlan) (*PurchaseQuote, error) {
 	if !plan.AudiencemartEnabled {
 		return nil, fmt.Errorf("plan %q does not include Audiencemart", plan.Name)
 	}

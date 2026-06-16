@@ -28,8 +28,19 @@ var (
 func (r *Repository) ListActive(ctx context.Context) ([]model.Campaign, error) {
 	var list []model.Campaign
 	err := r.db.WithContext(ctx).
-		Where("is_active = ? AND validation_status = ?", true, "passed").
+		Where("is_active = ? AND validation_status = ? AND moderation_status = ?",
+			true, "passed", campaigndomain.ModerationApproved).
 		Order("created_at desc").
+		Find(&list).Error
+	return list, err
+}
+
+// ListPendingModeration returns campaigns awaiting operator review.
+func (r *Repository) ListPendingModeration(ctx context.Context) ([]model.Campaign, error) {
+	var list []model.Campaign
+	err := r.db.WithContext(ctx).
+		Where("moderation_status = ? AND is_active = ?", campaigndomain.ModerationPending, false).
+		Order("created_at asc").
 		Find(&list).Error
 	return list, err
 }
@@ -88,8 +99,8 @@ func (r *Repository) FindActiveForIntent(ctx context.Context, targetIntent, chan
 		Table("campaigns").
 		Select("campaigns.*").
 		Joins("JOIN channels ON channels.id = campaigns.channel_id").
-		Where("campaigns.target_intent = ? AND campaigns.is_active = ? AND campaigns.validation_status = ?",
-			targetIntent, true, "passed")
+		Where("campaigns.target_intent = ? AND campaigns.is_active = ? AND campaigns.validation_status = ? AND campaigns.moderation_status = ?",
+			targetIntent, true, "passed", campaigndomain.ModerationApproved)
 	if channelCode != "" {
 		q = q.Where("channels.code = ?", channelCode)
 	}

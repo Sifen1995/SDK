@@ -2,6 +2,8 @@ package route
 
 import (
 	"skykin-platform/configs"
+	adminApp "skykin-platform/internal/admin/application"
+	adminHTTP "skykin-platform/internal/admin/interfaces/http"
 	advertiserApp "skykin-platform/internal/advertisers/application"
 	advertiserHTTP "skykin-platform/internal/advertisers/interfaces/http"
 	advertiserInfra "skykin-platform/internal/advertisers/infrastructure"
@@ -45,11 +47,13 @@ func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS
 	starterSubs := billingApp.NewStarterSubscriptionService(subRepo)
 
 	campaignSvc := campaignApp.NewCampaignService(campaignRepo, subEnforcer, audiencePurchases, channelRepo)
+	adminModeration := adminApp.NewCampaignModerationService(campaignRepo, channelRepo)
 
 	advertiserHTTP.RegisterRoutes(r,
 		advertiserHTTP.NewAuthHandler(advertiserApp.NewAuthService(adRepo, cfg, starterSubs)),
 		campaignHTTP.NewHandler(campaignSvc),
 		audienceHTTP.NewHandler(audienceList),
+		adminHTTP.NewCampaignHandler(adminModeration),
 		cfg,
 	)
 

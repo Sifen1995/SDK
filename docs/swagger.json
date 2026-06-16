@@ -9,6 +9,128 @@
     "host": "localhost:8081",
     "basePath": "/api/v1",
     "paths": {
+        "/ad-portal/admin/campaigns/pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "List campaigns pending operator validation",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.CampaignListResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/campaigns/{id}/activate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets is_active=true. Campaign must have moderation_status=approved and validation_status=passed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Activate an approved campaign (go live)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/campaigns/{id}/validate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Approve runs creative validation against the campaign channel and sets moderation_status=approved. Reject sets moderation_status=rejected.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Approve or reject a pending campaign",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "approve or reject",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.ValidateCampaignRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/admin/users": {
             "post": {
                 "security": [
@@ -650,6 +772,37 @@
         }
     },
     "definitions": {
+        "internal_admin_interfaces_http.CampaignListResponse": {
+            "type": "object",
+            "properties": {
+                "campaigns": {
+                    "type": "array",
+                    "items": {}
+                },
+                "count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_admin_interfaces_http.ValidateCampaignRequest": {
+            "type": "object",
+            "required": [
+                "action"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "approve",
+                        "reject"
+                    ]
+                },
+                "notes": {
+                    "type": "string",
+                    "maxLength": 2000
+                }
+            }
+        },
         "internal_advertisers_interfaces_http.AdPortalLoginResponse": {
             "type": "object",
             "properties": {
@@ -1197,6 +1350,20 @@
                 },
                 "isActive": {
                     "type": "boolean"
+                },
+                "moderatedAt": {
+                    "type": "string"
+                },
+                "moderatedBy": {
+                    "description": "portal_users.id of the operator",
+                    "type": "string"
+                },
+                "moderationNotes": {
+                    "type": "string"
+                },
+                "moderationStatus": {
+                    "description": "ModerationStatus is set by operator_admin (pending → approved/rejected).",
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"

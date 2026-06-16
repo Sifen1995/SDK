@@ -2,6 +2,7 @@ package http
 
 import (
 	"skykin-platform/configs"
+	adminHTTP "skykin-platform/internal/admin/interfaces/http"
 	audienceHTTP "skykin-platform/internal/audience/interfaces/http"
 	campaignHTTP "skykin-platform/internal/campaigns/interfaces/http"
 	platformMiddleware "skykin-platform/internal/platform/middleware"
@@ -9,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RegisterRoutes mounts ad portal auth + campaign + audience routes under /api/v1/ad-portal.
-func RegisterRoutes(r *gin.Engine, auth *AuthHandler, campaigns *campaignHTTP.Handler, audience *audienceHTTP.Handler, cfg *configs.Config) {
+// RegisterRoutes mounts ad portal auth + campaign + audience + admin routes under /api/v1/ad-portal.
+func RegisterRoutes(r *gin.Engine, auth *AuthHandler, campaigns *campaignHTTP.Handler, audience *audienceHTTP.Handler, adminCampaigns *adminHTTP.CampaignHandler, cfg *configs.Config) {
 	g := r.Group("/api/v1/ad-portal")
 	{
 		g.POST("/register", auth.Register)
@@ -31,13 +32,15 @@ func RegisterRoutes(r *gin.Engine, auth *AuthHandler, campaigns *campaignHTTP.Ha
 			write.Use(platformMiddleware.RequirePortalWrite())
 			{
 				write.POST("/campaigns", campaigns.CreateCampaign)
-				write.POST("/campaigns/:id/activate", campaigns.ActivateCampaign)
 			}
 
 			admin := protected.Group("/admin")
 			admin.Use(platformMiddleware.RequirePortalRoles("operator_admin"))
 			{
 				admin.POST("/users", auth.CreateUser)
+				admin.GET("/campaigns/pending", adminCampaigns.ListPendingCampaigns)
+				admin.POST("/campaigns/:id/validate", adminCampaigns.ValidateCampaign)
+				admin.POST("/campaigns/:id/activate", adminCampaigns.ActivateCampaign)
 			}
 		}
 	}
