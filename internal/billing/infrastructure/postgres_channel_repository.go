@@ -26,3 +26,12 @@ func (r *ChannelRepository) GetByID(ctx context.Context, id string) (*model.Chan
 	}
 	return &ch, nil
 }
+
+func (r *ChannelRepository) ListActive(ctx context.Context) ([]model.Channel, error) {
+	var channels []model.Channel
+	err := r.db.WithContext(ctx).
+		Where("is_active = ?", true).
+		Order("is_premium ASC, name ASC").
+		Find(&channels).Error
+	return channels, err
+}

@@ -33,7 +33,7 @@ func (e *SubscriptionEnforcer) AssertCanCreateCampaign(
 ) (*billingdomain.SubscriptionContext, error) {
 	sub, err := e.subs.GetActiveByAdvertiser(ctx, advertiserID)
 	if err != nil {
-		return nil, errors.New("no active subscription; contact support or re-register")
+		return nil, errors.New("no active subscription; subscribe to a plan before creating campaigns")
 	}
 	now := time.Now().UTC()
 	if sub.Status != "active" {
@@ -73,21 +73,4 @@ func (e *SubscriptionEnforcer) AssertCanCreateCampaign(
 		SubscriptionID: sub.ID,
 		Plan:           plan,
 	}, nil
-}
-
-// StarterSubscriptionService assigns the default Starter plan to new advertisers.
-type StarterSubscriptionService struct {
-	subs billingdomain.SubscriptionRepository
-}
-
-func NewStarterSubscriptionService(subs billingdomain.SubscriptionRepository) *StarterSubscriptionService {
-	return &StarterSubscriptionService{subs: subs}
-}
-
-// AssignStarter creates a Starter subscription if the advertiser has none yet.
-func (s *StarterSubscriptionService) AssignStarter(ctx context.Context, advertiserID string) error {
-	if advertiserID == "" {
-		return nil
-	}
-	return s.subs.EnsureStarterForAdvertiser(ctx, advertiserID)
 }

@@ -2,8 +2,6 @@ package infrastructure
 
 import (
 	"context"
-	"errors"
-	"time"
 
 	billingdomain "skykin-platform/internal/billing/domain"
 	"skykin-platform/internal/billing/model"
@@ -42,38 +40,23 @@ func (r *SubscriptionRepository) GetPlanByName(ctx context.Context, name string)
 	return &plan, nil
 }
 
+func (r *SubscriptionRepository) GetPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error) {
+	var plan model.SubscriptionPlan
+	if err := r.db.WithContext(ctx).Where("id = ? AND is_active = ?", planID, true).First(&plan).Error; err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
+func (r *SubscriptionRepository) ListActivePlans(ctx context.Context) ([]model.SubscriptionPlan, error) {
+	var plans []model.SubscriptionPlan
+	err := r.db.WithContext(ctx).
+		Where("is_active = ?", true).
+		Order("monthly_fee_etb ASC").
+		Find(&plans).Error
+	return plans, err
+}
+
 func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, sub *model.AdvertiserSubscription) error {
 	return r.db.WithContext(ctx).Create(sub).Error
-}
-
-func (r *SubscriptionRepository) CountAdvertisersWithoutSubscription(ctx context.Context) (int64, error) {
-	var n int64
-	err := r.db.WithContext(ctx).Raw(`
-		SELECT COUNT(*) FROM advertisers a
-		WHERE NOT EXISTS (
-			SELECT 1 FROM advertiser_subscriptions s WHERE s.advertiser_id = a.id
-		)
-	`).Scan(&n).Error
-	return n, err
-}
-
-// EnsureStarterForAdvertiser assigns Starter when missing (idempotent).
-func (r *SubscriptionRepository) EnsureStarterForAdvertiser(ctx context.Context, advertiserID string) error {
-	if _, err := r.GetActiveByAdvertiser(ctx, advertiserID); err == nil {
-		return nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-	plan, err := r.GetPlanByName(ctx, "Starter")
-	if err != nil {
-		return err
-	}
-	start, end := billingdomain.StarterPeriod(time.Now())
-	return r.CreateSubscription(ctx, &model.AdvertiserSubscription{
-		AdvertiserID:       advertiserID,
-		PlanID:             plan.ID,
-		Status:             "active",
-		CurrentPeriodStart: start,
-		CurrentPeriodEnd:   end,
-	})
 }

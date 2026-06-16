@@ -15,19 +15,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// StarterAssigner assigns a default subscription plan to new advertiser companies.
-type StarterAssigner interface {
-	AssignStarter(ctx context.Context, advertiserID string) error
-}
-
 type AuthService struct {
-	repo    *infrastructure.Repository
-	cfg     *configs.Config
-	starter StarterAssigner
+	repo *infrastructure.Repository
+	cfg  *configs.Config
 }
 
-func NewAuthService(repo *infrastructure.Repository, cfg *configs.Config, starter StarterAssigner) *AuthService {
-	return &AuthService{repo: repo, cfg: cfg, starter: starter}
+func NewAuthService(repo *infrastructure.Repository, cfg *configs.Config) *AuthService {
+	return &AuthService{repo: repo, cfg: cfg}
 }
 
 type portalClaims struct {
@@ -188,10 +182,6 @@ func (s *AuthService) createPortalUser(ctx context.Context, name, email, passwor
 	// duplicate advertiser rows.
 	if err := s.repo.CreateAdvertiserAndPortalUser(ctx, adv, u); err != nil {
 		return nil, err
-	}
-	// Assign Starter plan so campaign creation passes subscription gate on first login.
-	if s.starter != nil && adv.ID != "" {
-		_ = s.starter.AssignStarter(ctx, adv.ID)
 	}
 	return s.repo.GetPortalUserByID(ctx, u.ID)
 }
