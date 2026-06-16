@@ -19,7 +19,7 @@ func NewHandler(predict *application.PredictIntentUseCase) *Handler {
 
 // PredictIntent godoc
 // @Summary      Predict user intent (sync)
-// @Description  Loads stored/cached events for a user, calls ML, persists intent and reward when threshold is met.
+// @Description  Loads stored/cached events for a user, calls ML, persists intent, and pushes intent_predicted + campaign_ad (when matched) on WebSocket.
 // @Tags         SDK - Intents
 // @Accept       json
 // @Produce      json

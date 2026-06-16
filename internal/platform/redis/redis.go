@@ -24,6 +24,11 @@ func NewRedisClient(addr string) (*RedisClient, error) {
 	return &RedisClient{Client: rdb}, nil
 }
 
+// Del removes a key from Redis.
+func (c *RedisClient) Del(ctx context.Context, key string) error {
+	return c.Client.Del(ctx, key).Err()
+}
+
 // RPush pushes data onto the end of a Redis List (acting as our queue)
 func (c *RedisClient) RPush(ctx context.Context, key string, value string) error {
 	return c.Client.RPush(ctx, key, value).Err()

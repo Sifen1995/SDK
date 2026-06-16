@@ -10,6 +10,7 @@ import (
 
 	"skykin-platform/internal/events/domain"
 	intentdomain "skykin-platform/internal/intents/domain"
+	intentEvents "skykin-platform/internal/intents/events"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
 	intentModel "skykin-platform/internal/intents/model"
 	"skykin-platform/internal/platform/messaging"
@@ -104,6 +105,9 @@ func (uc *PredictIntentUseCase) Execute(ctx context.Context, externalUserID stri
 				Message: "prediction already in progress for this user",
 			}, nil
 		}
+		defer func() {
+			_ = uc.redis.Del(ctx, predictLockKey(externalUserID))
+		}()
 	}
 
 	history, err := uc.loadHistory(ctx, externalUserID)
@@ -160,7 +164,8 @@ func (uc *PredictIntentUseCase) Execute(ctx context.Context, externalUserID stri
 		TopSignals:      mlResult.TopSignals,
 	}
 
-	uc.deliverCampaignAd(ctx, externalUserID, user.ID, intent.IntentName, history)
+	uc.notifyIntentPredicted(ctx, externalUserID, result)
+	uc.deliverCampaignAd(ctx, externalUserID, user.ID, intent.IntentName, intent.Confidence, history)
 
 	if !mlResult.RewardTriggered {
 		return result, nil
@@ -248,7 +253,24 @@ func userEventsKey(externalUserID string) string {
 	return "user_events:" + externalUserID
 }
 
-func (uc *PredictIntentUseCase) deliverCampaignAd(ctx context.Context, externalUserID, internalUserID, intentName string, history []domain.Event) {
+func (uc *PredictIntentUseCase) notifyIntentPredicted(ctx context.Context, externalUserID string, result *PredictIntentResult) {
+	if uc.bus == nil || result.Intent == "" {
+		return
+	}
+	uc.bus.Publish(messaging.Event{
+		Name: intentEvents.TopicIntentPredicted,
+		Ctx:  ctx,
+		Payload: intentEvents.IntentPredicted{
+			ExternalUserID:  externalUserID,
+			Intent:          result.Intent,
+			Confidence:      result.Confidence,
+			TopSignals:      result.TopSignals,
+			RewardTriggered: result.RewardTriggered,
+		},
+	})
+}
+
+func (uc *PredictIntentUseCase) deliverCampaignAd(ctx context.Context, externalUserID, internalUserID, intentName string, confidence float64, history []domain.Event) {
 	if uc.adDelivery == nil || uc.bus == nil {
 		return
 	}
@@ -264,6 +286,7 @@ func (uc *PredictIntentUseCase) deliverCampaignAd(ctx context.Context, externalU
 	payload := map[string]any{
 		"type":            ad.Type,
 		"intent":          ad.Intent,
+		"confidence":      confidence,
 		"campaign_id":     ad.CampaignID,
 		"campaign_name":   ad.CampaignName,
 		"channel_code":    ad.ChannelCode,
