@@ -121,10 +121,6 @@ export default function CampaignDetail() {
               <dd className="font-mono text-xs text-primary break-all text-right">{campaign.id}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-muted">Application ID</dt>
-              <dd className="font-mono text-xs text-primary break-all text-right">{campaign.applicationId || '—'}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
               <dt className="text-muted">Destination URL</dt>
               <dd className="text-primary text-xs break-all text-right">
                 {campaign.destinationUrl ? (
