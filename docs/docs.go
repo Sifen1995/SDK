@@ -776,7 +776,7 @@ const docTemplate = `{
                         "APIKeyAuth": []
                     }
                 ],
-                "description": "Accepts domain-agnostic SDK events (screen views, content views, searches, etc.). Returns 202; intent prediction runs asynchronously.",
+                "description": "Accepts domain-agnostic SDK events (screen views, content views, searches, etc.). Stores events and caches history. Call POST /intents/predict to run prediction and receive intent + campaign on WebSocket.",
                 "consumes": [
                     "application/json"
                 ],
@@ -839,7 +839,7 @@ const docTemplate = `{
                         "APIKeyAuth": []
                     }
                 ],
-                "description": "Loads stored/cached events for a user, calls ML, persists intent and reward when threshold is met.",
+                "description": "Loads stored/cached events for a user, calls ML, persists intent, and pushes intent_predicted + campaign_ad (when matched) on WebSocket.",
                 "consumes": [
                     "application/json"
                 ],

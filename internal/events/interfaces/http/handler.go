@@ -21,7 +21,7 @@ func NewHandler(ingest *application.IngestEventsUseCase) *Handler {
 
 // PostEvents godoc
 // @Summary      Ingest batched behavioral events
-// @Description  Accepts domain-agnostic SDK events (screen views, content views, searches, etc.). Returns 202; intent prediction runs asynchronously.
+// @Description  Accepts domain-agnostic SDK events (screen views, content views, searches, etc.). Stores events and caches history. Call POST /intents/predict to run prediction and receive intent + campaign on WebSocket.
 // @Tags         SDK - Events
 // @Accept       json
 // @Produce      json

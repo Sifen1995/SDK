@@ -191,26 +191,9 @@ func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (
 		})
 	}
 
-	predictionQueued := false
-	if len(toStore) > 0 {
-		uc.publisher.Publish(ctx, internalevents.TopicIntentEvaluationRequested, internalevents.IntentEvaluationRequested{
-			UserID:         cmd.ExternalUserID,
-			InternalUserID: user.ID,
-			ApplicationID:  cmd.ApplicationID,
-			EventCount:     len(toStore),
-		})
-		predictionQueued = true
-	}
-
 	if uc.redis != nil {
 		if err := uc.cacheUserEvents(ctx, cmd.ExternalUserID, toStore); err != nil {
 			uc.logger.Warn("failed to cache user events in redis",
-				"user_id", cmd.ExternalUserID,
-				"error", err,
-			)
-		}
-		if err := uc.redis.RPush(ctx, "user_pipeline", cmd.ExternalUserID); err != nil {
-			uc.logger.Warn("failed to push user_id to redis pipeline",
 				"user_id", cmd.ExternalUserID,
 				"error", err,
 			)
@@ -219,7 +202,7 @@ func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (
 
 	return &IngestResult{
 		Accepted:         true,
-		PredictionQueued: predictionQueued,
+		PredictionQueued: false,
 		Results:          results,
 	}, nil
 }
