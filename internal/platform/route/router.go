@@ -7,9 +7,9 @@ import (
 	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
 	adminApp "skykin-platform/internal/admin/application"
 	adminHTTP "skykin-platform/internal/admin/interfaces/http"
-	advertiserApp "skykin-platform/internal/advertisers/application"
-	advertiserHTTP "skykin-platform/internal/advertisers/interfaces/http"
-	advertiserInfra "skykin-platform/internal/advertisers/infrastructure"
+	adportalApp "skykin-platform/internal/ad_portal/application"
+	adportalHTTP "skykin-platform/internal/ad_portal/interfaces/http"
+	adportalInfra "skykin-platform/internal/ad_portal/infrastructure"
 	audienceApp "skykin-platform/internal/audience/application"
 	audienceHTTP "skykin-platform/internal/audience/interfaces/http"
 	audienceInfra "skykin-platform/internal/audience/infrastructure"
@@ -39,7 +39,7 @@ func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS
 
 	sdkAuthMiddleware := authRoutes.RegisterRoutes(r, db, cfg)
 
-	adRepo := advertiserInfra.NewRepository(db)
+	adRepo := adportalInfra.NewRepository(db)
 	campaignRepo := campaignInfra.NewRepository(db)
 	subRepo := billingInfra.NewSubscriptionRepository(db)
 	channelRepo := billingInfra.NewChannelRepository(db)
@@ -54,8 +54,8 @@ func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS
 	adminModeration := adminApp.NewCampaignModerationService(campaignRepo, channelRepo)
 	analyticsSvc := analyticsApp.NewService(analyticsInfra.NewRepository(db))
 
-	advertiserHTTP.RegisterRoutes(r,
-		advertiserHTTP.NewAuthHandler(advertiserApp.NewAuthService(adRepo, cfg)),
+	adportalHTTP.RegisterRoutes(r,
+		adportalHTTP.NewAuthHandler(adportalApp.NewPortalAuthService(adRepo, cfg)),
 		campaignHTTP.NewHandler(campaignSvc),
 		audienceHTTP.NewHandler(audienceList),
 		billingHTTP.NewHandler(subscriptionSvc),

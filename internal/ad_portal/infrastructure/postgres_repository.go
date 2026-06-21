@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"skykin-platform/internal/advertisers/model"
+	"skykin-platform/internal/ad_portal/model"
 
 	"gorm.io/gorm"
 )

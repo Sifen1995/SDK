@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"skykin-platform/configs"
-	advertisermodel "skykin-platform/internal/advertisers/model"
+	adportalmodel "skykin-platform/internal/ad_portal/model"
 	audiencemodel "skykin-platform/internal/audience/model"
 	billingmodel "skykin-platform/internal/billing/model"
 	campaignmodel "skykin-platform/internal/campaigns/model"
@@ -64,9 +64,9 @@ func Migrate(db *gorm.DB) error {
 		&authmodel.Developer{},
 		&authmodel.Application{},
 		&authmodel.APIKey{},
-		&advertisermodel.Role{},
-		&advertisermodel.Advertiser{},
-		&advertisermodel.PortalUser{},
+		&adportalmodel.Role{},
+		&adportalmodel.Advertiser{},
+		&adportalmodel.PortalUser{},
 		&campaignmodel.Campaign{},
 		&campaignmodel.DeliveryLog{},
 		&deliverymodel.DeliveryJob{},
@@ -91,7 +91,7 @@ func Migrate(db *gorm.DB) error {
 }
 
 func seedPortalRoles(db *gorm.DB) {
-	roles := []advertisermodel.Role{
+	roles := []adportalmodel.Role{
 		{Slug: "operator_admin", DisplayName: "Operator Admin"},
 		{Slug: "advertiser", DisplayName: "Advertiser"},
 		{Slug: "read_only_analyst", DisplayName: "Read-Only Analyst"},

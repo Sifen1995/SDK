@@ -3,17 +3,17 @@ package http
 import (
 	"net/http"
 
-	"skykin-platform/internal/advertisers/application"
+	adportalApp "skykin-platform/internal/ad_portal/application"
 	platformHTTP "skykin-platform/internal/platform/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 type AuthHandler struct {
-	auth *application.AuthService
+	auth *adportalApp.PortalAuthService
 }
 
-func NewAuthHandler(auth *application.AuthService) *AuthHandler {
+func NewAuthHandler(auth *adportalApp.PortalAuthService) *AuthHandler {
 	return &AuthHandler{auth: auth}
 }
 
@@ -37,7 +37,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "registration failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"user": application.UserResponse(u)})
+	c.JSON(http.StatusCreated, gin.H{"user": adportalApp.UserResponse(u)})
 }
 
 // Login godoc
@@ -60,7 +60,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusUnauthorized, "login failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"token": token, "user": application.UserResponse(u)})
+	c.JSON(http.StatusOK, gin.H{"token": token, "user": adportalApp.UserResponse(u)})
 }
 
 // Me godoc
@@ -78,7 +78,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusNotFound, "user not found", nil)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": application.UserResponse(u)})
+	c.JSON(http.StatusOK, gin.H{"user": adportalApp.UserResponse(u)})
 }
 
 // CreateUser godoc
@@ -102,5 +102,5 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "create user failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"user": application.UserResponse(u)})
+	c.JSON(http.StatusCreated, gin.H{"user": adportalApp.UserResponse(u)})
 }

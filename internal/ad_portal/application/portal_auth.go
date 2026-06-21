@@ -7,21 +7,22 @@ import (
 	"time"
 
 	"skykin-platform/configs"
-	"skykin-platform/internal/advertisers/domain"
-	"skykin-platform/internal/advertisers/infrastructure"
-	"skykin-platform/internal/advertisers/model"
+	"skykin-platform/internal/ad_portal/domain"
+	"skykin-platform/internal/ad_portal/infrastructure"
+	"skykin-platform/internal/ad_portal/model"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type AuthService struct {
+// PortalAuthService handles registration, login, and portal user management for all ad-portal roles.
+type PortalAuthService struct {
 	repo *infrastructure.Repository
 	cfg  *configs.Config
 }
 
-func NewAuthService(repo *infrastructure.Repository, cfg *configs.Config) *AuthService {
-	return &AuthService{repo: repo, cfg: cfg}
+func NewPortalAuthService(repo *infrastructure.Repository, cfg *configs.Config) *PortalAuthService {
+	return &PortalAuthService{repo: repo, cfg: cfg}
 }
 
 type portalClaims struct {
@@ -32,7 +33,8 @@ type portalClaims struct {
 	jwt.RegisteredClaims
 }
 
-func (s *AuthService) Register(ctx context.Context, name, email, password, company, roleSlug string) (*model.PortalUser, error) {
+// Register creates an advertiser or read-only analyst portal user.
+func (s *PortalAuthService) Register(ctx context.Context, name, email, password, company, roleSlug string) (*model.PortalUser, error) {
 	if roleSlug == "" {
 		roleSlug = domain.RoleAdvertiser
 	}
@@ -42,7 +44,8 @@ func (s *AuthService) Register(ctx context.Context, name, email, password, compa
 	return s.createPortalUser(ctx, name, email, password, company, roleSlug)
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (string, *model.PortalUser, error) {
+// Login authenticates any portal role (operator_admin, advertiser, read_only_analyst).
+func (s *PortalAuthService) Login(ctx context.Context, email, password string) (string, *model.PortalUser, error) {
 	u, err := s.repo.GetPortalUserByEmail(ctx, email)
 	if err != nil {
 		return "", nil, errors.New("invalid credentials")
@@ -60,7 +63,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	return token, u, nil
 }
 
-func (s *AuthService) signToken(u *model.PortalUser) (string, error) {
+func (s *PortalAuthService) signToken(u *model.PortalUser) (string, error) {
 	claims := portalClaims{
 		PortalUserID: u.ID,
 		AdvertiserID: u.AccountAdvertiserID(),
@@ -75,6 +78,7 @@ func (s *AuthService) signToken(u *model.PortalUser) (string, error) {
 	return t.SignedString([]byte(s.cfg.JwtSecret))
 }
 
+// ParsePortalToken validates a portal JWT and returns its claims.
 func ParsePortalToken(cfg *configs.Config, tokenStr string) (*portalClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &portalClaims{}, func(t *jwt.Token) (interface{}, error) {
 		return []byte(cfg.JwtSecret), nil
@@ -89,7 +93,8 @@ func ParsePortalToken(cfg *configs.Config, tokenStr string) (*portalClaims, erro
 	return claims, nil
 }
 
-func (s *AuthService) EnsureOperatorAdmin(ctx context.Context, email, password, name, company string) error {
+// EnsureOperatorAdmin seeds the default operator admin if missing.
+func (s *PortalAuthService) EnsureOperatorAdmin(ctx context.Context, email, password, name, company string) error {
 	_, err := s.repo.GetPortalUserByEmail(ctx, email)
 	if err == nil {
 		return nil
@@ -112,10 +117,12 @@ func (s *AuthService) EnsureOperatorAdmin(ctx context.Context, email, password, 
 	return s.repo.CreatePortalUser(ctx, u)
 }
 
-func (s *AuthService) Me(ctx context.Context, portalUserID string) (*model.PortalUser, error) {
+// Me returns the current portal user profile.
+func (s *PortalAuthService) Me(ctx context.Context, portalUserID string) (*model.PortalUser, error) {
 	return s.repo.GetPortalUserByID(ctx, portalUserID)
 }
 
+// UserResponse maps a portal user to the API shape.
 func UserResponse(u *model.PortalUser) map[string]any {
 	resp := map[string]any{
 		"id":            u.ID,
@@ -132,7 +139,8 @@ func UserResponse(u *model.PortalUser) map[string]any {
 	return resp
 }
 
-func (s *AuthService) CreateOperatorUser(ctx context.Context, name, email, password, roleSlug, company string) (*model.PortalUser, error) {
+// CreateOperatorUser is used by operator_admin to provision portal accounts.
+func (s *PortalAuthService) CreateOperatorUser(ctx context.Context, name, email, password, roleSlug, company string) (*model.PortalUser, error) {
 	if roleSlug != domain.RoleAdvertiser && roleSlug != domain.RoleReadOnlyAnalyst && roleSlug != domain.RoleOperatorAdmin {
 		return nil, fmt.Errorf("invalid role")
 	}
@@ -156,7 +164,7 @@ func (s *AuthService) CreateOperatorUser(ctx context.Context, name, email, passw
 	return s.createPortalUser(ctx, name, email, password, company, roleSlug)
 }
 
-func (s *AuthService) createPortalUser(ctx context.Context, name, email, password, company, roleSlug string) (*model.PortalUser, error) {
+func (s *PortalAuthService) createPortalUser(ctx context.Context, name, email, password, company, roleSlug string) (*model.PortalUser, error) {
 	if company == "" {
 		return nil, errors.New("company_name is required")
 	}
@@ -176,10 +184,6 @@ func (s *AuthService) createPortalUser(ctx context.Context, name, email, passwor
 		RoleID:       role.ID,
 		IsActive:     true,
 	}
-
-	// Create advertiser (or reuse existing by company name) and portal user
-	// inside a single DB transaction to avoid orphaned advertisers and
-	// duplicate advertiser rows.
 	if err := s.repo.CreateAdvertiserAndPortalUser(ctx, adv, u); err != nil {
 		return nil, err
 	}
