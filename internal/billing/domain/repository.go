@@ -18,8 +18,18 @@ type SubscriptionRepository interface {
 	GetActiveByAdvertiser(ctx context.Context, advertiserID string) (*model.AdvertiserSubscription, error)
 	GetPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error)
 	GetPlanByName(ctx context.Context, name string) (*model.SubscriptionPlan, error)
+	FindPlanByName(ctx context.Context, name string) (*model.SubscriptionPlan, error)
 	ListActivePlans(ctx context.Context) ([]model.SubscriptionPlan, error)
+	CreatePlan(ctx context.Context, plan *model.SubscriptionPlan) error
 	CreateSubscription(ctx context.Context, sub *model.AdvertiserSubscription) error
+}
+
+// BillingRateRepository manages per-plan usage rates.
+type BillingRateRepository interface {
+	ListByPlanID(ctx context.Context, planID string) ([]model.BillingRate, error)
+	GetByID(ctx context.Context, id string) (*model.BillingRate, error)
+	UpdateRate(ctx context.Context, id string, rateETB float64, isActive bool) (*model.BillingRate, error)
+	CreateBatch(ctx context.Context, rates []model.BillingRate) error
 }
 
 // ChannelRepository loads delivery channels for entitlement checks.

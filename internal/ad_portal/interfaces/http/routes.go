@@ -13,7 +13,7 @@ import (
 )
 
 // RegisterRoutes mounts ad portal auth + campaign + audience + billing + admin routes under /api/v1/ad-portal.
-func RegisterRoutes(r *gin.Engine, auth *AuthHandler, campaigns *campaignHTTP.Handler, audience *audienceHTTP.Handler, billing *billingHTTP.Handler, adminCampaigns *adminHTTP.CampaignHandler, analytics *analyticsHTTP.Handler, cfg *configs.Config) {
+func RegisterRoutes(r *gin.Engine, auth *AuthHandler, campaigns *campaignHTTP.Handler, audience *audienceHTTP.Handler, billing *billingHTTP.Handler, adminCampaigns *adminHTTP.CampaignHandler, adminCatalog *adminHTTP.CatalogHandler, analytics *analyticsHTTP.Handler, cfg *configs.Config) {
 	g := r.Group("/api/v1/ad-portal")
 	{
 		g.POST("/register", auth.Register)
@@ -45,6 +45,10 @@ func RegisterRoutes(r *gin.Engine, auth *AuthHandler, campaigns *campaignHTTP.Ha
 			admin.Use(platformMiddleware.RequirePortalRoles("operator_admin"))
 			{
 				admin.POST("/users", auth.CreateUser)
+				admin.POST("/plans", adminCatalog.CreatePlan)
+				admin.GET("/plans/:plan_id/billing-rates", adminCatalog.ListBillingRates)
+				admin.PATCH("/billing-rates/:id", adminCatalog.UpdateBillingRate)
+				admin.POST("/audience/segments", adminCatalog.CreateSegment)
 				admin.GET("/campaigns/pending", adminCampaigns.ListPendingCampaigns)
 				admin.POST("/campaigns/:id/validate", adminCampaigns.ValidateCampaign)
 				admin.POST("/campaigns/:id/activate", adminCampaigns.ActivateCampaign)

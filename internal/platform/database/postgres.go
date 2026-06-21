@@ -6,19 +6,19 @@ import (
 	"time"
 
 	"skykin-platform/configs"
-	adportalmodel "skykin-platform/internal/ad_portal/model"
+	advertisermodel "skykin-platform/internal/ad_portal/model"
 	audiencemodel "skykin-platform/internal/audience/model"
+	authmodel "skykin-platform/internal/auth/model"
 	billingmodel "skykin-platform/internal/billing/model"
 	campaignmodel "skykin-platform/internal/campaigns/model"
 	deliverymodel "skykin-platform/internal/delivery/model"
-	authmodel "skykin-platform/internal/auth/model"
 	eventpersistence "skykin-platform/internal/events/infrastructure/persistence"
 	intentmodel "skykin-platform/internal/intents/model"
 	rewardmodel "skykin-platform/internal/rewards/model"
 	usermodel "skykin-platform/internal/users/model"
 
-	gormpg "gorm.io/driver/postgres"
 	"gorm.io/datatypes"
+	gormpg "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -64,9 +64,9 @@ func Migrate(db *gorm.DB) error {
 		&authmodel.Developer{},
 		&authmodel.Application{},
 		&authmodel.APIKey{},
-		&adportalmodel.Role{},
-		&adportalmodel.Advertiser{},
-		&adportalmodel.PortalUser{},
+		&advertisermodel.Role{},
+		&advertisermodel.Advertiser{},
+		&advertisermodel.PortalUser{},
 		&campaignmodel.Campaign{},
 		&campaignmodel.DeliveryLog{},
 		&deliverymodel.DeliveryJob{},
@@ -91,7 +91,7 @@ func Migrate(db *gorm.DB) error {
 }
 
 func seedPortalRoles(db *gorm.DB) {
-	roles := []adportalmodel.Role{
+	roles := []advertisermodel.Role{
 		{Slug: "operator_admin", DisplayName: "Operator Admin"},
 		{Slug: "advertiser", DisplayName: "Advertiser"},
 		{Slug: "read_only_analyst", DisplayName: "Read-Only Analyst"},
@@ -182,4 +182,3 @@ func seedAudienceSegments(db *gorm.DB) {
 	}
 	log.Println("audience segments seeded")
 }
-

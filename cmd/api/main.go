@@ -10,8 +10,8 @@ import (
 
 	"skykin-platform/configs"
 	_ "skykin-platform/docs"
-	adportalApp "skykin-platform/internal/ad_portal/application"
-	adportalInfra "skykin-platform/internal/ad_portal/infrastructure"
+	advertiserApp "skykin-platform/internal/ad_portal/application"
+	advertiserInfra "skykin-platform/internal/ad_portal/infrastructure"
 	"skykin-platform/internal/platform/bootstrap"
 	"skykin-platform/internal/platform/database"
 	"skykin-platform/internal/platform/messaging"
@@ -62,9 +62,9 @@ func main() {
 	}
 	log.Println("database migrations completed")
 
-	adRepo := adportalInfra.NewRepository(db)
+	adRepo := advertiserInfra.NewRepository(db)
 	_ = adRepo.SeedRoles(context.Background())
-	if err := adportalApp.NewPortalAuthService(adRepo, cfg).EnsureOperatorAdmin(
+	if err := advertiserApp.NewAuthService(adRepo, cfg).EnsureOperatorAdmin(
 		context.Background(), cfg.AdminEmail, cfg.AdminPassword, "Operator Admin", "",
 	); err != nil {
 		log.Printf("operator admin seed skipped: %v", err)

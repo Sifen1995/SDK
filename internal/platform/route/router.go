@@ -2,24 +2,24 @@ package route
 
 import (
 	"skykin-platform/configs"
-	analyticsApp "skykin-platform/internal/analytics/application"
-	analyticsHTTP "skykin-platform/internal/analytics/interfaces/http"
-	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
+	advertiserApp "skykin-platform/internal/ad_portal/application"
+	advertiserInfra "skykin-platform/internal/ad_portal/infrastructure"
+	advertiserHTTP "skykin-platform/internal/ad_portal/interfaces/http"
 	adminApp "skykin-platform/internal/admin/application"
 	adminHTTP "skykin-platform/internal/admin/interfaces/http"
-	adportalApp "skykin-platform/internal/ad_portal/application"
-	adportalHTTP "skykin-platform/internal/ad_portal/interfaces/http"
-	adportalInfra "skykin-platform/internal/ad_portal/infrastructure"
+	analyticsApp "skykin-platform/internal/analytics/application"
+	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
+	analyticsHTTP "skykin-platform/internal/analytics/interfaces/http"
 	audienceApp "skykin-platform/internal/audience/application"
-	audienceHTTP "skykin-platform/internal/audience/interfaces/http"
 	audienceInfra "skykin-platform/internal/audience/infrastructure"
-	billingApp "skykin-platform/internal/billing/application"
-	billingHTTP "skykin-platform/internal/billing/interfaces/http"
-	billingInfra "skykin-platform/internal/billing/infrastructure"
-	campaignApp "skykin-platform/internal/campaigns/application"
-	campaignHTTP "skykin-platform/internal/campaigns/interfaces/http"
-	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	audienceHTTP "skykin-platform/internal/audience/interfaces/http"
 	authRoutes "skykin-platform/internal/auth/routes"
+	billingApp "skykin-platform/internal/billing/application"
+	billingInfra "skykin-platform/internal/billing/infrastructure"
+	billingHTTP "skykin-platform/internal/billing/interfaces/http"
+	campaignApp "skykin-platform/internal/campaigns/application"
+	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	campaignHTTP "skykin-platform/internal/campaigns/interfaces/http"
 	eventHTTP "skykin-platform/internal/events/interfaces/http"
 	intentHTTP "skykin-platform/internal/intents/interfaces/http"
 	"skykin-platform/internal/platform/bootstrap"
@@ -39,9 +39,10 @@ func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS
 
 	sdkAuthMiddleware := authRoutes.RegisterRoutes(r, db, cfg)
 
-	adRepo := adportalInfra.NewRepository(db)
+	adRepo := advertiserInfra.NewRepository(db)
 	campaignRepo := campaignInfra.NewRepository(db)
 	subRepo := billingInfra.NewSubscriptionRepository(db)
+	rateRepo := billingInfra.NewBillingRateRepository(db)
 	channelRepo := billingInfra.NewChannelRepository(db)
 	segmentRepo := audienceInfra.NewSegmentRepository(db)
 
@@ -52,14 +53,17 @@ func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS
 
 	campaignSvc := campaignApp.NewCampaignService(campaignRepo, subEnforcer, audiencePurchases, channelRepo)
 	adminModeration := adminApp.NewCampaignModerationService(campaignRepo, channelRepo)
+	adminCatalog := adminApp.NewPlanAndSegmentService(subRepo, rateRepo, segmentRepo)
+	adminBilling := adminApp.NewBillingAdminService(subRepo, rateRepo)
 	analyticsSvc := analyticsApp.NewService(analyticsInfra.NewRepository(db))
 
-	adportalHTTP.RegisterRoutes(r,
-		adportalHTTP.NewAuthHandler(adportalApp.NewPortalAuthService(adRepo, cfg)),
+	advertiserHTTP.RegisterRoutes(r,
+		advertiserHTTP.NewAuthHandler(advertiserApp.NewAuthService(adRepo, cfg)),
 		campaignHTTP.NewHandler(campaignSvc),
 		audienceHTTP.NewHandler(audienceList),
 		billingHTTP.NewHandler(subscriptionSvc),
 		adminHTTP.NewCampaignHandler(adminModeration),
+		adminHTTP.NewCatalogHandler(adminCatalog, adminBilling),
 		analyticsHTTP.NewHandler(analyticsSvc),
 		cfg,
 	)
