@@ -23,7 +23,7 @@ func NewCatalogHandler(catalog *adminApp.PlanAndSegmentService, billing *adminAp
 // CreatePlan godoc
 // @Summary      Create subscription plan
 // @Description  Creates a plan and seeds default billing rates (CPM/CPC/CPI/CPA/REV_SHARE).
-// @Tags         Ad Portal - Admin Catalog
+// @Tags         Ad Portal - Admin
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
@@ -57,7 +57,7 @@ func (h *CatalogHandler) CreatePlan(c *gin.Context) {
 // CreateSegment godoc
 // @Summary      Create audience segment
 // @Description  Adds a new Audiencemart catalog segment.
-// @Tags         Ad Portal - Admin Catalog
+// @Tags         Ad Portal - Admin
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
@@ -95,7 +95,7 @@ func (h *CatalogHandler) CreateSegment(c *gin.Context) {
 
 // ListBillingRates godoc
 // @Summary      List billing rates for a plan
-// @Tags         Ad Portal - Admin Catalog
+// @Tags         Ad Portal - Admin
 // @Produce      json
 // @Security     BearerAuth
 // @Param        plan_id  path  string  true  "Plan ID"
@@ -117,7 +117,7 @@ func (h *CatalogHandler) ListBillingRates(c *gin.Context) {
 
 // UpdateBillingRate godoc
 // @Summary      Update a billing rate
-// @Tags         Ad Portal - Admin Catalog
+// @Tags         Ad Portal - Admin
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth

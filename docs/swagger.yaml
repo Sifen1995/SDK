@@ -1,34 +1,13 @@
 basePath: /api/v1
 definitions:
-  internal_admin_interfaces_http.CampaignListResponse:
-    properties:
-      campaigns:
-        items: {}
-        type: array
-      count:
-        type: integer
-    type: object
-  internal_admin_interfaces_http.ValidateCampaignRequest:
-    properties:
-      action:
-        enum:
-        - approve
-        - reject
-        type: string
-      notes:
-        maxLength: 2000
-        type: string
-    required:
-    - action
-    type: object
-  internal_advertisers_interfaces_http.AdPortalLoginResponse:
+  internal_ad_portal_interfaces_http.AdPortalLoginResponse:
     properties:
       token:
         type: string
       user:
-        $ref: '#/definitions/internal_advertisers_interfaces_http.PortalUserDTO'
+        $ref: '#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO'
     type: object
-  internal_advertisers_interfaces_http.CreateUserRequest:
+  internal_ad_portal_interfaces_http.CreateUserRequest:
     properties:
       company_name:
         type: string
@@ -51,7 +30,7 @@ definitions:
     - password
     - role
     type: object
-  internal_advertisers_interfaces_http.LoginRequest:
+  internal_ad_portal_interfaces_http.LoginRequest:
     properties:
       email:
         type: string
@@ -61,12 +40,12 @@ definitions:
     - email
     - password
     type: object
-  internal_advertisers_interfaces_http.MeResponse:
+  internal_ad_portal_interfaces_http.MeResponse:
     properties:
       user:
-        $ref: '#/definitions/internal_advertisers_interfaces_http.PortalUserDTO'
+        $ref: '#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO'
     type: object
-  internal_advertisers_interfaces_http.PortalUserDTO:
+  internal_ad_portal_interfaces_http.PortalUserDTO:
     properties:
       advertiser_id:
         example: 770e8400-e29b-41d4-a716-446655440002
@@ -93,7 +72,7 @@ definitions:
         example: 660e8400-e29b-41d4-a716-446655440001
         type: string
     type: object
-  internal_advertisers_interfaces_http.RegisterRequest:
+  internal_ad_portal_interfaces_http.RegisterRequest:
     properties:
       company_name:
         example: Acme Inc
@@ -120,10 +99,110 @@ definitions:
     - name
     - password
     type: object
-  internal_advertisers_interfaces_http.RegisterResponse:
+  internal_ad_portal_interfaces_http.RegisterResponse:
     properties:
       user:
-        $ref: '#/definitions/internal_advertisers_interfaces_http.PortalUserDTO'
+        $ref: '#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO'
+    type: object
+  internal_admin_interfaces_http.BillingRateListResponse:
+    properties:
+      count:
+        type: integer
+      rates:
+        items: {}
+        type: array
+    type: object
+  internal_admin_interfaces_http.CampaignListResponse:
+    properties:
+      campaigns:
+        items: {}
+        type: array
+      count:
+        type: integer
+    type: object
+  internal_admin_interfaces_http.CreatePlanRequest:
+    properties:
+      audiencemart_enabled:
+        type: boolean
+      cpc_discount_pct:
+        maximum: 100
+        minimum: 0
+        type: number
+      included_impressions:
+        minimum: 0
+        type: integer
+      max_active_campaigns:
+        minimum: 1
+        type: integer
+      max_daily_budget_etb:
+        type: number
+      monthly_fee_etb:
+        minimum: 0
+        type: number
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      sms_plus_enabled:
+        type: boolean
+    required:
+    - max_active_campaigns
+    - max_daily_budget_etb
+    - monthly_fee_etb
+    - name
+    type: object
+  internal_admin_interfaces_http.CreateSegmentRequest:
+    properties:
+      approximate_size:
+        minimum: 0
+        type: integer
+      available_from:
+        type: string
+      available_until:
+        type: string
+      description:
+        maxLength: 2000
+        type: string
+      estimated_cpm:
+        type: number
+      is_active:
+        type: boolean
+      name:
+        maxLength: 255
+        minLength: 2
+        type: string
+      top_intent_signals:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - estimated_cpm
+    - name
+    - top_intent_signals
+    type: object
+  internal_admin_interfaces_http.UpdateBillingRateRequest:
+    properties:
+      is_active:
+        type: boolean
+      rate_etb:
+        minimum: 0
+        type: number
+    required:
+    - rate_etb
+    type: object
+  internal_admin_interfaces_http.ValidateCampaignRequest:
+    properties:
+      action:
+        enum:
+        - approve
+        - reject
+        type: string
+      notes:
+        maxLength: 2000
+        type: string
+    required:
+    - action
     type: object
   internal_analytics_interfaces_http.AdvertiserListResponse:
     properties:
@@ -516,6 +595,33 @@ definitions:
           type: string
         type: array
     type: object
+  skykin-platform_internal_audience_model.AudienceSegment:
+    properties:
+      approximateSize:
+        type: integer
+      availableFrom:
+        type: string
+      availableUntil:
+        type: string
+      createdAt:
+        type: string
+      description:
+        type: string
+      estimatedCPM:
+        type: number
+      id:
+        type: string
+      isActive:
+        type: boolean
+      name:
+        type: string
+      topIntentSignals:
+        items:
+          type: integer
+        type: array
+      updatedAt:
+        type: string
+    type: object
   skykin-platform_internal_auth_dto.ApplicationCreateRequest:
     properties:
       app_name:
@@ -618,6 +724,48 @@ definitions:
         $ref: '#/definitions/skykin-platform_internal_billing_application.PlanDTO'
       status:
         type: string
+    type: object
+  skykin-platform_internal_billing_model.BillingRate:
+    properties:
+      createdAt:
+        type: string
+      eventType:
+        type: string
+      id:
+        type: string
+      isActive:
+        type: boolean
+      model:
+        type: string
+      planID:
+        type: string
+      rateETB:
+        type: number
+    type: object
+  skykin-platform_internal_billing_model.SubscriptionPlan:
+    properties:
+      audiencemartEnabled:
+        type: boolean
+      cpcdiscountPct:
+        type: number
+      createdAt:
+        type: string
+      id:
+        type: string
+      includedImpressions:
+        type: integer
+      isActive:
+        type: boolean
+      maxActiveCampaigns:
+        type: integer
+      maxDailyBudgetETB:
+        type: number
+      monthlyFeeETB:
+        type: number
+      name:
+        type: string
+      smsplusEnabled:
+        type: boolean
     type: object
   skykin-platform_internal_campaigns_model.Campaign:
     properties:
@@ -838,6 +986,70 @@ paths:
       summary: Revenue and subscription analytics
       tags:
       - Ad Portal - Admin Analytics
+  /ad-portal/admin/audience/segments:
+    post:
+      consumes:
+      - application/json
+      description: Adds a new Audiencemart catalog segment.
+      parameters:
+      - description: Segment
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_admin_interfaces_http.CreateSegmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_audience_model.AudienceSegment'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Create audience segment
+      tags:
+      - Ad Portal - Admin
+  /ad-portal/admin/billing-rates/{id}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Billing rate ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Rate update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_admin_interfaces_http.UpdateBillingRateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_billing_model.BillingRate'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Update a billing rate
+      tags:
+      - Ad Portal - Admin
   /ad-portal/admin/campaigns/{id}/activate:
     post:
       description: Sets is_active=true. Campaign must have moderation_status=approved
@@ -916,6 +1128,58 @@ paths:
       summary: List campaigns pending operator validation
       tags:
       - Ad Portal - Admin
+  /ad-portal/admin/plans:
+    post:
+      consumes:
+      - application/json
+      description: Creates a plan and seeds default billing rates (CPM/CPC/CPI/CPA/REV_SHARE).
+      parameters:
+      - description: Plan
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_admin_interfaces_http.CreatePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Create subscription plan
+      tags:
+      - Ad Portal - Admin
+  /ad-portal/admin/plans/{plan_id}/billing-rates:
+    get:
+      parameters:
+      - description: Plan ID
+        in: path
+        name: plan_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_admin_interfaces_http.BillingRateListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: List billing rates for a plan
+      tags:
+      - Ad Portal - Admin
   /ad-portal/admin/users:
     post:
       consumes:
@@ -926,14 +1190,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_advertisers_interfaces_http.CreateUserRequest'
+          $ref: '#/definitions/internal_ad_portal_interfaces_http.CreateUserRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_advertisers_interfaces_http.RegisterResponse'
+            $ref: '#/definitions/internal_ad_portal_interfaces_http.RegisterResponse'
         "403":
           description: Forbidden
           schema:
@@ -1094,14 +1358,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_advertisers_interfaces_http.LoginRequest'
+          $ref: '#/definitions/internal_ad_portal_interfaces_http.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_advertisers_interfaces_http.AdPortalLoginResponse'
+            $ref: '#/definitions/internal_ad_portal_interfaces_http.AdPortalLoginResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1117,7 +1381,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_advertisers_interfaces_http.MeResponse'
+            $ref: '#/definitions/internal_ad_portal_interfaces_http.MeResponse'
         "404":
           description: Not Found
           schema:
@@ -1153,14 +1417,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_advertisers_interfaces_http.RegisterRequest'
+          $ref: '#/definitions/internal_ad_portal_interfaces_http.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_advertisers_interfaces_http.RegisterResponse'
+            $ref: '#/definitions/internal_ad_portal_interfaces_http.RegisterResponse'
         "400":
           description: Bad Request
           schema:
