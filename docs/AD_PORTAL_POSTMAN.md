@@ -9,7 +9,7 @@ This document is for **frontend (React/Next.js campaign portal)** and **Flutter/
 
 **Import in Postman:** *File → Import* → select both files → choose environment **Skykin — Local**.
 
-**Swagger UI:** [http://localhost:8081/swagger/index.html](http://localhost:8081/swagger/index.html) — tags **Ad Portal - Auth**, **Ad Portal - Campaigns**, **Ad Portal - Admin**. Regenerate: `make swagger`.
+**Swagger UI:** [http://localhost:8081/swagger/index.html](http://localhost:8081/swagger/index.html) — tags **Ad Portal - Auth**, **Ad Portal - Campaigns**, **Ad Portal - Admin**, **Ad Portal - Segment Classification**. Regenerate: `make swagger`.
 
 **Architecture:** See [`docs/AD_CAMPAIGN_ARCHITECTURE.md`](AD_CAMPAIGN_ARCHITECTURE.md) for module split (`advertisers` vs `campaigns`) and delivery flow.
 
@@ -29,6 +29,7 @@ This document is for **frontend (React/Next.js campaign portal)** and **Flutter/
 | `userId` | `user-demo-001` | SDK end-user id |
 | `campaignId` | *(set by Create campaign)* | Active campaign UUID |
 | `creativeId` | *(set by Create creative)* | Creative UUID |
+| `candidateId` | *(set by List Segment Candidates)* | Segment classification candidate UUID |
 
 **Health check:** `GET {{baseUrl}}/ping` → `{ "status": "ok" }`
 
@@ -280,6 +281,46 @@ Login as `operator_admin`.
 ```
 
 `role`: `advertiser` \| `read_only_analyst` \| `operator_admin`
+
+### Segment classification (operator only)
+
+Intent **analysis** runs in the analytics module and publishes findings as events. The **audience** module persists candidates; **admin** approves or rejects them.
+
+**Flow:** analysis scan → `IntentConsistencyFinding` event → audience saves `segment_candidates` → admin approve/reject.
+
+#### 1. Login as operator admin
+`POST {{baseUrl}}/api/v1/ad-portal/login` (see above).
+
+#### 2. (Optional) Seed intent data
+Same SQL as before — users need 5+ distinct days of the same intent with confidence ≥ 0.70.
+
+#### 3. Trigger intent consistency analysis
+`POST {{baseUrl}}/api/v1/ad-portal/admin/analytics/intent-consistency/run`  
+`Authorization: Bearer {{adPortalToken}}`
+
+**202:** `{ "message": "intent consistency analysis started" }`
+
+#### 4. List segment candidates (audience)
+`GET {{baseUrl}}/api/v1/ad-portal/audience/segment-candidates?status=pending`  
+`Authorization: Bearer {{adPortalToken}}` (operator_admin)
+
+#### 5a. Approve candidate (admin)
+`POST {{baseUrl}}/api/v1/ad-portal/admin/audience/segment-candidates/{{candidateId}}/approve`
+
+```json
+{
+  "name": "Coffee Enthusiasts",
+  "description": "Users with sustained coffee purchase intent",
+  "estimated_cpm": 4.5
+}
+```
+
+#### 5b. Reject candidate (admin)
+`POST {{baseUrl}}/api/v1/ad-portal/admin/audience/segment-candidates/{{candidateId}}/reject`
+
+```json
+{ "notes": "Insufficient user volume" }
+```
 
 ### Error shape (Ad Portal)
 

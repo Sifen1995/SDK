@@ -7,6 +7,7 @@ import (
 	"time"
 
 	audienceapp "skykin-platform/internal/audience/application"
+	audiencedomain "skykin-platform/internal/audience/domain"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
 	billingdomain "skykin-platform/internal/billing/domain"
 	"skykin-platform/internal/campaigns/model"
@@ -24,18 +25,20 @@ const (
 )
 
 type TargetingJob struct {
-	campaignRepo campaigndomain.CampaignRepository
-	intentRepo   intentdomain.IntentRepository
-	deliveryRepo deliverydomain.DeliveryRepository
-	channels     billingdomain.ChannelRepository
-	segmentMatch *audienceapp.TargetingResolver
-	bus          *messaging.Bus
-	logger       *slog.Logger
+	campaignRepo   campaigndomain.CampaignRepository
+	intentRepo     intentdomain.IntentRepository
+	membershipRepo audiencedomain.MembershipRepository
+	deliveryRepo   deliverydomain.DeliveryRepository
+	channels       billingdomain.ChannelRepository
+	segmentMatch   *audienceapp.TargetingResolver
+	bus            *messaging.Bus
+	logger         *slog.Logger
 }
 
 func NewTargetingJob(
 	campaignRepo campaigndomain.CampaignRepository,
 	intentRepo intentdomain.IntentRepository,
+	membershipRepo audiencedomain.MembershipRepository,
 	deliveryRepo deliverydomain.DeliveryRepository,
 	channels billingdomain.ChannelRepository,
 	segmentMatch *audienceapp.TargetingResolver,
@@ -43,13 +46,14 @@ func NewTargetingJob(
 	logger *slog.Logger,
 ) *TargetingJob {
 	return &TargetingJob{
-		campaignRepo: campaignRepo,
-		intentRepo:   intentRepo,
-		deliveryRepo: deliveryRepo,
-		channels:     channels,
-		segmentMatch: segmentMatch,
-		bus:          bus,
-		logger:       logger,
+		campaignRepo:   campaignRepo,
+		intentRepo:     intentRepo,
+		membershipRepo: membershipRepo,
+		deliveryRepo:   deliveryRepo,
+		channels:       channels,
+		segmentMatch:   segmentMatch,
+		bus:            bus,
+		logger:         logger,
 	}
 }
 
@@ -70,10 +74,26 @@ func (j *TargetingJob) matchCampaign(ctx context.Context, campaign *model.Campai
 		return
 	}
 
-	userIDs, err := j.segmentMatch.ResolveUserIDs(ctx, campaign, j.intentRepo, defaultMinConfidence, since)
-	if err != nil {
-		j.logger.Error("resolve targeting users failed", "campaign_id", campaign.ID, "error", err)
-		return
+	var userIDs []uuid.UUID
+	var err error
+
+	if campaign.SegmentID != nil && strings.TrimSpace(*campaign.SegmentID) != "" {
+		segID, parseErr := uuid.Parse(*campaign.SegmentID)
+		if parseErr != nil {
+			j.logger.Error("invalid segment_id", "campaign_id", campaign.ID, "segment_id", *campaign.SegmentID)
+			return
+		}
+		userIDs, err = j.membershipRepo.FindUsersInSegment(ctx, segID)
+		if err != nil {
+			j.logger.Error("segment membership query failed", "segment_id", campaign.SegmentID, "error", err)
+			return
+		}
+	} else {
+		userIDs, err = j.intentRepo.FindUsersWithIntent(ctx, campaign.TargetIntent, defaultMinConfidence, since)
+		if err != nil {
+			j.logger.Error("resolve targeting users failed", "campaign_id", campaign.ID, "error", err)
+			return
+		}
 	}
 	campaignID, err := uuid.Parse(campaign.ID)
 	if err != nil {

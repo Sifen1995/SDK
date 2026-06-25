@@ -13,7 +13,19 @@ import (
 )
 
 // RegisterRoutes mounts ad portal auth + campaign + audience + billing + admin routes under /api/v1/ad-portal.
-func RegisterRoutes(r *gin.Engine, auth *AuthHandler, campaigns *campaignHTTP.Handler, audience *audienceHTTP.Handler, billing *billingHTTP.Handler, adminCampaigns *adminHTTP.CampaignHandler, adminCatalog *adminHTTP.CatalogHandler, analytics *analyticsHTTP.Handler, cfg *configs.Config) {
+func RegisterRoutes(
+	r *gin.Engine,
+	auth *AuthHandler,
+	campaigns *campaignHTTP.Handler,
+	audience *audienceHTTP.Handler,
+	billing *billingHTTP.Handler,
+	adminCampaigns *adminHTTP.CampaignHandler,
+	adminCatalog *adminHTTP.CatalogHandler,
+	analytics *analyticsHTTP.Handler,
+	analyticsOps *adminHTTP.AnalyticsHandler,
+	segmentCandidates *adminHTTP.SegmentCandidateHandler,
+	cfg *configs.Config,
+) {
 	g := r.Group("/api/v1/ad-portal")
 	{
 		g.POST("/register", auth.Register)
@@ -29,6 +41,7 @@ func RegisterRoutes(r *gin.Engine, auth *AuthHandler, campaigns *campaignHTTP.Ha
 			protected.GET("/subscription", platformMiddleware.RequirePortalRead(), billing.GetSubscription)
 
 			protected.GET("/audience/segments", platformMiddleware.RequirePortalRead(), audience.ListSegments)
+			protected.GET("/audience/segment-candidates", platformMiddleware.RequirePortalRoles("operator_admin"), audience.ListSegmentCandidates)
 
 			protected.GET("/campaigns", platformMiddleware.RequirePortalRead(), campaigns.ListCampaigns)
 			protected.GET("/campaigns/:id", platformMiddleware.RequirePortalRead(), campaigns.GetCampaign)
@@ -49,6 +62,9 @@ func RegisterRoutes(r *gin.Engine, auth *AuthHandler, campaigns *campaignHTTP.Ha
 				admin.GET("/plans/:plan_id/billing-rates", adminCatalog.ListBillingRates)
 				admin.PATCH("/billing-rates/:id", adminCatalog.UpdateBillingRate)
 				admin.POST("/audience/segments", adminCatalog.CreateSegment)
+				admin.POST("/audience/segment-candidates/:id/approve", segmentCandidates.ApproveSegmentCandidate)
+				admin.POST("/audience/segment-candidates/:id/reject", segmentCandidates.RejectSegmentCandidate)
+				admin.POST("/analytics/intent-consistency/run", analyticsOps.TriggerIntentConsistency)
 				admin.GET("/campaigns/pending", adminCampaigns.ListPendingCampaigns)
 				admin.POST("/campaigns/:id/validate", adminCampaigns.ValidateCampaign)
 				admin.POST("/campaigns/:id/activate", adminCampaigns.ActivateCampaign)

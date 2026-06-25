@@ -83,6 +83,7 @@ func Migrate(db *gorm.DB) error {
 	}
 
 	alignAdPortalSchema(db)
+	alignSegmentClassificationSchema(db)
 	seedPortalRoles(db)
 	seedRewardRules(db)
 	seedBillingCatalog(db)

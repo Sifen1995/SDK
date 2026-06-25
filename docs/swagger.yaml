@@ -104,6 +104,21 @@ definitions:
       user:
         $ref: '#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO'
     type: object
+  internal_admin_interfaces_http.ApproveSegmentCandidateRequest:
+    properties:
+      description:
+        example: Users with sustained coffee purchase intent
+        type: string
+      estimated_cpm:
+        example: 4.5
+        type: number
+      name:
+        example: Coffee Lovers
+        type: string
+    required:
+    - estimated_cpm
+    - name
+    type: object
   internal_admin_interfaces_http.BillingRateListResponse:
     properties:
       count:
@@ -181,6 +196,12 @@ definitions:
     - name
     - top_intent_signals
     type: object
+  internal_admin_interfaces_http.RejectSegmentCandidateRequest:
+    properties:
+      notes:
+        example: Insufficient user volume for this vertical
+        type: string
+    type: object
   internal_admin_interfaces_http.UpdateBillingRateRequest:
     properties:
       is_active:
@@ -218,6 +239,27 @@ definitions:
         items: {}
         type: array
       count:
+        type: integer
+    type: object
+  internal_audience_interfaces_http.CandidateResponse:
+    properties:
+      avg_confidence:
+        type: number
+      avg_days_active:
+        type: number
+      id:
+        type: string
+      intent_name:
+        type: string
+      lookback_days:
+        type: integer
+      min_days_active:
+        type: integer
+      scanned_at:
+        type: string
+      status:
+        type: string
+      user_count:
         type: integer
     type: object
   internal_billing_interfaces_http.ChannelListResponse:
@@ -955,6 +997,32 @@ paths:
       summary: Delivery volume and funnel analytics
       tags:
       - Ad Portal - Admin Analytics
+  /ad-portal/admin/analytics/intent-consistency/run:
+    post:
+      description: Starts an asynchronous scan of intent signals. Findings are published
+        as events for audience module to persist as candidates.
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Run intent consistency analysis
+      tags:
+      - Ad Portal - Admin Analytics
   /ad-portal/admin/analytics/overview:
     get:
       description: 'KPI snapshot: advertisers, campaigns, deliveries, subscriptions,
@@ -986,6 +1054,73 @@ paths:
       summary: Revenue and subscription analytics
       tags:
       - Ad Portal - Admin Analytics
+  /ad-portal/admin/audience/segment-candidates/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Creates an audience segment from a pending candidate and writes
+        segment_memberships.
+      parameters:
+      - description: Candidate ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Segment details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_admin_interfaces_http.ApproveSegmentCandidateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_audience_model.AudienceSegment'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Approve segment candidate and publish segment
+      tags:
+      - Ad Portal - Admin
+  /ad-portal/admin/audience/segment-candidates/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Candidate ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Notes
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/internal_admin_interfaces_http.RejectSegmentCandidateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Reject segment candidate
+      tags:
+      - Ad Portal - Admin
   /ad-portal/admin/audience/segments:
     post:
       consumes:
@@ -1207,6 +1342,42 @@ paths:
       summary: Create portal user (operator admin)
       tags:
       - Ad Portal - Admin
+  /ad-portal/audience/segment-candidates:
+    get:
+      description: Returns audience segment candidates created from intent consistency
+        findings.
+      parameters:
+      - default: pending
+        description: pending|approved|rejected
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_audience_interfaces_http.CandidateResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: List segment candidates awaiting review
+      tags:
+      - Ad Portal - Audience
   /ad-portal/audience/segments:
     get:
       description: Returns Audiencemart catalog filtered by the advertiser subscription

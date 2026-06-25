@@ -310,6 +310,88 @@
             "description": "Requires operator_admin JWT. Run **Login Operator Admin** first."
           },
           "response": []
+        },
+        {
+          "name": "List Segment Candidates",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const list = pm.response.json();",
+                  "if (Array.isArray(list) && list[0] && list[0].id) {",
+                  "  pm.environment.set('candidateId', list[0].id);",
+                  "  console.log('candidateId saved:', list[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ad-portal/audience/segment-candidates?status=pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ad-portal", "audience", "segment-candidates"],
+              "query": [{ "key": "status", "value": "pending" }]
+            },
+            "description": "Requires operator_admin JWT. Lists candidates from the nightly intent classification scan."
+          },
+          "response": []
+        },
+        {
+          "name": "Run Intent Consistency Analysis",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ad-portal/admin/analytics/intent-consistency/run",
+            "description": "Triggers async classification scan. Returns 202 immediately."
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Segment Candidate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.environment.set('segmentId', j.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Coffee Enthusiasts\",\n  \"description\": \"Users with sustained coffee purchase intent\",\n  \"estimated_cpm\": 4.5\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/admin/audience/segment-candidates/{{candidateId}}/approve",
+            "description": "Publishes segment and writes segment_memberships. Set `candidateId` from List Segment Candidates."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Segment Candidate",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Insufficient user volume\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/ad-portal/admin/audience/segment-candidates/{{candidateId}}/reject",
+            "description": "Marks a pending candidate as rejected."
+          },
+          "response": []
         }
       ]
     },

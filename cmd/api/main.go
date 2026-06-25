@@ -81,8 +81,9 @@ func main() {
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	route.InitRouter(r, db, cfg, hub, bus)
+	classJobs := route.InitRouter(r, db, cfg, hub, bus)
 	bootstrap.StartTargetingJob(db, bus, slog.Default(), 5*time.Minute)
+	bootstrap.StartIntentConsistencyJobs(classJobs, slog.Default())
 
 	// Fire up the HTTP engine instance
 	serverAddress := fmt.Sprintf("0.0.0.0:%s", cfg.Port)

@@ -1,6 +1,8 @@
 package route
 
 import (
+	"log/slog"
+
 	"skykin-platform/configs"
 	advertiserApp "skykin-platform/internal/ad_portal/application"
 	advertiserInfra "skykin-platform/internal/ad_portal/infrastructure"
@@ -32,7 +34,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS.Hub, bus *messaging.Bus) {
+func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS.Hub, bus *messaging.Bus) *bootstrap.IntentConsistencyJobs {
 	r.Use(platformMiddleware.CORS())
 	r.Use(gin.Logger())
 	r.Use(platformMiddleware.GlobalRecovery())
@@ -45,26 +47,38 @@ func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS
 	rateRepo := billingInfra.NewBillingRateRepository(db)
 	channelRepo := billingInfra.NewChannelRepository(db)
 	segmentRepo := audienceInfra.NewSegmentRepository(db)
+	membershipRepo := audienceInfra.NewMembershipRepository(db)
 
 	subEnforcer := billingApp.NewSubscriptionEnforcer(subRepo, channelRepo, campaignRepo)
 	audiencePurchases := audienceApp.NewPurchaseService(segmentRepo)
 	audienceList := audienceApp.NewListService(segmentRepo, subRepo)
 	subscriptionSvc := billingApp.NewSubscriptionService(subRepo, channelRepo)
 
+	consistencyJobs := bootstrap.SetupIntentConsistency(db, cfg, bus, slog.Default())
+	listCandidates := audienceApp.NewListSegmentCandidatesUseCase(consistencyJobs.CandidateRepo)
+
 	campaignSvc := campaignApp.NewCampaignService(campaignRepo, subEnforcer, audiencePurchases, channelRepo)
 	adminModeration := adminApp.NewCampaignModerationService(campaignRepo, channelRepo)
 	adminCatalog := adminApp.NewPlanAndSegmentService(subRepo, rateRepo, segmentRepo)
 	adminBilling := adminApp.NewBillingAdminService(subRepo, rateRepo)
+	approveCandidate := adminApp.NewApproveCandidateUseCase(consistencyJobs.CandidateRepo, membershipRepo, adminCatalog, slog.Default())
+	rejectCandidate := adminApp.NewRejectCandidateUseCase(consistencyJobs.CandidateRepo, slog.Default())
+
 	analyticsSvc := analyticsApp.NewService(analyticsInfra.NewRepository(db))
+	analyticsHandler := analyticsHTTP.NewHandler(analyticsSvc)
+	analyticsOps := adminHTTP.NewAnalyticsHandler(consistencyJobs.AnalyzeUC)
+	segmentCandidateAdmin := adminHTTP.NewSegmentCandidateHandler(approveCandidate, rejectCandidate)
 
 	advertiserHTTP.RegisterRoutes(r,
 		advertiserHTTP.NewAuthHandler(advertiserApp.NewAuthService(adRepo, cfg)),
 		campaignHTTP.NewHandler(campaignSvc),
-		audienceHTTP.NewHandler(audienceList),
+		audienceHTTP.NewHandler(audienceList, listCandidates),
 		billingHTTP.NewHandler(subscriptionSvc),
 		adminHTTP.NewCampaignHandler(adminModeration),
 		adminHTTP.NewCatalogHandler(adminCatalog, adminBilling),
-		analyticsHTTP.NewHandler(analyticsSvc),
+		analyticsHandler,
+		analyticsOps,
+		segmentCandidateAdmin,
 		cfg,
 	)
 
@@ -79,4 +93,5 @@ func InitRouter(r *gin.Engine, db *gorm.DB, cfg *configs.Config, hub *platformWS
 		intentHTTP.RegisterRoutes(sdkGroup, intentHandler)
 		wsRoutes.RegisterRoutes(sdkGroup, hub)
 	}
+	return consistencyJobs
 }

@@ -114,6 +114,46 @@
                 }
             }
         },
+        "/ad-portal/admin/analytics/intent-consistency/run": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Starts an asynchronous scan of intent signals. Findings are published as events for audience module to persist as candidates.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Analytics"
+                ],
+                "summary": "Run intent consistency analysis",
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/admin/analytics/overview": {
             "get": {
                 "security": [
@@ -159,6 +199,111 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_analytics_domain.RevenueOverview"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/audience/segment-candidates/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates an audience segment from a pending candidate and writes segment_memberships.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Approve segment candidate and publish segment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Candidate ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Segment details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.ApproveSegmentCandidateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/audience/segment-candidates/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Reject segment candidate",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Candidate ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Notes",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.RejectSegmentCandidateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     }
                 }
@@ -509,6 +654,61 @@
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/audience/segment-candidates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns audience segment candidates created from intent consistency findings.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Audience"
+                ],
+                "summary": "List segment candidates awaiting review",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "pending",
+                        "description": "pending|approved|rejected",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_audience_interfaces_http.CandidateResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -1384,6 +1584,27 @@
                 }
             }
         },
+        "internal_admin_interfaces_http.ApproveSegmentCandidateRequest": {
+            "type": "object",
+            "required": [
+                "estimated_cpm",
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "Users with sustained coffee purchase intent"
+                },
+                "estimated_cpm": {
+                    "type": "number",
+                    "example": 4.5
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Coffee Lovers"
+                }
+            }
+        },
         "internal_admin_interfaces_http.BillingRateListResponse": {
             "type": "object",
             "properties": {
@@ -1492,6 +1713,15 @@
                 }
             }
         },
+        "internal_admin_interfaces_http.RejectSegmentCandidateRequest": {
+            "type": "object",
+            "properties": {
+                "notes": {
+                    "type": "string",
+                    "example": "Insufficient user volume for this vertical"
+                }
+            }
+        },
         "internal_admin_interfaces_http.UpdateBillingRateRequest": {
             "type": "object",
             "required": [
@@ -1546,6 +1776,38 @@
                     "items": {}
                 },
                 "count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_audience_interfaces_http.CandidateResponse": {
+            "type": "object",
+            "properties": {
+                "avg_confidence": {
+                    "type": "number"
+                },
+                "avg_days_active": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "intent_name": {
+                    "type": "string"
+                },
+                "lookback_days": {
+                    "type": "integer"
+                },
+                "min_days_active": {
+                    "type": "integer"
+                },
+                "scanned_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "user_count": {
                     "type": "integer"
                 }
             }

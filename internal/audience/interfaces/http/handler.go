@@ -11,11 +11,12 @@ import (
 
 // Handler serves Audiencemart browse endpoints on the ad portal.
 type Handler struct {
-	list *application.ListService
+	list        *application.ListService
+	candidates  *application.ListSegmentCandidatesUseCase
 }
 
-func NewHandler(list *application.ListService) *Handler {
-	return &Handler{list: list}
+func NewHandler(list *application.ListService, candidates *application.ListSegmentCandidatesUseCase) *Handler {
+	return &Handler{list: list, candidates: candidates}
 }
 
 // ListSegments godoc
