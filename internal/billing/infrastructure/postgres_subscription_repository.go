@@ -40,6 +40,18 @@ func (r *SubscriptionRepository) GetPlanByName(ctx context.Context, name string)
 	return &plan, nil
 }
 
+func (r *SubscriptionRepository) FindPlanByName(ctx context.Context, name string) (*model.SubscriptionPlan, error) {
+	var plan model.SubscriptionPlan
+	if err := r.db.WithContext(ctx).Where("name = ?", name).First(&plan).Error; err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
+func (r *SubscriptionRepository) CreatePlan(ctx context.Context, plan *model.SubscriptionPlan) error {
+	return r.db.WithContext(ctx).Create(plan).Error
+}
+
 func (r *SubscriptionRepository) GetPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error) {
 	var plan model.SubscriptionPlan
 	if err := r.db.WithContext(ctx).Where("id = ? AND is_active = ?", planID, true).First(&plan).Error; err != nil {

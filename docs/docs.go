@@ -120,6 +120,46 @@ const docTemplate = `{
                 }
             }
         },
+        "/ad-portal/admin/analytics/intent-consistency/run": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Starts an asynchronous scan of intent signals. Findings are published as events for audience module to persist as candidates.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Analytics"
+                ],
+                "summary": "Run intent consistency analysis",
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/admin/analytics/overview": {
             "get": {
                 "security": [
@@ -165,6 +205,213 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_analytics_domain.RevenueOverview"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/audience/segment-candidates/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates an audience segment from a pending candidate and writes segment_memberships.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Approve segment candidate and publish segment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Candidate ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Segment details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.ApproveSegmentCandidateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/audience/segment-candidates/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Reject segment candidate",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Candidate ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Notes",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.RejectSegmentCandidateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/audience/segments": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds a new Audiencemart catalog segment.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Create audience segment",
+                "parameters": [
+                    {
+                        "description": "Segment",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.CreateSegmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/billing-rates/{id}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Update a billing rate",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Billing rate ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Rate update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.UpdateBillingRateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_billing_model.BillingRate"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     }
                 }
@@ -292,6 +539,90 @@ const docTemplate = `{
                 }
             }
         },
+        "/ad-portal/admin/plans": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a plan and seeds default billing rates (CPM/CPC/CPI/CPA/REV_SHARE).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Create subscription plan",
+                "parameters": [
+                    {
+                        "description": "Plan",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.CreatePlanRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/plans/{plan_id}/billing-rates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "List billing rates for a plan",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Plan ID",
+                        "name": "plan_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.BillingRateListResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/admin/users": {
             "post": {
                 "security": [
@@ -316,7 +647,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_advertisers_interfaces_http.CreateUserRequest"
+                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.CreateUserRequest"
                         }
                     }
                 ],
@@ -324,11 +655,66 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_advertisers_interfaces_http.RegisterResponse"
+                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.RegisterResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/audience/segment-candidates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns audience segment candidates created from intent consistency findings.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Audience"
+                ],
+                "summary": "List segment candidates awaiting review",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "pending",
+                        "description": "pending|approved|rejected",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_audience_interfaces_http.CandidateResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -581,7 +967,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_advertisers_interfaces_http.LoginRequest"
+                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.LoginRequest"
                         }
                     }
                 ],
@@ -589,7 +975,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_advertisers_interfaces_http.AdPortalLoginResponse"
+                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.AdPortalLoginResponse"
                         }
                     },
                     "401": {
@@ -619,7 +1005,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_advertisers_interfaces_http.MeResponse"
+                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.MeResponse"
                         }
                     },
                     "404": {
@@ -675,7 +1061,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_advertisers_interfaces_http.RegisterRequest"
+                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.RegisterRequest"
                         }
                     }
                 ],
@@ -683,7 +1069,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_advertisers_interfaces_http.RegisterResponse"
+                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.RegisterResponse"
                         }
                     },
                     "400": {
@@ -1057,49 +1443,18 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "internal_admin_interfaces_http.CampaignListResponse": {
-            "type": "object",
-            "properties": {
-                "campaigns": {
-                    "type": "array",
-                    "items": {}
-                },
-                "count": {
-                    "type": "integer"
-                }
-            }
-        },
-        "internal_admin_interfaces_http.ValidateCampaignRequest": {
-            "type": "object",
-            "required": [
-                "action"
-            ],
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "enum": [
-                        "approve",
-                        "reject"
-                    ]
-                },
-                "notes": {
-                    "type": "string",
-                    "maxLength": 2000
-                }
-            }
-        },
-        "internal_advertisers_interfaces_http.AdPortalLoginResponse": {
+        "internal_ad_portal_interfaces_http.AdPortalLoginResponse": {
             "type": "object",
             "properties": {
                 "token": {
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/internal_advertisers_interfaces_http.PortalUserDTO"
+                    "$ref": "#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO"
                 }
             }
         },
-        "internal_advertisers_interfaces_http.CreateUserRequest": {
+        "internal_ad_portal_interfaces_http.CreateUserRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -1131,7 +1486,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_advertisers_interfaces_http.LoginRequest": {
+        "internal_ad_portal_interfaces_http.LoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -1146,15 +1501,15 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_advertisers_interfaces_http.MeResponse": {
+        "internal_ad_portal_interfaces_http.MeResponse": {
             "type": "object",
             "properties": {
                 "user": {
-                    "$ref": "#/definitions/internal_advertisers_interfaces_http.PortalUserDTO"
+                    "$ref": "#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO"
                 }
             }
         },
-        "internal_advertisers_interfaces_http.PortalUserDTO": {
+        "internal_ad_portal_interfaces_http.PortalUserDTO": {
             "type": "object",
             "properties": {
                 "advertiser_id": {
@@ -1191,7 +1546,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_advertisers_interfaces_http.RegisterRequest": {
+        "internal_ad_portal_interfaces_http.RegisterRequest": {
             "type": "object",
             "required": [
                 "company_name",
@@ -1227,11 +1582,183 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_advertisers_interfaces_http.RegisterResponse": {
+        "internal_ad_portal_interfaces_http.RegisterResponse": {
             "type": "object",
             "properties": {
                 "user": {
-                    "$ref": "#/definitions/internal_advertisers_interfaces_http.PortalUserDTO"
+                    "$ref": "#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO"
+                }
+            }
+        },
+        "internal_admin_interfaces_http.ApproveSegmentCandidateRequest": {
+            "type": "object",
+            "required": [
+                "estimated_cpm",
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "Users with sustained coffee purchase intent"
+                },
+                "estimated_cpm": {
+                    "type": "number",
+                    "example": 4.5
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Coffee Lovers"
+                }
+            }
+        },
+        "internal_admin_interfaces_http.BillingRateListResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "rates": {
+                    "type": "array",
+                    "items": {}
+                }
+            }
+        },
+        "internal_admin_interfaces_http.CampaignListResponse": {
+            "type": "object",
+            "properties": {
+                "campaigns": {
+                    "type": "array",
+                    "items": {}
+                },
+                "count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_admin_interfaces_http.CreatePlanRequest": {
+            "type": "object",
+            "required": [
+                "max_active_campaigns",
+                "max_daily_budget_etb",
+                "monthly_fee_etb",
+                "name"
+            ],
+            "properties": {
+                "audiencemart_enabled": {
+                    "type": "boolean"
+                },
+                "cpc_discount_pct": {
+                    "type": "number",
+                    "maximum": 100,
+                    "minimum": 0
+                },
+                "included_impressions": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "max_active_campaigns": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "max_daily_budget_etb": {
+                    "type": "number"
+                },
+                "monthly_fee_etb": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2
+                },
+                "sms_plus_enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_admin_interfaces_http.CreateSegmentRequest": {
+            "type": "object",
+            "required": [
+                "estimated_cpm",
+                "name",
+                "top_intent_signals"
+            ],
+            "properties": {
+                "approximate_size": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "available_from": {
+                    "type": "string"
+                },
+                "available_until": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 2000
+                },
+                "estimated_cpm": {
+                    "type": "number"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 2
+                },
+                "top_intent_signals": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "internal_admin_interfaces_http.RejectSegmentCandidateRequest": {
+            "type": "object",
+            "properties": {
+                "notes": {
+                    "type": "string",
+                    "example": "Insufficient user volume for this vertical"
+                }
+            }
+        },
+        "internal_admin_interfaces_http.UpdateBillingRateRequest": {
+            "type": "object",
+            "required": [
+                "rate_etb"
+            ],
+            "properties": {
+                "is_active": {
+                    "type": "boolean"
+                },
+                "rate_etb": {
+                    "type": "number",
+                    "minimum": 0
+                }
+            }
+        },
+        "internal_admin_interfaces_http.ValidateCampaignRequest": {
+            "type": "object",
+            "required": [
+                "action"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "approve",
+                        "reject"
+                    ]
+                },
+                "notes": {
+                    "type": "string",
+                    "maxLength": 2000
                 }
             }
         },
@@ -1255,6 +1782,38 @@ const docTemplate = `{
                     "items": {}
                 },
                 "count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_audience_interfaces_http.CandidateResponse": {
+            "type": "object",
+            "properties": {
+                "avg_confidence": {
+                    "type": "number"
+                },
+                "avg_days_active": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "intent_name": {
+                    "type": "string"
+                },
+                "lookback_days": {
+                    "type": "integer"
+                },
+                "min_days_active": {
+                    "type": "integer"
+                },
+                "scanned_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "user_count": {
                     "type": "integer"
                 }
             }
@@ -1803,6 +2362,47 @@ const docTemplate = `{
                 }
             }
         },
+        "skykin-platform_internal_audience_model.AudienceSegment": {
+            "type": "object",
+            "properties": {
+                "approximateSize": {
+                    "type": "integer"
+                },
+                "availableFrom": {
+                    "type": "string"
+                },
+                "availableUntil": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "estimatedCPM": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "topIntentSignals": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
         "skykin-platform_internal_auth_dto.ApplicationCreateRequest": {
             "type": "object",
             "required": [
@@ -1947,6 +2547,70 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_billing_model.BillingRate": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "eventType": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "planID": {
+                    "type": "string"
+                },
+                "rateETB": {
+                    "type": "number"
+                }
+            }
+        },
+        "skykin-platform_internal_billing_model.SubscriptionPlan": {
+            "type": "object",
+            "properties": {
+                "audiencemartEnabled": {
+                    "type": "boolean"
+                },
+                "cpcdiscountPct": {
+                    "type": "number"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "includedImpressions": {
+                    "type": "integer"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "maxActiveCampaigns": {
+                    "type": "integer"
+                },
+                "maxDailyBudgetETB": {
+                    "type": "number"
+                },
+                "monthlyFeeETB": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "smsplusEnabled": {
+                    "type": "boolean"
                 }
             }
         },

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	advertiserdomain "skykin-platform/internal/advertisers/domain"
+	adportaldomain "skykin-platform/internal/ad_portal/domain"
 	audienceapp "skykin-platform/internal/audience/application"
 	billingapp "skykin-platform/internal/billing/application"
 	billingdomain "skykin-platform/internal/billing/domain"
@@ -43,7 +43,7 @@ func NewCampaignService(
 
 // Create validates subscription entitlements, campaign fields, and optionally records a segment purchase.
 func (s *CampaignService) Create(ctx context.Context, advertiserID, role string, cmd CreateCampaignCommand) (*model.Campaign, error) {
-	if !advertiserdomain.CanWrite(role) {
+	if !adportaldomain.CanWrite(role) {
 		return nil, errors.New("forbidden")
 	}
 	if strings.TrimSpace(advertiserID) == "" {
@@ -127,31 +127,31 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 }
 
 func (s *CampaignService) List(ctx context.Context, advertiserID, role string) ([]model.Campaign, error) {
-	if !advertiserdomain.CanRead(role) {
+	if !adportaldomain.CanRead(role) {
 		return nil, errors.New("forbidden")
 	}
-	if role == advertiserdomain.RoleOperatorAdmin {
+	if role == adportaldomain.RoleOperatorAdmin {
 		return s.repo.ListAll(ctx)
 	}
 	return s.repo.ListByAdvertiser(ctx, advertiserID)
 }
 
 func (s *CampaignService) Get(ctx context.Context, advertiserID, role, id string) (*model.Campaign, error) {
-	if !advertiserdomain.CanRead(role) {
+	if !adportaldomain.CanRead(role) {
 		return nil, errors.New("forbidden")
 	}
 	c, err := s.repo.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if role != advertiserdomain.RoleOperatorAdmin && c.AdvertiserID != advertiserID {
+	if role != adportaldomain.RoleOperatorAdmin && c.AdvertiserID != advertiserID {
 		return nil, errors.New("forbidden")
 	}
 	return c, nil
 }
 
 func (s *CampaignService) Activate(ctx context.Context, advertiserID, role, id string) (*model.Campaign, error) {
-	if !advertiserdomain.CanWrite(role) {
+	if !adportaldomain.CanWrite(role) {
 		return nil, errors.New("forbidden")
 	}
 	c, err := s.Get(ctx, advertiserID, role, id)

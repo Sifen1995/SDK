@@ -3,7 +3,7 @@ package http
 import (
 	"net/http"
 
-	"skykin-platform/internal/advertisers/application"
+	"skykin-platform/internal/ad_portal/application"
 	platformHTTP "skykin-platform/internal/platform/http"
 
 	"github.com/gin-gonic/gin"

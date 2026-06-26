@@ -6,19 +6,19 @@ import (
 	"time"
 
 	"skykin-platform/configs"
-	advertisermodel "skykin-platform/internal/advertisers/model"
+	advertisermodel "skykin-platform/internal/ad_portal/model"
 	audiencemodel "skykin-platform/internal/audience/model"
+	authmodel "skykin-platform/internal/auth/model"
 	billingmodel "skykin-platform/internal/billing/model"
 	campaignmodel "skykin-platform/internal/campaigns/model"
 	deliverymodel "skykin-platform/internal/delivery/model"
-	authmodel "skykin-platform/internal/auth/model"
 	eventpersistence "skykin-platform/internal/events/infrastructure/persistence"
 	intentmodel "skykin-platform/internal/intents/model"
 	rewardmodel "skykin-platform/internal/rewards/model"
 	usermodel "skykin-platform/internal/users/model"
 
-	gormpg "gorm.io/driver/postgres"
 	"gorm.io/datatypes"
+	gormpg "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -83,6 +83,7 @@ func Migrate(db *gorm.DB) error {
 	}
 
 	alignAdPortalSchema(db)
+	alignSegmentClassificationSchema(db)
 	seedPortalRoles(db)
 	seedRewardRules(db)
 	seedBillingCatalog(db)
@@ -182,4 +183,3 @@ func seedAudienceSegments(db *gorm.DB) {
 	}
 	log.Println("audience segments seeded")
 }
-

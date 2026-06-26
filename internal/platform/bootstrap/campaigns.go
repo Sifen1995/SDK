@@ -26,9 +26,10 @@ func StartTargetingJob(db *gorm.DB, bus *messaging.Bus, logger *slog.Logger, int
 	channelRepo := billingInfra.NewChannelRepository(db)
 	segmentRepo := audienceInfra.NewSegmentRepository(db)
 	purchaseRepo := audienceInfra.NewPurchaseRepository(db)
+	membershipRepo := audienceInfra.NewMembershipRepository(db)
 	segmentMatch := audienceApp.NewTargetingResolver(segmentRepo, purchaseRepo)
 
-	job := campaignApp.NewTargetingJob(campaignRepo, intentRepo, deliveryRepo, channelRepo, segmentMatch, bus, logger)
+	job := campaignApp.NewTargetingJob(campaignRepo, intentRepo, membershipRepo, deliveryRepo, channelRepo, segmentMatch, bus, logger)
 
 	job.Run(context.Background())
 	go func() {

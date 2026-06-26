@@ -10,6 +10,8 @@ import (
 // SegmentRepository loads Audiencemart segment definitions.
 type SegmentRepository interface {
 	GetByID(ctx context.Context, id string) (*model.AudienceSegment, error)
+	GetByName(ctx context.Context, name string) (*model.AudienceSegment, error)
+	Create(ctx context.Context, seg *model.AudienceSegment) error
 	// ListAvailableNow returns active segments within their availability window.
 	ListAvailableNow(ctx context.Context, now time.Time) ([]model.AudienceSegment, error)
 }

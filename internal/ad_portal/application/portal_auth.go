@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"skykin-platform/configs"
-	"skykin-platform/internal/advertisers/domain"
-	"skykin-platform/internal/advertisers/infrastructure"
-	"skykin-platform/internal/advertisers/model"
+	"skykin-platform/internal/ad_portal/domain"
+	"skykin-platform/internal/ad_portal/infrastructure"
+	"skykin-platform/internal/ad_portal/model"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"

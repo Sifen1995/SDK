@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"skykin-platform/configs"
-	"skykin-platform/internal/advertisers/application"
-	"skykin-platform/internal/advertisers/domain"
+	"skykin-platform/internal/ad_portal/application"
+	"skykin-platform/internal/ad_portal/domain"
 
 	"github.com/gin-gonic/gin"
 )
