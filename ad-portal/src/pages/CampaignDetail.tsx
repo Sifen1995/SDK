@@ -67,7 +67,7 @@ export default function CampaignDetail() {
       <div className="mt-4 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold text-primary">{campaign.name}</h1>
+            <h1 className="text-xl font-bold text-primary">{campaign.name}</h1>
             <ActiveBadge active={campaign.isActive} />
             <ModerationBadge status={campaign.moderationStatus} />
             <ValidationBadge status={campaign.validationStatus} />

@@ -32,15 +32,15 @@ export default function Login() {
       <div className="hidden lg:flex lg:w-[48%] auth-hero flex-col justify-between p-12">
         <div className="auth-hero-content">
           <div className="auth-logo-mark mb-8">Sk</div>
-          <h1 className="text-4xl font-bold leading-tight mb-4 text-white">Skykin Ad Portal</h1>
-          <p className="text-lg text-white/85 max-w-md leading-relaxed">
+          <h1 className="text-3xl font-bold leading-tight mb-3 text-white">Skykin Ad Portal</h1>
+          <p className="text-base text-white/85 max-w-md leading-relaxed">
             Launch intent-driven campaigns, reach the right audience segments, and track performance across the Skykin network.
           </p>
         </div>
         <div className="auth-hero-content flex flex-wrap gap-3">
-          <span className="auth-pill">🎯 Intent targeting</span>
-          <span className="auth-pill">📊 Audiencemart segments</span>
-          <span className="auth-pill">🚀 Multi-channel delivery</span>
+          <span className="auth-pill">Intent targeting</span>
+          <span className="auth-pill">Audiencemart segments</span>
+          <span className="auth-pill">Multi-channel delivery</span>
         </div>
       </div>
 
@@ -57,7 +57,7 @@ export default function Login() {
             </div>
 
             <div className="mb-8 hidden lg:block">
-              <h2 className="text-2xl font-bold text-primary">Welcome back</h2>
+              <h2 className="text-xl font-bold text-primary">Welcome back</h2>
               <p className="text-muted mt-2">Sign in to manage your campaigns and subscription.</p>
             </div>
 

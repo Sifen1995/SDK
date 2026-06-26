@@ -145,8 +145,8 @@ export default function AdminPendingCampaigns() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-primary mb-2">Campaign Moderation</h1>
-      <p className="text-muted mb-6">
+      <h1 className="text-xl font-bold text-primary mb-1">Campaign Moderation</h1>
+      <p className="text-sm text-muted mb-5">
         Review pending submissions, approve moderation, and activate approved campaigns.
       </p>
 

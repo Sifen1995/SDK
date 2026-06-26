@@ -16,6 +16,30 @@ export interface AudienceSegment {
   name: string;
   description: string;
   price_etb: number;
+  top_intent_signals?: string[];
+  approximate_size?: number;
+  estimated_cpm?: number;
+  is_active?: boolean;
+}
+
+export interface SegmentCandidate {
+  id: string;
+  intent_name: string;
+  user_count: number;
+  avg_confidence: number;
+  avg_days_active: number;
+  min_days_active: number;
+  lookback_days: number;
+  status: 'pending' | 'approved' | 'rejected';
+  scanned_at: string;
+}
+
+export interface BillingRate {
+  id: string;
+  plan_id: string;
+  billing_model: string;
+  rate_etb: number;
+  is_active: boolean;
 }
 
 export interface Campaign {
@@ -130,4 +154,39 @@ export function canWriteCampaigns(role: PortalRole): boolean {
 
 export function isOperatorAdmin(role: PortalRole): boolean {
   return role === 'operator_admin';
+}
+
+export interface CreatePlanRequest {
+  name: string;
+  monthly_fee_etb: number;
+  max_active_campaigns: number;
+  max_daily_budget_etb: number;
+  included_impressions: number;
+  sms_plus_enabled: boolean;
+  audiencemart_enabled: boolean;
+  cpc_discount_pct: number;
+}
+
+export interface CreateSegmentRequest {
+  name: string;
+  description: string;
+  top_intent_signals: string[];
+  approximate_size: number;
+  estimated_cpm: number;
+  is_active: boolean;
+}
+
+export interface UpdateBillingRateRequest {
+  rate_etb: number;
+  is_active: boolean;
+}
+
+export interface ApproveSegmentCandidateRequest {
+  name: string;
+  description: string;
+  estimated_cpm: number;
+}
+
+export interface RejectSegmentCandidateRequest {
+  notes: string;
 }

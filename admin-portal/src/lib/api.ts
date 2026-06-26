@@ -153,4 +153,53 @@ export const api = {
   analyticsCampaignDetail(id: string) {
     return request<import('../types/analytics').CampaignDetail>(`/admin/analytics/campaigns/${id}`);
   },
+
+  // Segment Candidates
+  listSegmentCandidates(status: string = 'pending') {
+    return request<import('../types').SegmentCandidate[]>(`/audience/segment-candidates?status=${status}`);
+  },
+  approveSegmentCandidate(id: string, data: import('../types').ApproveSegmentCandidateRequest) {
+    return request<import('../types').AudienceSegment>(`/admin/audience/segment-candidates/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  rejectSegmentCandidate(id: string, notes: string) {
+    return request<{ message: string }>(`/admin/audience/segment-candidates/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  },
+
+  // Plans & Billing
+  createPlan(data: import('../types').CreatePlanRequest) {
+    return request<Record<string, unknown>>('/admin/plans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  listBillingRates(planId: string) {
+    return request<{ rates: import('../types').BillingRate[]; count: number }>(`/admin/plans/${planId}/billing-rates`);
+  },
+  updateBillingRate(id: string, data: import('../types').UpdateBillingRateRequest) {
+    return request<import('../types').BillingRate>(`/admin/billing-rates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Admin Segments
+  createSegment(data: import('../types').CreateSegmentRequest) {
+    return request<import('../types').AudienceSegment>('/admin/audience/segments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Intent Consistency Analysis
+  runIntentConsistency() {
+    return request<{ message: string }>('/admin/analytics/intent-consistency/run', {
+      method: 'POST',
+    });
+  },
 };

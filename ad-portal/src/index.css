@@ -3,16 +3,16 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-brand-50: #f3e8ff;
-  --color-brand-100: #e9d5ff;
-  --color-brand-200: #d8b4fe;
-  --color-brand-300: #c084fc;
-  --color-brand-400: #a855f7;
-  --color-brand-500: #7e22ce;
-  --color-brand-600: #6b21a8;
-  --color-brand-700: #581c87;
-  --color-brand-800: #3b0764;
-  --color-brand-900: #2e054e;
+  --color-brand-50: #e8f4ff;
+  --color-brand-100: #d0e8ff;
+  --color-brand-200: #a3d1ff;
+  --color-brand-300: #6bb5ff;
+  --color-brand-400: #3da0ff;
+  --color-brand-500: #1589FF;
+  --color-brand-600: #0f6fd4;
+  --color-brand-700: #0b57a8;
+  --color-brand-800: #073d78;
+  --color-brand-900: #042952;
 }
 
 :root {
@@ -571,10 +571,10 @@ body {
 
 .subscription-active-banner {
   border-radius: 1rem;
-  background: linear-gradient(135deg, #2b193d 0%, #581c87 50%, #7e22ce 100%);
+  background: linear-gradient(135deg, #042952 0%, #0b57a8 50%, #1589FF 100%);
   padding: 1.5rem 2rem;
   color: #fff;
-  box-shadow: 0 8px 24px rgb(88 28 135 / 0.35);
+  box-shadow: 0 8px 24px rgb(11 87 168 / 0.35);
 }
 
 .plan-feature-pill {
@@ -673,7 +673,7 @@ body {
 .auth-hero {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(145deg, #2b193d 0%, #581c87 42%, #7e22ce 100%);
+  background: linear-gradient(145deg, #042952 0%, #0b57a8 42%, #1589FF 100%);
   color: #fff;
 }
 

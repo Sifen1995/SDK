@@ -75,7 +75,7 @@ export default function AdminAdvertisersAnalytics() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-primary mb-2">Advertisers</h1>
+        <h1 className="text-xl font-bold text-primary mb-1">Advertisers</h1>
         <p className="text-muted">Operational summary across {count} registered advertisers.</p>
       </div>
 

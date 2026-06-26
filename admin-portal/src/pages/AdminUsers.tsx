@@ -38,8 +38,8 @@ export default function AdminUsers() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-primary mb-2">User Management</h1>
-      <p className="text-muted mb-8">Create new portal users, including operator admins and managed advertisers.</p>
+      <h1 className="text-xl font-bold text-primary mb-1">User Management</h1>
+      <p className="text-sm text-muted mb-6">Create new portal users, including operator admins and managed advertisers.</p>
 
       <form onSubmit={handleSubmit} className="card p-6 sm:p-8 space-y-6 bg-white dark:bg-[#1c1b22]">
         {message && (

@@ -34,15 +34,15 @@ export default function Login() {
           <div className="h-12 w-12 rounded-2xl bg-white/15 flex items-center justify-center text-xl font-bold shadow-lg mb-8">
             ◆
           </div>
-          <h1 className="text-4xl font-bold leading-tight mb-4">Skykin Admin</h1>
-          <p className="text-lg text-white/80 max-w-md leading-relaxed">
+          <h1 className="text-3xl font-bold leading-tight mb-3">Skykin Admin</h1>
+          <p className="text-base text-white/80 max-w-md leading-relaxed">
             Monitor platform health, approve campaigns, and analyze delivery performance across the ad network.
           </p>
         </div>
         <div className="login-hero-content flex flex-wrap gap-3">
-          <span className="stat-pill">📊 Real-time analytics</span>
-          <span className="stat-pill">⚡ Campaign moderation</span>
-          <span className="stat-pill">🛡️ Operator access</span>
+          <span className="stat-pill">Real-time analytics</span>
+          <span className="stat-pill">Campaign moderation</span>
+          <span className="stat-pill">Operator access</span>
         </div>
       </div>
 
@@ -61,7 +61,7 @@ export default function Login() {
             </div>
 
             <div className="mb-8 hidden lg:block">
-              <h2 className="text-2xl font-bold text-primary">Welcome back</h2>
+              <h2 className="text-xl font-bold text-primary">Welcome back</h2>
               <p className="text-muted mt-2">Sign in with your operator admin credentials.</p>
             </div>
 

@@ -1,6 +1,6 @@
 /** Shared Recharts styling — uses CSS variables for light/dark readability. */
 
-export const CHART_PALETTE = ['#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
+export const CHART_PALETTE = ['#1589FF', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6'];
 
 export const CHART_ACCENT = 'var(--chart-accent)';
 export const CHART_GRID = 'var(--chart-grid)';

@@ -134,4 +134,11 @@ export const api = {
   previewCampaign(id: string) {
     return request<CampaignPreview>(`/campaigns/${id}/preview`);
   },
+
+  async activateCampaign(id: string): Promise<Campaign> {
+    const raw = await request<Record<string, unknown>>(`/campaigns/${id}/activate`, {
+      method: 'POST',
+    });
+    return normalizeCampaign(raw);
+  },
 };

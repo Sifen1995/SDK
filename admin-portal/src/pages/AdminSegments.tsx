@@ -18,8 +18,8 @@ export default function AdminSegments() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-primary mb-2">Audience Segments</h1>
-          <p className="text-muted">Manage the purchasable audience segments available to advertisers.</p>
+          <h1 className="text-xl font-bold text-primary mb-1">Audience Segments</h1>
+          <p className="text-sm text-muted">Manage the purchasable audience segments available to advertisers.</p>
         </div>
         <button className="btn-primary opacity-50 cursor-not-allowed" title="Coming soon">
           + New Segment

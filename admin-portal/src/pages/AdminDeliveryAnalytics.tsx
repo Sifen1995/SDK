@@ -54,8 +54,8 @@ export default function AdminDeliveryAnalytics() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-primary mb-2">Delivery Analytics</h1>
-      <p className="text-muted mb-6">Delivery volume trends and funnel conversion.</p>
+      <h1 className="text-xl font-bold text-primary mb-1">Delivery Analytics</h1>
+      <p className="text-sm text-muted mb-5">Delivery volume trends and funnel conversion.</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="card-static p-5 border-t-4 border-t-brand-500">

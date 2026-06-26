@@ -32,7 +32,7 @@ export default function AdminCampaignDetailAnalytics() {
 
       <div className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-primary">{data.name}</h1>
+          <h1 className="text-xl font-bold text-primary">{data.name}</h1>
           <p className="text-muted mt-1">
             {data.company_name} &bull; {data.target_intent}
           </p>

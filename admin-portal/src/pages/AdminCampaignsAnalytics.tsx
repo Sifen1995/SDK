@@ -82,8 +82,8 @@ export default function AdminCampaignsAnalytics() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-primary mb-2">Campaigns Performance</h1>
-      <p className="text-muted mb-6">Performance breakdown for all {count} campaigns across the platform.</p>
+      <h1 className="text-xl font-bold text-primary mb-1">Campaigns Performance</h1>
+      <p className="text-sm text-muted mb-5">Performance breakdown for all {count} campaigns across the platform.</p>
 
       <FilterBar resultCount={filtered.length} totalCount={data.length}>
         <FilterSearch value={search} onChange={setSearch} placeholder="Search name, company, intent…" className="min-w-[14rem]" />

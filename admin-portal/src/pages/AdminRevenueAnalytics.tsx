@@ -37,8 +37,8 @@ export default function AdminRevenueAnalytics() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-primary mb-2">Revenue Analytics</h1>
-      <p className="text-muted mb-8">Financial metrics and subscription breakdowns.</p>
+      <h1 className="text-xl font-bold text-primary mb-1">Revenue Analytics</h1>
+      <p className="text-sm text-muted mb-6">Financial metrics and subscription breakdowns.</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {[

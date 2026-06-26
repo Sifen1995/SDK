@@ -80,8 +80,8 @@ export default function Campaigns() {
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-primary">Campaigns</h1>
-          <p className="text-muted mt-1">Manage intent-targeted ad creatives</p>
+          <h1 className="text-xl font-bold text-primary">Campaigns</h1>
+          <p className="text-sm text-muted mt-0.5">Manage intent-targeted ad creatives</p>
         </div>
         {canWrite && subscribed && (
           <Link to="/campaigns/new" className="btn-primary shrink-0">

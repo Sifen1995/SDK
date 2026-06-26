@@ -11,6 +11,9 @@ import AdminDeliveryAnalytics from './pages/AdminDeliveryAnalytics';
 import AdminAdvertisersAnalytics from './pages/AdminAdvertisersAnalytics';
 import AdminCampaignsAnalytics from './pages/AdminCampaignsAnalytics';
 import AdminCampaignDetailAnalytics from './pages/AdminCampaignDetailAnalytics';
+import AdminSegmentCandidates from './pages/AdminSegmentCandidates';
+import AdminSegments from './pages/AdminSegments';
+import AdminPlans from './pages/AdminPlans';
 import type { ReactNode } from 'react';
 
 function GuestRoute({ children }: { children: ReactNode }) {
@@ -21,7 +24,7 @@ function GuestRoute({ children }: { children: ReactNode }) {
 function AdminRoute({ children }: { children: ReactNode }) {
   const { token, isAdmin } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  if (!isAdmin) return <div className="p-8 text-center text-red-500">Access Denied. Operator Admin only.</div>;
+  if (!isAdmin) return <div className="p-8 text-center text-red-500 text-sm">Access Denied. Operator Admin only.</div>;
   return <>{children}</>;
 }
 
@@ -40,6 +43,9 @@ export default function App() {
               <Route path="campaigns/pending" element={<AdminPendingCampaigns />} />
               <Route path="campaigns/:id" element={<AdminCampaignDetailAnalytics />} />
               <Route path="campaigns" element={<AdminCampaignsAnalytics />} />
+              <Route path="segment-candidates" element={<AdminSegmentCandidates />} />
+              <Route path="segments" element={<AdminSegments />} />
+              <Route path="plans" element={<AdminPlans />} />
               <Route path="users" element={<AdminUsers />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
