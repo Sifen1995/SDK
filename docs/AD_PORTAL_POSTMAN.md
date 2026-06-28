@@ -300,9 +300,16 @@ Same SQL as before — users need 5+ distinct days of the same intent with confi
 
 **202:** `{ "message": "intent consistency analysis started" }`
 
-#### 4. List segment candidates (audience)
-`GET {{baseUrl}}/api/v1/ad-portal/audience/segment-candidates?status=pending`  
+#### 4. List segment candidates (audience or admin)
+`GET {{baseUrl}}/api/v1/ad-portal/admin/audience/segment-candidates?status=pending`  
+(or `GET .../ad-portal/audience/segment-candidates` — same data)  
 `Authorization: Bearer {{adPortalToken}}` (operator_admin)
+
+#### 4b. List published catalog segments (admin)
+`GET {{baseUrl}}/api/v1/ad-portal/admin/audience/segments`  
+`Authorization: Bearer {{adPortalToken}}` (operator_admin)
+
+**Note:** `GET /ad-portal/audience/segments` is for **advertisers** with an active subscription and returns 403 for operator admin.
 
 #### 5a. Approve candidate (admin)
 `POST {{baseUrl}}/api/v1/ad-portal/admin/audience/segment-candidates/{{candidateId}}/approve`
