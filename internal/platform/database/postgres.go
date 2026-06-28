@@ -88,6 +88,7 @@ func Migrate(db *gorm.DB) error {
 	seedRewardRules(db)
 	seedBillingCatalog(db)
 	seedAudienceSegments(db)
+	seedDemoFashionUser(db)
 	return nil
 }
 
