@@ -43,6 +43,7 @@ func toCandidateResponse(c *audienceDomain.SegmentCandidate) CandidateResponse {
 // @Failure      403  {object}  platformHTTP.APIError
 // @Failure      500  {object}  platformHTTP.APIError
 // @Router       /ad-portal/audience/segment-candidates [get]
+// @Router       /ad-portal/admin/audience/segment-candidates [get]
 func (h *Handler) ListSegmentCandidates(c *gin.Context) {
 	status := c.DefaultQuery("status", string(audienceDomain.CandidateStatusPending))
 	list, err := h.candidates.ListByStatus(c.Request.Context(), audienceDomain.CandidateStatus(status))

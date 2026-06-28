@@ -1,6 +1,10 @@
 package http
 
-import "time"
+import (
+	"time"
+
+	audiencemodel "skykin-platform/internal/audience/model"
+)
 
 // ValidateCampaignRequest is the operator approve/reject payload.
 type ValidateCampaignRequest struct {
@@ -48,4 +52,10 @@ type UpdateBillingRateRequest struct {
 type BillingRateListResponse struct {
 	Rates []interface{} `json:"rates"`
 	Count int           `json:"count"`
+}
+
+// SegmentListResponse wraps catalog segments for admin list endpoints.
+type SegmentListResponse struct {
+	Segments []audiencemodel.AudienceSegment `json:"segments"`
+	Count    int                             `json:"count"`
 }

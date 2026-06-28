@@ -124,6 +124,11 @@ func (s *PlanAndSegmentService) CreateSegment(ctx context.Context, cmd CreateSeg
 	return seg, nil
 }
 
+// ListSegments returns all active catalog audience segments for operator admin.
+func (s *PlanAndSegmentService) ListSegments(ctx context.Context) ([]segmentmodel.AudienceSegment, error) {
+	return s.segmentRepo.ListAvailableNow(ctx, time.Now().UTC())
+}
+
 func validateCreatePlan(cmd CreatePlanCmd) error {
 	if strings.TrimSpace(cmd.Name) == "" {
 		return errors.New("name is required")
