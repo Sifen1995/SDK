@@ -131,11 +131,11 @@ func (r *intentRepository) findConsistentUsers(
 		FROM intents
 		WHERE intent_name  = ?
 		AND   confidence  >= ?
-		AND   created_at  >= NOW() - (? || ' days')::interval
+		AND   created_at  >= NOW() - make_interval(days => ?::int)
 		GROUP BY user_id
 		HAVING
 			COUNT(DISTINCT DATE(created_at)) >= ?
-			AND MAX(created_at) >= NOW() - (? || ' days')::interval
+			AND MAX(created_at) >= NOW() - make_interval(days => ?::int)
 		ORDER BY days_active DESC, avg_confidence DESC
 	`, intentName, minConf, lookbackDays, minDays, maxAgeDays).Scan(&rows).Error
 	if err != nil {
