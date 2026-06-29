@@ -93,6 +93,24 @@ func (h *CatalogHandler) CreateSegment(c *gin.Context) {
 	c.JSON(http.StatusCreated, seg)
 }
 
+// ListSegments godoc
+// @Summary      List audience catalog segments
+// @Description  Returns all active Audiencemart segments for operator admin review.
+// @Tags         Ad Portal - Admin
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  SegmentListResponse
+// @Failure      500  {object}  platformHTTP.APIError
+// @Router       /ad-portal/admin/audience/segments [get]
+func (h *CatalogHandler) ListSegments(c *gin.Context) {
+	segments, err := h.catalog.ListSegments(c.Request.Context())
+	if err != nil {
+		platformHTTP.Error(c, http.StatusInternalServerError, "list segments failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, SegmentListResponse{Segments: segments, Count: len(segments)})
+}
+
 // ListBillingRates godoc
 // @Summary      List billing rates for a plan
 // @Tags         Ad Portal - Admin

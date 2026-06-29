@@ -62,6 +62,8 @@ func RegisterRoutes(
 				admin.GET("/plans/:plan_id/billing-rates", adminCatalog.ListBillingRates)
 				admin.PATCH("/billing-rates/:id", adminCatalog.UpdateBillingRate)
 				admin.POST("/audience/segments", adminCatalog.CreateSegment)
+				admin.GET("/audience/segments", adminCatalog.ListSegments)
+				admin.GET("/audience/segment-candidates", audience.ListSegmentCandidates)
 				admin.POST("/audience/segment-candidates/:id/approve", segmentCandidates.ApproveSegmentCandidate)
 				admin.POST("/audience/segment-candidates/:id/reject", segmentCandidates.RejectSegmentCandidate)
 				admin.POST("/analytics/intent-consistency/run", analyticsOps.TriggerIntentConsistency)
