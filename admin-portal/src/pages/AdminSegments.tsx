@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Layers } from 'lucide-react';
 import { api } from '../lib/api';
 import type { AudienceSegment } from '../types';
 
@@ -29,10 +30,24 @@ export default function AdminSegments() {
       {error && <div className="alert-error mb-6">{error}</div>}
 
       {loading ? (
-        <div className="text-muted">Loading segments...</div>
+        <div className="card p-6">
+          <div className="animate-pulse flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-[var(--bg-subtle)]" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-32 rounded bg-[var(--bg-subtle)]" />
+              <div className="h-3 w-48 rounded bg-[var(--bg-subtle)]" />
+            </div>
+          </div>
+        </div>
       ) : segments.length === 0 ? (
         <div className="card p-12 text-center border-dashed">
-          <p className="text-muted">No audience segments found.</p>
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400">
+            <Layers size={20} />
+          </div>
+          <h3 className="mt-4 text-sm font-semibold text-primary">No audience segments available yet</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+            Segments will appear here as soon as they are created or approved for use.
+          </p>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
