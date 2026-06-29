@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"skykin-platform/internal/ad_portal/application"
+	adportalvalidation "skykin-platform/internal/ad_portal/validation"
 	platformHTTP "skykin-platform/internal/platform/http"
 
 	"github.com/gin-gonic/gin"
@@ -32,7 +33,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
 		return
 	}
-	u, err := h.auth.Register(c.Request.Context(), req.Name, req.Email, req.Password, req.CompanyName, req.Role)
+	email, err := adportalvalidation.Register(req.Name, req.Email, req.Password, req.CompanyName, req.Role)
+	if err != nil {
+		platformHTTP.Error(c, http.StatusBadRequest, "validation failed", err.Error())
+		return
+	}
+	u, err := h.auth.Register(c.Request.Context(), req.Name, email, req.Password, req.CompanyName, req.Role)
 	if err != nil {
 		platformHTTP.Error(c, http.StatusBadRequest, "registration failed", err.Error())
 		return
@@ -55,7 +61,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
 		return
 	}
-	token, u, err := h.auth.Login(c.Request.Context(), req.Email, req.Password)
+	email, err := adportalvalidation.Login(req.Email, req.Password)
+	if err != nil {
+		platformHTTP.Error(c, http.StatusBadRequest, "validation failed", err.Error())
+		return
+	}
+	token, u, err := h.auth.Login(c.Request.Context(), email, req.Password)
 	if err != nil {
 		platformHTTP.Error(c, http.StatusUnauthorized, "login failed", err.Error())
 		return
@@ -97,7 +108,12 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
 		return
 	}
-	u, err := h.auth.CreateOperatorUser(c.Request.Context(), req.Name, req.Email, req.Password, req.Role, req.CompanyName)
+	email, err := adportalvalidation.CreateUser(req.Name, req.Email, req.Password, req.Role, req.CompanyName)
+	if err != nil {
+		platformHTTP.Error(c, http.StatusBadRequest, "validation failed", err.Error())
+		return
+	}
+	u, err := h.auth.CreateOperatorUser(c.Request.Context(), req.Name, email, req.Password, req.Role, req.CompanyName)
 	if err != nil {
 		platformHTTP.Error(c, http.StatusBadRequest, "create user failed", err.Error())
 		return

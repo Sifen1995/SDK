@@ -1,8 +1,12 @@
 {
   "name": "ad-portal",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
+  "description": "Advertiser-facing web app for campaign management. Connects to the Go backend at `/api/v1/ad-portal`.",
+  "license": "ISC",
+  "author": "",
   "type": "module",
+  "main": "eslint.config.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

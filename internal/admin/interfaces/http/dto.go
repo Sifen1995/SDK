@@ -48,6 +48,19 @@ type UpdateBillingRateRequest struct {
 	IsActive bool    `json:"is_active"`
 }
 
+// UpdatePlanRequest is the HTTP body for PATCH /admin/plans/:plan_id.
+type UpdatePlanRequest struct {
+	Name                string  `json:"name" binding:"required,min=2,max=100"`
+	MonthlyFeeETB       float64 `json:"monthly_fee_etb" binding:"required,gte=0"`
+	MaxActiveCampaigns  int     `json:"max_active_campaigns" binding:"required,min=1"`
+	MaxDailyBudgetETB   float64 `json:"max_daily_budget_etb" binding:"required,gt=0"`
+	IncludedImpressions int     `json:"included_impressions" binding:"gte=0"`
+	SMSPlusEnabled      bool    `json:"sms_plus_enabled"`
+	AudiencemartEnabled bool    `json:"audiencemart_enabled"`
+	CPCDiscountPct      float64 `json:"cpc_discount_pct" binding:"gte=0,lte=100"`
+	IsActive            bool    `json:"is_active"`
+}
+
 // BillingRateListResponse for swagger.
 type BillingRateListResponse struct {
 	Rates []interface{} `json:"rates"`

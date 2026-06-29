@@ -12,6 +12,7 @@ import (
 	billingapp "skykin-platform/internal/billing/application"
 	billingdomain "skykin-platform/internal/billing/domain"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
+	campaignvalidation "skykin-platform/internal/campaigns/validation"
 	"skykin-platform/internal/campaigns/infrastructure"
 	"skykin-platform/internal/campaigns/model"
 
@@ -109,7 +110,7 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 	}
 
 	// 4. Creative validation by channel code.
-	vr := ValidateCampaign(c, channel.Code)
+	vr := campaignvalidation.Campaign(c, channel.Code)
 	c.ValidationStatus = vr.Status
 	c.ValidationNotes = vr.Notes
 

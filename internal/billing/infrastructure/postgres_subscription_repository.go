@@ -60,6 +60,18 @@ func (r *SubscriptionRepository) GetPlanByID(ctx context.Context, planID string)
 	return &plan, nil
 }
 
+func (r *SubscriptionRepository) FindPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error) {
+	var plan model.SubscriptionPlan
+	if err := r.db.WithContext(ctx).Where("id = ?", planID).First(&plan).Error; err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
+func (r *SubscriptionRepository) UpdatePlan(ctx context.Context, plan *model.SubscriptionPlan) error {
+	return r.db.WithContext(ctx).Save(plan).Error
+}
+
 func (r *SubscriptionRepository) ListActivePlans(ctx context.Context) ([]model.SubscriptionPlan, error) {
 	var plans []model.SubscriptionPlan
 	err := r.db.WithContext(ctx).

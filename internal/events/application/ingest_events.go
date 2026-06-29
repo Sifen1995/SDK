@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"skykin-platform/internal/events/domain"
+	eventvalidation "skykin-platform/internal/events/validation"
 	internalevents "skykin-platform/internal/events/events"
 	platformredis "skykin-platform/internal/platform/redis"
 )
@@ -99,7 +100,7 @@ func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (
 	now := time.Now().UTC()
 
 	for _, input := range cmd.Events {
-		if err := ValidateEventInput(
+		if err := eventvalidation.EventInput(
 			input.EventID,
 			input.EventType,
 			input.Domain,

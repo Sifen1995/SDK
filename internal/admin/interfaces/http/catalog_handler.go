@@ -5,6 +5,7 @@ import (
 	"time"
 
 	adminApp "skykin-platform/internal/admin/application"
+	billingApp "skykin-platform/internal/billing/application"
 	platformHTTP "skykin-platform/internal/platform/http"
 
 	"github.com/gin-gonic/gin"
@@ -14,10 +15,15 @@ import (
 type CatalogHandler struct {
 	catalog *adminApp.PlanAndSegmentService
 	billing *adminApp.BillingAdminService
+	plans   *billingApp.PlanService
 }
 
-func NewCatalogHandler(catalog *adminApp.PlanAndSegmentService, billing *adminApp.BillingAdminService) *CatalogHandler {
-	return &CatalogHandler{catalog: catalog, billing: billing}
+func NewCatalogHandler(
+	catalog *adminApp.PlanAndSegmentService,
+	billing *adminApp.BillingAdminService,
+	plans *billingApp.PlanService,
+) *CatalogHandler {
+	return &CatalogHandler{catalog: catalog, billing: billing, plans: plans}
 }
 
 // CreatePlan godoc
@@ -52,6 +58,71 @@ func (h *CatalogHandler) CreatePlan(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, plan)
+}
+
+// GetPlan godoc
+// @Summary      Get subscription plan by ID
+// @Description  Returns a single subscription plan including inactive plans for operator review.
+// @Tags         Ad Portal - Admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        plan_id  path  string  true  "Plan ID"
+// @Success      200  {object}  skykin-platform_internal_billing_model.SubscriptionPlan
+// @Failure      404  {object}  platformHTTP.APIError
+// @Router       /ad-portal/admin/plans/{plan_id} [get]
+func (h *CatalogHandler) GetPlan(c *gin.Context) {
+	plan, err := h.plans.GetPlanByID(c.Request.Context(), c.Param("plan_id"))
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "plan not found" {
+			status = http.StatusNotFound
+		}
+		platformHTTP.Error(c, status, "get plan failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, plan)
+}
+
+// UpdatePlan godoc
+// @Summary      Update subscription plan
+// @Description  Updates plan limits, entitlements, and active status. Billing rates are managed separately.
+// @Tags         Ad Portal - Admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        plan_id  path  string  true  "Plan ID"
+// @Param        body     body  UpdatePlanRequest  true  "Plan update"
+// @Success      200  {object}  skykin-platform_internal_billing_model.SubscriptionPlan
+// @Failure      400  {object}  platformHTTP.APIError
+// @Failure      404  {object}  platformHTTP.APIError
+// @Router       /ad-portal/admin/plans/{plan_id} [patch]
+func (h *CatalogHandler) UpdatePlan(c *gin.Context) {
+	var req UpdatePlanRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		platformHTTP.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
+		return
+	}
+	plan, err := h.plans.UpdatePlan(c.Request.Context(), billingApp.UpdatePlanCmd{
+		PlanID:              c.Param("plan_id"),
+		Name:                req.Name,
+		MonthlyFeeETB:       req.MonthlyFeeETB,
+		MaxActiveCampaigns:  req.MaxActiveCampaigns,
+		MaxDailyBudgetETB:   req.MaxDailyBudgetETB,
+		IncludedImpressions: req.IncludedImpressions,
+		SMSPlusEnabled:      req.SMSPlusEnabled,
+		AudiencemartEnabled: req.AudiencemartEnabled,
+		CPCDiscountPct:      req.CPCDiscountPct,
+		IsActive:            req.IsActive,
+	})
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "plan not found" {
+			status = http.StatusNotFound
+		}
+		platformHTTP.Error(c, status, "update plan failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, plan)
 }
 
 // CreateSegment godoc

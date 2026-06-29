@@ -10,6 +10,7 @@ import (
 
 	segmentdomain "skykin-platform/internal/audience/domain"
 	segmentmodel "skykin-platform/internal/audience/model"
+	adminvalidation "skykin-platform/internal/admin/validation"
 	billingdomain "skykin-platform/internal/billing/domain"
 	billingmodel "skykin-platform/internal/billing/model"
 
@@ -58,7 +59,14 @@ func NewPlanAndSegmentService(
 
 // CreatePlan creates a subscription plan and seeds default billing rates.
 func (s *PlanAndSegmentService) CreatePlan(ctx context.Context, cmd CreatePlanCmd) (*billingmodel.SubscriptionPlan, error) {
-	if err := validateCreatePlan(cmd); err != nil {
+	if err := adminvalidation.ValidateCreatePlan(adminvalidation.CreatePlanInput{
+		Name:                cmd.Name,
+		MonthlyFeeETB:       cmd.MonthlyFeeETB,
+		MaxActiveCampaigns:  cmd.MaxActiveCampaigns,
+		MaxDailyBudgetETB:   cmd.MaxDailyBudgetETB,
+		IncludedImpressions: cmd.IncludedImpressions,
+		CPCDiscountPct:      cmd.CPCDiscountPct,
+	}); err != nil {
 		return nil, err
 	}
 	if _, err := s.planRepo.FindPlanByName(ctx, cmd.Name); err == nil {
@@ -89,7 +97,12 @@ func (s *PlanAndSegmentService) CreatePlan(ctx context.Context, cmd CreatePlanCm
 
 // CreateSegment creates an audience segment in the catalog.
 func (s *PlanAndSegmentService) CreateSegment(ctx context.Context, cmd CreateSegmentCmd) (*segmentmodel.AudienceSegment, error) {
-	if err := validateCreateSegment(cmd); err != nil {
+	if err := adminvalidation.ValidateCreateSegment(adminvalidation.CreateSegmentInput{
+		Name:             cmd.Name,
+		TopIntentSignals: cmd.TopIntentSignals,
+		ApproximateSize:  cmd.ApproximateSize,
+		EstimatedCPM:     cmd.EstimatedCPM,
+	}); err != nil {
 		return nil, err
 	}
 	if _, err := s.segmentRepo.GetByName(ctx, strings.TrimSpace(cmd.Name)); err == nil {
@@ -127,49 +140,6 @@ func (s *PlanAndSegmentService) CreateSegment(ctx context.Context, cmd CreateSeg
 // ListSegments returns all active catalog audience segments for operator admin.
 func (s *PlanAndSegmentService) ListSegments(ctx context.Context) ([]segmentmodel.AudienceSegment, error) {
 	return s.segmentRepo.ListAvailableNow(ctx, time.Now().UTC())
-}
-
-func validateCreatePlan(cmd CreatePlanCmd) error {
-	if strings.TrimSpace(cmd.Name) == "" {
-		return errors.New("name is required")
-	}
-	if cmd.MonthlyFeeETB < 0 {
-		return errors.New("monthly_fee_etb must be >= 0")
-	}
-	if cmd.MaxActiveCampaigns < 1 {
-		return errors.New("max_active_campaigns must be at least 1")
-	}
-	if cmd.MaxDailyBudgetETB <= 0 {
-		return errors.New("max_daily_budget_etb must be > 0")
-	}
-	if cmd.IncludedImpressions < 0 {
-		return errors.New("included_impressions must be >= 0")
-	}
-	if cmd.CPCDiscountPct < 0 || cmd.CPCDiscountPct > 100 {
-		return errors.New("cpc_discount_pct must be between 0 and 100")
-	}
-	return nil
-}
-
-func validateCreateSegment(cmd CreateSegmentCmd) error {
-	if strings.TrimSpace(cmd.Name) == "" {
-		return errors.New("name is required")
-	}
-	if len(cmd.TopIntentSignals) == 0 {
-		return errors.New("top_intent_signals must include at least one intent")
-	}
-	for _, sig := range cmd.TopIntentSignals {
-		if strings.TrimSpace(sig) == "" {
-			return errors.New("top_intent_signals cannot contain empty values")
-		}
-	}
-	if cmd.ApproximateSize < 0 {
-		return errors.New("approximate_size must be >= 0")
-	}
-	if cmd.EstimatedCPM <= 0 {
-		return errors.New("estimated_cpm must be > 0")
-	}
-	return nil
 }
 
 func (s *PlanAndSegmentService) seedDefaultRates(ctx context.Context, planID string) error {

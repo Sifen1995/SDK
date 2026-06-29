@@ -7,7 +7,7 @@ import (
 	"time"
 
 	campaigndomain "skykin-platform/internal/campaigns/domain"
-	campaignapp "skykin-platform/internal/campaigns/application"
+	campaignvalidation "skykin-platform/internal/campaigns/validation"
 	billingdomain "skykin-platform/internal/billing/domain"
 	"skykin-platform/internal/campaigns/infrastructure"
 	"skykin-platform/internal/campaigns/model"
@@ -48,7 +48,7 @@ func (s *CampaignModerationService) Validate(ctx context.Context, campaignID, op
 		if err != nil {
 			return nil, errors.New("channel not found")
 		}
-		vr := campaignapp.ValidateCampaign(c, ch.Code)
+		vr := campaignvalidation.Campaign(c, ch.Code)
 		if vr.Status != "passed" {
 			return nil, fmt.Errorf("cannot approve: %s", vr.Notes)
 		}

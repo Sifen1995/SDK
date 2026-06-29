@@ -1,4 +1,4 @@
-package application
+package validation
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// ValidateEventInput validates a single SDK event payload.
-func ValidateEventInput(
+// EventInput validates a single SDK event payload.
+func EventInput(
 	eventID, eventType, domainName, sessionID, screenName string,
 	metadata map[string]any,
 ) error {

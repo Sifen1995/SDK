@@ -22,6 +22,7 @@ type SubscriptionRepository interface {
 	ListActivePlans(ctx context.Context) ([]model.SubscriptionPlan, error)
 	CreatePlan(ctx context.Context, plan *model.SubscriptionPlan) error
 	CreateSubscription(ctx context.Context, sub *model.AdvertiserSubscription) error
+	UpdatePlan(ctx context.Context, planID string, name string, monthlyFeeETB float64, isActive bool) (*model.SubscriptionPlan, error)
 }
 
 // BillingRateRepository manages per-plan usage rates.

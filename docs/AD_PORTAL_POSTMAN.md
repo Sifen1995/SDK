@@ -302,7 +302,6 @@ Same SQL as before — users need 5+ distinct days of the same intent with confi
 
 #### 4. List segment candidates (audience or admin)
 `GET {{baseUrl}}/api/v1/ad-portal/admin/audience/segment-candidates?status=pending`  
-(or `GET .../ad-portal/audience/segment-candidates` — same data)  
 `Authorization: Bearer {{adPortalToken}}` (operator_admin)
 
 #### 4b. List published catalog segments (admin)

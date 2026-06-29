@@ -333,9 +333,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/ad-portal/audience/segment-candidates?status=pending",
+              "raw": "{{baseUrl}}/api/v1/ad-portal/admin/audience/segment-candidates?status=pending",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "ad-portal", "audience", "segment-candidates"],
+              "path": ["api", "v1", "ad-portal", "admin", "audience", "segment-candidates"],
               "query": [{ "key": "status", "value": "pending" }]
             },
             "description": "Requires operator_admin JWT. Lists candidates from the nightly intent classification scan."

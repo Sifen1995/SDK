@@ -78,6 +78,28 @@ func (h *Handler) GetSubscription(c *gin.Context) {
 }
 
 // Subscribe godoc
+// @Summary      show single plan
+// @Description  Fetchs deatil of a single subscription plam by ID
+// @Tags         Ad Portal - Billing
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      SubscribeRequest  true  "Plan selection"
+// @Success      201   {object}  SubscriptionStatusResponse
+// @Failure      400   {object}  platformHTTP.APIError
+// @Failure      409   {object}  platformHTTP.APIError
+// @Router       /ad-portal/subscription [post]
+func (h *Handler) GetPlanByID(c *gin.Context) {
+	planID := c.Param("plan_id")
+	plan, err := h.svc.GetPlanByID(c.Request.Context(), planID)
+	if err != nil {
+		platformHTTP.Error(c, http.StatusNotFound, "plan not found", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"plan": plan})
+}
+
+// Subscribe godoc
 // @Summary      Subscribe to a plan
 // @Description  Creates an active subscription for the advertiser. Required before campaign creation.
 // @Tags         Ad Portal - Billing

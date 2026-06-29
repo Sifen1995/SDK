@@ -34,7 +34,7 @@ func toCandidateResponse(c *audienceDomain.SegmentCandidate) CandidateResponse {
 // ListSegmentCandidates godoc
 // @Summary      List segment candidates awaiting review
 // @Description  Returns audience segment candidates created from intent consistency findings.
-// @Tags         Ad Portal - Audience
+// @Tags         Ad Portal - Admin
 // @Produce      json
 // @Security     BearerAuth
 // @Param        status  query  string  false  "pending|approved|rejected" default(pending)
@@ -42,7 +42,6 @@ func toCandidateResponse(c *audienceDomain.SegmentCandidate) CandidateResponse {
 // @Failure      401  {object}  platformHTTP.APIError
 // @Failure      403  {object}  platformHTTP.APIError
 // @Failure      500  {object}  platformHTTP.APIError
-// @Router       /ad-portal/audience/segment-candidates [get]
 // @Router       /ad-portal/admin/audience/segment-candidates [get]
 func (h *Handler) ListSegmentCandidates(c *gin.Context) {
 	status := c.DefaultQuery("status", string(audienceDomain.CandidateStatusPending))

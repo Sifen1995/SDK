@@ -3,6 +3,7 @@ package controller
 import (
 	"net/http"
 	"skykin-platform/internal/auth/dto"
+	authvalidation "skykin-platform/internal/auth/validation"
 	"skykin-platform/internal/auth/service"
 	platformHTTP "skykin-platform/internal/platform/http"
 
@@ -79,6 +80,12 @@ func (ctrl *AuthController) RegisterDeveloper(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
+	email, err := authvalidation.DeveloperRegister(req.Name, req.Email, req.Password)
+	if err != nil {
+		platformHTTP.Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+	req.Email = email
 
 	dev, err := ctrl.authService.RegisterDeveloper(c.Request.Context(), req)
 	if err != nil {
@@ -141,6 +148,12 @@ func (ctrl *AuthController) LoginDeveloper(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "Invalid request body structure", err.Error())
 		return
 	}
+	email, err := authvalidation.DeveloperLogin(req.Email, req.Password)
+	if err != nil {
+		platformHTTP.Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+	req.Email = email
 
 	res, err := ctrl.authService.LoginDeveloper(c.Request.Context(), req)
 	if err != nil {

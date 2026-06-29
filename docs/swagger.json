@@ -204,6 +204,61 @@
                 }
             }
         },
+        "/ad-portal/admin/audience/segment-candidates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns audience segment candidates created from intent consistency findings.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "List segment candidates awaiting review",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "pending",
+                        "description": "pending|approved|rejected",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_audience_interfaces_http.CandidateResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/admin/audience/segment-candidates/{id}/approve": {
             "post": {
                 "security": [
@@ -310,6 +365,35 @@
             }
         },
         "/ad-portal/admin/audience/segments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all active Audiencemart segments for operator admin review.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "List audience catalog segments",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.SegmentListResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -578,6 +662,102 @@
                 }
             }
         },
+        "/ad-portal/admin/plans/{plan_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a single subscription plan including inactive plans for operator review.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Get subscription plan by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Plan ID",
+                        "name": "plan_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates plan limits, entitlements, and active status. Billing rates are managed separately.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Update subscription plan",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Plan ID",
+                        "name": "plan_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Plan update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.UpdatePlanRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/admin/plans/{plan_id}/billing-rates": {
             "get": {
                 "security": [
@@ -654,61 +834,6 @@
                     },
                     "403": {
                         "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
-                        }
-                    }
-                }
-            }
-        },
-        "/ad-portal/audience/segment-candidates": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns audience segment candidates created from intent consistency findings.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Ad Portal - Audience"
-                ],
-                "summary": "List segment candidates awaiting review",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "default": "pending",
-                        "description": "pending|approved|rejected",
-                        "name": "status",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/internal_audience_interfaces_http.CandidateResponse"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -1722,6 +1847,20 @@
                 }
             }
         },
+        "internal_admin_interfaces_http.SegmentListResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "segments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                    }
+                }
+            }
+        },
         "internal_admin_interfaces_http.UpdateBillingRateRequest": {
             "type": "object",
             "required": [
@@ -1734,6 +1873,51 @@
                 "rate_etb": {
                     "type": "number",
                     "minimum": 0
+                }
+            }
+        },
+        "internal_admin_interfaces_http.UpdatePlanRequest": {
+            "type": "object",
+            "required": [
+                "max_active_campaigns",
+                "max_daily_budget_etb",
+                "monthly_fee_etb",
+                "name"
+            ],
+            "properties": {
+                "audiencemart_enabled": {
+                    "type": "boolean"
+                },
+                "cpc_discount_pct": {
+                    "type": "number",
+                    "maximum": 100,
+                    "minimum": 0
+                },
+                "included_impressions": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "max_active_campaigns": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "max_daily_budget_etb": {
+                    "type": "number"
+                },
+                "monthly_fee_etb": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2
+                },
+                "sms_plus_enabled": {
+                    "type": "boolean"
                 }
             }
         },

@@ -202,6 +202,15 @@ definitions:
         example: Insufficient user volume for this vertical
         type: string
     type: object
+  internal_admin_interfaces_http.SegmentListResponse:
+    properties:
+      count:
+        type: integer
+      segments:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_audience_model.AudienceSegment'
+        type: array
+    type: object
   internal_admin_interfaces_http.UpdateBillingRateRequest:
     properties:
       is_active:
@@ -211,6 +220,39 @@ definitions:
         type: number
     required:
     - rate_etb
+    type: object
+  internal_admin_interfaces_http.UpdatePlanRequest:
+    properties:
+      audiencemart_enabled:
+        type: boolean
+      cpc_discount_pct:
+        maximum: 100
+        minimum: 0
+        type: number
+      included_impressions:
+        minimum: 0
+        type: integer
+      is_active:
+        type: boolean
+      max_active_campaigns:
+        minimum: 1
+        type: integer
+      max_daily_budget_etb:
+        type: number
+      monthly_fee_etb:
+        minimum: 0
+        type: number
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      sms_plus_enabled:
+        type: boolean
+    required:
+    - max_active_campaigns
+    - max_daily_budget_etb
+    - monthly_fee_etb
+    - name
     type: object
   internal_admin_interfaces_http.ValidateCampaignRequest:
     properties:
@@ -1054,6 +1096,42 @@ paths:
       summary: Revenue and subscription analytics
       tags:
       - Ad Portal - Admin Analytics
+  /ad-portal/admin/audience/segment-candidates:
+    get:
+      description: Returns audience segment candidates created from intent consistency
+        findings.
+      parameters:
+      - default: pending
+        description: pending|approved|rejected
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_audience_interfaces_http.CandidateResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: List segment candidates awaiting review
+      tags:
+      - Ad Portal - Admin
   /ad-portal/admin/audience/segment-candidates/{id}/approve:
     post:
       consumes:
@@ -1122,6 +1200,24 @@ paths:
       tags:
       - Ad Portal - Admin
   /ad-portal/admin/audience/segments:
+    get:
+      description: Returns all active Audiencemart segments for operator admin review.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_admin_interfaces_http.SegmentListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: List audience catalog segments
+      tags:
+      - Ad Portal - Admin
     post:
       consumes:
       - application/json
@@ -1291,6 +1387,69 @@ paths:
       summary: Create subscription plan
       tags:
       - Ad Portal - Admin
+  /ad-portal/admin/plans/{plan_id}:
+    get:
+      description: Returns a single subscription plan including inactive plans for
+        operator review.
+      parameters:
+      - description: Plan ID
+        in: path
+        name: plan_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Get subscription plan by ID
+      tags:
+      - Ad Portal - Admin
+    patch:
+      consumes:
+      - application/json
+      description: Updates plan limits, entitlements, and active status. Billing rates
+        are managed separately.
+      parameters:
+      - description: Plan ID
+        in: path
+        name: plan_id
+        required: true
+        type: string
+      - description: Plan update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_admin_interfaces_http.UpdatePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Update subscription plan
+      tags:
+      - Ad Portal - Admin
   /ad-portal/admin/plans/{plan_id}/billing-rates:
     get:
       parameters:
@@ -1342,42 +1501,6 @@ paths:
       summary: Create portal user (operator admin)
       tags:
       - Ad Portal - Admin
-  /ad-portal/audience/segment-candidates:
-    get:
-      description: Returns audience segment candidates created from intent consistency
-        findings.
-      parameters:
-      - default: pending
-        description: pending|approved|rejected
-        in: query
-        name: status
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/internal_audience_interfaces_http.CandidateResponse'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
-      security:
-      - BearerAuth: []
-      summary: List segment candidates awaiting review
-      tags:
-      - Ad Portal - Audience
   /ad-portal/audience/segments:
     get:
       description: Returns Audiencemart catalog filtered by the advertiser subscription

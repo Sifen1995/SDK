@@ -79,9 +79,9 @@ func TestAudience_ListSegmentCandidates_HTTP(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.GET("/api/v1/ad-portal/audience/segment-candidates", handler.ListSegmentCandidates)
+	r.GET("/api/v1/ad-portal/admin/audience/segment-candidates", handler.ListSegmentCandidates)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/ad-portal/audience/segment-candidates?status=pending", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ad-portal/admin/audience/segment-candidates?status=pending", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
