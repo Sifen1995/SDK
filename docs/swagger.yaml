@@ -104,6 +104,15 @@ definitions:
       user:
         $ref: '#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO'
     type: object
+  internal_admin_interfaces_http.AdminPlanListResponse:
+    properties:
+      count:
+        type: integer
+      plans:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan'
+        type: array
+    type: object
   internal_admin_interfaces_http.ApproveSegmentCandidateRequest:
     properties:
       description:
@@ -1360,6 +1369,25 @@ paths:
       tags:
       - Ad Portal - Admin
   /ad-portal/admin/plans:
+    get:
+      description: Returns every subscription plan including suspended (inactive)
+        plans for operator admin.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_admin_interfaces_http.AdminPlanListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: List all subscription plans
+      tags:
+      - Ad Portal - Admin
     post:
       consumes:
       - application/json
@@ -1472,6 +1500,36 @@ paths:
       security:
       - BearerAuth: []
       summary: List billing rates for a plan
+      tags:
+      - Ad Portal - Admin
+  /ad-portal/admin/plans/{plan_id}/suspend:
+    post:
+      description: Deactivates an active plan so it is no longer offered to advertisers.
+        Existing subscriptions are not affected.
+      parameters:
+      - description: Plan ID
+        in: path
+        name: plan_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Suspend subscription plan
       tags:
       - Ad Portal - Admin
   /ad-portal/admin/users:
@@ -1687,8 +1745,8 @@ paths:
       - Ad Portal - Auth
   /ad-portal/plans:
     get:
-      description: Returns available plans for advertisers to choose before creating
-        campaigns.
+      description: Returns active plans available for advertisers to choose before
+        subscribing or creating campaigns.
       produces:
       - application/json
       responses:
@@ -1698,7 +1756,7 @@ paths:
             $ref: '#/definitions/internal_billing_interfaces_http.PlanListResponse'
       security:
       - BearerAuth: []
-      summary: List subscription plans
+      summary: List active subscription plans
       tags:
       - Ad Portal - Billing
   /ad-portal/register:

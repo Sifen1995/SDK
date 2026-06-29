@@ -51,6 +51,33 @@ func (s *PlanService) GetPlanByID(ctx context.Context, planID string) (*model.Su
 	return plan, nil
 }
 
+// ListAllPlans returns every subscription plan for operator admin (active and inactive).
+func (s *PlanService) ListAllPlans(ctx context.Context) ([]model.SubscriptionPlan, error) {
+	return s.plans.ListAllPlans(ctx)
+}
+
+// SuspendPlan deactivates an active subscription plan so it is hidden from advertisers.
+func (s *PlanService) SuspendPlan(ctx context.Context, planID string) (*model.SubscriptionPlan, error) {
+	if err := billingvalidation.ValidatePlanID(planID); err != nil {
+		return nil, err
+	}
+	plan, err := s.plans.FindPlanByID(ctx, planID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("plan not found")
+		}
+		return nil, err
+	}
+	if !plan.IsActive {
+		return nil, errors.New("plan is already suspended")
+	}
+	plan.IsActive = false
+	if err := s.plans.UpdatePlan(ctx, plan); err != nil {
+		return nil, fmt.Errorf("suspend plan: %w", err)
+	}
+	return plan, nil
+}
+
 // UpdatePlan updates mutable plan fields for operator admin.
 func (s *PlanService) UpdatePlan(ctx context.Context, cmd UpdatePlanCmd) (*model.SubscriptionPlan, error) {
 	if err := billingvalidation.ValidatePlanID(cmd.PlanID); err != nil {

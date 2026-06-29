@@ -137,24 +137,6 @@ func (s *SubscriptionService) Subscribe(ctx context.Context, advertiserID, planI
 	return &dto, nil
 }
 
-func (s *SubscriptionService) GetPlanByID(ctx context.Context, planID string) (*PlanDTO, error) {
-	plan, err := s.subs.GetPlanByID(ctx, planID)
-	if err != nil {
-		return nil, err
-	}
-	dto := toPlanDTO(plan)
-	return &dto, nil
-
-}
-func (s *SubscriptionService) UpdatePlan(ctx context.Context, palnID string) (*PlanDTO, error) {
-	plan, err := s.subs.UpdatePlan(ctx, planID)
-	if err != nil {
-		return nil, err
-	}
-	dto := toPlanDTO(plan)
-	return &dto, nil
-}
-
 func toPlanDTO(p *model.SubscriptionPlan) PlanDTO {
 	return PlanDTO{
 		ID:                  p.ID,

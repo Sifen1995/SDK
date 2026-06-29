@@ -4,6 +4,7 @@ import (
 	"time"
 
 	audiencemodel "skykin-platform/internal/audience/model"
+	billingmodel "skykin-platform/internal/billing/model"
 )
 
 // ValidateCampaignRequest is the operator approve/reject payload.
@@ -71,4 +72,10 @@ type BillingRateListResponse struct {
 type SegmentListResponse struct {
 	Segments []audiencemodel.AudienceSegment `json:"segments"`
 	Count    int                             `json:"count"`
+}
+
+// AdminPlanListResponse wraps all subscription plans for operator admin.
+type AdminPlanListResponse struct {
+	Plans []billingmodel.SubscriptionPlan `json:"plans"`
+	Count int                             `json:"count"`
 }

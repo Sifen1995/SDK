@@ -17,12 +17,14 @@ type SubscriptionContext struct {
 type SubscriptionRepository interface {
 	GetActiveByAdvertiser(ctx context.Context, advertiserID string) (*model.AdvertiserSubscription, error)
 	GetPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error)
+	FindPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error)
 	GetPlanByName(ctx context.Context, name string) (*model.SubscriptionPlan, error)
 	FindPlanByName(ctx context.Context, name string) (*model.SubscriptionPlan, error)
 	ListActivePlans(ctx context.Context) ([]model.SubscriptionPlan, error)
+	ListAllPlans(ctx context.Context) ([]model.SubscriptionPlan, error)
 	CreatePlan(ctx context.Context, plan *model.SubscriptionPlan) error
+	UpdatePlan(ctx context.Context, plan *model.SubscriptionPlan) error
 	CreateSubscription(ctx context.Context, sub *model.AdvertiserSubscription) error
-	UpdatePlan(ctx context.Context, planID string, name string, monthlyFeeETB float64, isActive bool) (*model.SubscriptionPlan, error)
 }
 
 // BillingRateRepository manages per-plan usage rates.

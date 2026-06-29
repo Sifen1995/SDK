@@ -60,6 +60,24 @@ func (h *CatalogHandler) CreatePlan(c *gin.Context) {
 	c.JSON(http.StatusCreated, plan)
 }
 
+// ListPlans godoc
+// @Summary      List all subscription plans
+// @Description  Returns every subscription plan including suspended (inactive) plans for operator admin.
+// @Tags         Ad Portal - Admin
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  AdminPlanListResponse
+// @Failure      500  {object}  platformHTTP.APIError
+// @Router       /ad-portal/admin/plans [get]
+func (h *CatalogHandler) ListPlans(c *gin.Context) {
+	plans, err := h.plans.ListAllPlans(c.Request.Context())
+	if err != nil {
+		platformHTTP.Error(c, http.StatusInternalServerError, "list plans failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, AdminPlanListResponse{Plans: plans, Count: len(plans)})
+}
+
 // GetPlan godoc
 // @Summary      Get subscription plan by ID
 // @Description  Returns a single subscription plan including inactive plans for operator review.
@@ -120,6 +138,30 @@ func (h *CatalogHandler) UpdatePlan(c *gin.Context) {
 			status = http.StatusNotFound
 		}
 		platformHTTP.Error(c, status, "update plan failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, plan)
+}
+
+// SuspendPlan godoc
+// @Summary      Suspend subscription plan
+// @Description  Deactivates an active plan so it is no longer offered to advertisers. Existing subscriptions are not affected.
+// @Tags         Ad Portal - Admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        plan_id  path  string  true  "Plan ID"
+// @Success      200  {object}  skykin-platform_internal_billing_model.SubscriptionPlan
+// @Failure      400  {object}  platformHTTP.APIError
+// @Failure      404  {object}  platformHTTP.APIError
+// @Router       /ad-portal/admin/plans/{plan_id}/suspend [post]
+func (h *CatalogHandler) SuspendPlan(c *gin.Context) {
+	plan, err := h.plans.SuspendPlan(c.Request.Context(), c.Param("plan_id"))
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "plan not found" {
+			status = http.StatusNotFound
+		}
+		platformHTTP.Error(c, status, "suspend plan failed", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, plan)

@@ -624,6 +624,35 @@ const docTemplate = `{
             }
         },
         "/ad-portal/admin/plans": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns every subscription plan including suspended (inactive) plans for operator admin.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "List all subscription plans",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin_interfaces_http.AdminPlanListResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -792,6 +821,52 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/internal_admin_interfaces_http.BillingRateListResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/plans/{plan_id}/suspend": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deactivates an active plan so it is no longer offered to advertisers. Existing subscriptions are not affected.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Suspend subscription plan",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Plan ID",
+                        "name": "plan_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     },
                     "404": {
@@ -1149,14 +1224,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns available plans for advertisers to choose before creating campaigns.",
+                "description": "Returns active plans available for advertisers to choose before subscribing or creating campaigns.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Ad Portal - Billing"
                 ],
-                "summary": "List subscription plans",
+                "summary": "List active subscription plans",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1712,6 +1787,20 @@ const docTemplate = `{
             "properties": {
                 "user": {
                     "$ref": "#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO"
+                }
+            }
+        },
+        "internal_admin_interfaces_http.AdminPlanListResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "plans": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                    }
                 }
             }
         },

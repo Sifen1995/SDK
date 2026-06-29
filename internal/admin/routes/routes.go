@@ -51,9 +51,11 @@ func Wire(db *gorm.DB, jobs *bootstrap.IntentConsistencyJobs) *Module {
 // Register mounts operator admin routes on the admin group.
 func (m *Module) Register(g *gin.RouterGroup, auth *adportalHTTP.AuthHandler) {
 	g.POST("/users", auth.CreateUser)
+	g.GET("/plans", m.Catalog.ListPlans)
 	g.POST("/plans", m.Catalog.CreatePlan)
 	g.GET("/plans/:plan_id", m.Catalog.GetPlan)
 	g.PATCH("/plans/:plan_id", m.Catalog.UpdatePlan)
+	g.POST("/plans/:plan_id/suspend", m.Catalog.SuspendPlan)
 	g.GET("/plans/:plan_id/billing-rates", m.Catalog.ListBillingRates)
 	g.PATCH("/billing-rates/:id", m.Catalog.UpdateBillingRate)
 	g.POST("/audience/segments", m.Catalog.CreateSegment)

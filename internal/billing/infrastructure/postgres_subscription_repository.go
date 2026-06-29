@@ -81,6 +81,14 @@ func (r *SubscriptionRepository) ListActivePlans(ctx context.Context) ([]model.S
 	return plans, err
 }
 
+func (r *SubscriptionRepository) ListAllPlans(ctx context.Context) ([]model.SubscriptionPlan, error) {
+	var plans []model.SubscriptionPlan
+	err := r.db.WithContext(ctx).
+		Order("is_active DESC, monthly_fee_etb ASC").
+		Find(&plans).Error
+	return plans, err
+}
+
 func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, sub *model.AdvertiserSubscription) error {
 	return r.db.WithContext(ctx).Create(sub).Error
 }
