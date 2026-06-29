@@ -131,7 +131,9 @@ export const api = {
   },
 
   listSegments() {
-    return request<{ segments: import('../types').AudienceSegment[] }>('/audience/segments').then(res => res.segments);
+    return request<{ segments: import('../types').AudienceSegment[] }>('/admin/audience/segments')
+      .then(res => res.segments ?? [])
+      .catch(() => []);
   },
 
   // Analytics Endpoints

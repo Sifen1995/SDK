@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
 import type { AudienceSegment, BillingRate, CreatePlanRequest, CreateSegmentRequest } from '../types';
-import { Plus, DollarSign, Layers } from 'lucide-react';
+import { Plus, DollarSign, Layers, PackageOpen } from 'lucide-react';
 
 type Tab = 'plans' | 'segments';
 
@@ -132,7 +132,23 @@ export default function AdminPlans() {
     }
   }
 
-  if (loading) return <div className="text-muted text-sm">Loading…</div>;
+  if (loading) return (
+    <div className="space-y-4">
+      <div className="animate-pulse">
+        <div className="h-6 w-48 rounded bg-[var(--bg-subtle)]" />
+        <div className="mt-2 h-4 w-72 rounded bg-[var(--bg-subtle)]" />
+      </div>
+      <div className="card-static p-6">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-[var(--bg-subtle)]" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-32 rounded bg-[var(--bg-subtle)]" />
+            <div className="h-3 w-48 rounded bg-[var(--bg-subtle)]" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -213,7 +229,13 @@ export default function AdminPlans() {
 
           {plans.length === 0 ? (
             <div className="card-static p-8 text-center border-dashed">
-              <p className="text-sm text-muted">No plans found. Create the first subscription plan.</p>
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400">
+                <PackageOpen size={20} />
+              </div>
+              <h3 className="mt-4 text-sm font-semibold text-primary">No subscription plans created yet</h3>
+              <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+                Subscription plans will appear here once they are configured for the catalog.
+              </p>
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -319,7 +341,13 @@ export default function AdminPlans() {
 
           {segments.length === 0 ? (
             <div className="card-static p-8 text-center border-dashed">
-              <p className="text-sm text-muted">No audience segments found.</p>
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400">
+                <Layers size={20} />
+              </div>
+              <h3 className="mt-4 text-sm font-semibold text-primary">No audience segments created yet</h3>
+              <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+                Audience segments will appear here once they are created and approved.
+              </p>
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">

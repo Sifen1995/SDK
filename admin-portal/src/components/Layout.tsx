@@ -9,7 +9,6 @@ import {
   Megaphone,
   ShieldCheck,
   UserPlus,
-  Layers,
   FileCheck,
   Settings,
   LogOut,
@@ -51,7 +50,6 @@ export default function AdminLayout() {
       items: [
         { name: 'Moderation', path: '/campaigns/pending', icon: ShieldCheck },
         { name: 'Segment Candidates', path: '/segment-candidates', icon: FileCheck },
-        { name: 'Segments', path: '/segments', icon: Layers },
         { name: 'Plans & Billing', path: '/plans', icon: Settings },
         { name: 'Operator Team', path: '/users', icon: UserPlus },
       ],

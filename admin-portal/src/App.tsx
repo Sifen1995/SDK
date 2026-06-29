@@ -12,7 +12,6 @@ import AdminAdvertisersAnalytics from './pages/AdminAdvertisersAnalytics';
 import AdminCampaignsAnalytics from './pages/AdminCampaignsAnalytics';
 import AdminCampaignDetailAnalytics from './pages/AdminCampaignDetailAnalytics';
 import AdminSegmentCandidates from './pages/AdminSegmentCandidates';
-import AdminSegments from './pages/AdminSegments';
 import AdminPlans from './pages/AdminPlans';
 import type { ReactNode } from 'react';
 
@@ -44,7 +43,7 @@ export default function App() {
               <Route path="campaigns/:id" element={<AdminCampaignDetailAnalytics />} />
               <Route path="campaigns" element={<AdminCampaignsAnalytics />} />
               <Route path="segment-candidates" element={<AdminSegmentCandidates />} />
-              <Route path="segments" element={<AdminSegments />} />
+              <Route path="segments" element={<Navigate to="/plans" replace />} />
               <Route path="plans" element={<AdminPlans />} />
               <Route path="users" element={<AdminUsers />} />
             </Route>
