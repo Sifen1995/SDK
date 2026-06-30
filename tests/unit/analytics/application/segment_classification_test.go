@@ -7,6 +7,7 @@ import (
 	"time"
 
 	adminApp "skykin-platform/internal/admin/application"
+	adminEvents "skykin-platform/internal/admin/events"
 	analyticsApp "skykin-platform/internal/analytics/application"
 	analyticsdomain "skykin-platform/internal/analytics/domain"
 	audienceApp "skykin-platform/internal/audience/application"
@@ -113,7 +114,7 @@ type mockCatalog struct {
 	segment *model.AudienceSegment
 }
 
-func (m *mockCatalog) CreateSegment(_ context.Context, cmd adminApp.CreateSegmentCmd) (*model.AudienceSegment, error) {
+func (m *mockCatalog) CreateSegment(_ context.Context, cmd audienceApp.CreateSegmentCmd) (*model.AudienceSegment, error) {
 	return m.segment, nil
 }
 
@@ -157,30 +158,49 @@ func TestSaveCandidateFromFinding(t *testing.T) {
 
 func TestApproveCandidate_Success(t *testing.T) {
 	candidateID := uuid.New()
-	segmentID := uuid.New()
-	userID := uuid.New()
-	candidateRepo := newMockCandidateRepo()
-	candidateRepo.byID[candidateID] = &audiencedomain.SegmentCandidate{
-		ID: candidateID, IntentName: "crypto_interest", UserCount: 1,
-		Status: audiencedomain.CandidateStatusPending,
-	}
-	candidateRepo.users[candidateID] = []*audiencedomain.UserInCandidate{{UserID: userID, Confidence: 0.88, DaysActive: 7}}
-	membershipRepo := &mockMembershipRepo{}
-	catalog := &mockCatalog{segment: &model.AudienceSegment{ID: segmentID.String(), Name: "Crypto Segment"}}
-	uc := adminApp.NewApproveCandidateUseCase(candidateRepo, membershipRepo, catalog, nil)
+	bus := messaging.NewBus()
+	var published adminEvents.CandidateApprovedEvent
+	done := make(chan struct{}, 1)
+	bus.Subscribe(adminEvents.TopicCandidateApproved, func(e messaging.Event) {
+		published = e.Payload.(adminEvents.CandidateApprovedEvent)
+		done <- struct{}{}
+	})
+	uc := adminApp.NewApproveCandidateUseCase(bus, nil)
 
-	seg, err := uc.Execute(context.Background(), candidateID, uuid.New(), "Crypto Segment", "desc", 6.5)
+	err := uc.Execute(context.Background(), candidateID, uuid.New(), "Crypto Segment", "desc", 6.5)
 	require.NoError(t, err)
-	require.NotNil(t, seg)
-	assert.Equal(t, audiencedomain.CandidateStatusApproved, candidateRepo.status[candidateID])
-	assert.Equal(t, []uuid.UUID{userID}, membershipRepo.inserted)
+	<-done
+	assert.Equal(t, candidateID, published.CandidateID)
+	assert.Equal(t, "Crypto Segment", published.Name)
+	assert.Equal(t, 6.5, published.EstimatedCPM)
 }
 
 func TestRejectCandidate_Success(t *testing.T) {
 	candidateID := uuid.New()
+	bus := messaging.NewBus()
+	var published adminEvents.CandidateRejectedEvent
+	done := make(chan struct{}, 1)
+	bus.Subscribe(adminEvents.TopicCandidateRejected, func(e messaging.Event) {
+		published = e.Payload.(adminEvents.CandidateRejectedEvent)
+		done <- struct{}{}
+	})
+	uc := adminApp.NewRejectCandidateUseCase(bus, nil)
+	require.NoError(t, uc.Execute(context.Background(), candidateID, uuid.New(), "too small"))
+	<-done
+	assert.Equal(t, candidateID, published.CandidateID)
+	assert.Equal(t, "too small", published.Notes)
+}
+
+func TestAudienceRejectCandidate_Success(t *testing.T) {
+	candidateID := uuid.New()
 	candidateRepo := newMockCandidateRepo()
 	candidateRepo.byID[candidateID] = &audiencedomain.SegmentCandidate{ID: candidateID, Status: audiencedomain.CandidateStatusPending}
-	uc := adminApp.NewRejectCandidateUseCase(candidateRepo, nil)
-	require.NoError(t, uc.Execute(context.Background(), candidateID, uuid.New(), "too small"))
+	uc := audienceApp.NewRejectCandidateUseCase(candidateRepo, nil)
+	adminID := uuid.New()
+	require.NoError(t, uc.Execute(context.Background(), adminEvents.CandidateRejectedEvent{
+		CandidateID: candidateID,
+		AdminID:     adminID,
+		Notes:       "too small",
+	}))
 	assert.Equal(t, audiencedomain.CandidateStatusRejected, candidateRepo.status[candidateID])
 }

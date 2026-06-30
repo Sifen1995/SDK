@@ -3,7 +3,7 @@ package http
 import (
 	"net/http"
 
-	adminApp "skykin-platform/internal/admin/application"
+	campaignApp "skykin-platform/internal/campaigns/application"
 	platformHTTP "skykin-platform/internal/platform/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,10 +11,10 @@ import (
 
 // CampaignHandler exposes operator campaign moderation endpoints.
 type CampaignHandler struct {
-	moderation *adminApp.CampaignModerationService
+	moderation *campaignApp.ModerationService
 }
 
-func NewCampaignHandler(moderation *adminApp.CampaignModerationService) *CampaignHandler {
+func NewCampaignHandler(moderation *campaignApp.ModerationService) *CampaignHandler {
 	return &CampaignHandler{moderation: moderation}
 }
 

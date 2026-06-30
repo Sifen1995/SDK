@@ -272,7 +272,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates an audience segment from a pending candidate and writes segment_memberships.",
+                "description": "Marks the candidate approved and asynchronously provisions the audience segment and memberships.",
                 "consumes": [
                     "application/json"
                 ],
@@ -302,10 +302,13 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "400": {
@@ -377,7 +380,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all active Audiencemart segments for operator admin review.",
+                "description": "Returns every Audiencemart segment including suspended (inactive) segments for operator admin.",
                 "produces": [
                     "application/json"
                 ],
@@ -389,7 +392,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_admin_interfaces_http.SegmentListResponse"
+                            "$ref": "#/definitions/skykin-platform_internal_audience_application.ListSegmentsResult"
                         }
                     },
                     "500": {
@@ -437,6 +440,92 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/audience/segments/{segment_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a single catalog segment including inactive segments for operator review.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Get audience segment by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Segment ID",
+                        "name": "segment_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/audience/segments/{segment_id}/suspend": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deactivates an active catalog segment so it is no longer offered to advertisers. Existing purchases are not affected.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Suspend audience segment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Segment ID",
+                        "name": "segment_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -929,7 +1018,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns Audiencemart catalog filtered by the advertiser subscription plan. Starter plan returns an empty list with audiencemart_enabled=false.",
+                "description": "Returns active Audiencemart catalog segments filtered by the advertiser subscription plan. Starter plan returns an empty list with audiencemart_enabled=false.",
                 "produces": [
                     "application/json"
                 ],
@@ -946,6 +1035,52 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/audience/segments/{segment_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a single active Audiencemart segment when the advertiser plan includes Audiencemart.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Audience"
+                ],
+                "summary": "Get audience segment by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Segment ID",
+                        "name": "segment_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_audience_application.SegmentDTO"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -1942,20 +2077,6 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_admin_interfaces_http.SegmentListResponse": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "segments": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
-                    }
-                }
-            }
-        },
         "internal_admin_interfaces_http.UpdateBillingRateRequest": {
             "type": "object",
             "required": [
@@ -2591,6 +2712,9 @@ const docTemplate = `{
                 "audiencemart_enabled": {
                     "type": "boolean"
                 },
+                "count": {
+                    "type": "integer"
+                },
                 "plan_name": {
                     "type": "string"
                 },
@@ -2620,6 +2744,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
                 },
                 "name": {
                     "type": "string"

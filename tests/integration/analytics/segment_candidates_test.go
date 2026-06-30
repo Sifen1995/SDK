@@ -16,9 +16,9 @@ import (
 	analyticsdomain "skykin-platform/internal/analytics/domain"
 	audienceApp "skykin-platform/internal/audience/application"
 	audiencedomain "skykin-platform/internal/audience/domain"
+	audienceEvents "skykin-platform/internal/audience/interfaces/events"
 	audienceHTTP "skykin-platform/internal/audience/interfaces/http"
 	audienceInfra "skykin-platform/internal/audience/infrastructure"
-	"skykin-platform/internal/audience/model"
 	"skykin-platform/internal/platform/messaging"
 
 	"github.com/gin-gonic/gin"
@@ -41,6 +41,20 @@ func setupSegmentTestDB(t *testing.T) *gorm.DB {
 			scanned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			reviewed_by TEXT, reviewed_at DATETIME, review_notes TEXT, published_segment_id TEXT
 		)`,
+		`CREATE TABLE audience_segments (
+			id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT,
+			top_intent_signals TEXT NOT NULL DEFAULT '[]', approximate_size INTEGER NOT NULL DEFAULT 0,
+			estimated_cpm REAL NOT NULL, available_from DATETIME NOT NULL,
+			available_until DATETIME, is_active INTEGER NOT NULL DEFAULT 1,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE segment_memberships (
+			segment_id TEXT NOT NULL, user_id TEXT NOT NULL,
+			confidence REAL NOT NULL, days_active INTEGER NOT NULL,
+			added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (segment_id, user_id)
+		)`,
 	}
 	for _, stmt := range stmts {
 		require.NoError(t, db.Exec(stmt).Error)
@@ -61,14 +75,6 @@ func seedPendingCandidate(t *testing.T, repo *audienceInfra.CandidateRepository)
 	}
 	require.NoError(t, repo.Save(context.Background(), candidate, users))
 	return candidateID
-}
-
-type stubPublisher struct {
-	segmentID uuid.UUID
-}
-
-func (s *stubPublisher) CreateSegment(_ context.Context, cmd adminApp.CreateSegmentCmd) (*model.AudienceSegment, error) {
-	return &model.AudienceSegment{ID: s.segmentID.String(), Name: cmd.Name}, nil
 }
 
 func TestAudience_ListSegmentCandidates_HTTP(t *testing.T) {
@@ -109,21 +115,26 @@ func TestAdmin_TriggerIntentConsistency_HTTP(t *testing.T) {
 }
 
 func TestAdmin_ApproveSegmentCandidate_HTTP(t *testing.T) {
-	candidateID := uuid.New()
-	segmentID := uuid.New()
-	adminID := uuid.New()
-	repo := newInMemoryCandidateRepo()
-	repo.byID[candidateID] = &audiencedomain.SegmentCandidate{
-		ID: candidateID, IntentName: "fashion_interest", UserCount: 1, Status: audiencedomain.CandidateStatusPending,
-	}
-	repo.users[candidateID] = []*audiencedomain.UserInCandidate{{UserID: uuid.New(), Confidence: 0.82, DaysActive: 6}}
-	handler := adminHTTP.NewSegmentCandidateHandler(
-		adminApp.NewApproveCandidateUseCase(repo, &recordingMembershipRepo{}, &stubPublisher{segmentID: segmentID}, nil),
-		nil,
+	db := setupSegmentTestDB(t)
+	bus := messaging.NewBus()
+	candidateRepo := audienceInfra.NewCandidateRepository(db)
+	segmentRepo := audienceInfra.NewSegmentRepository(db)
+	membershipRepo := audienceInfra.NewMembershipRepository(db)
+	candidateID := seedPendingCandidate(t, candidateRepo)
+
+	processApproved := audienceApp.NewProcessApprovedCandidateUseCase(
+		segmentRepo, membershipRepo, candidateRepo, slog.Default(),
 	)
+	rejectCandidate := audienceApp.NewRejectCandidateUseCase(candidateRepo, slog.Default())
+	recordPurchase := audienceApp.NewRecordSegmentPurchaseUseCase(audienceInfra.NewPurchaseRepository(db))
+	audienceEvents.NewCandidateConsumer(processApproved, rejectCandidate, recordPurchase, slog.Default()).Register(bus)
+
+	approveUC := adminApp.NewApproveCandidateUseCase(bus, slog.Default())
+	handler := adminHTTP.NewSegmentCandidateHandler(approveUC, nil)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	adminID := uuid.New()
 	r.Use(func(c *gin.Context) { c.Set("portal_user_id", adminID.String()); c.Next() })
 	r.POST("/api/v1/ad-portal/admin/audience/segment-candidates/:id/approve", handler.ApproveSegmentCandidate)
 
@@ -132,57 +143,19 @@ func TestAdmin_ApproveSegmentCandidate_HTTP(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
-	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	require.Equal(t, http.StatusAccepted, w.Code, w.Body.String())
+
+	require.Eventually(t, func() bool {
+		candidate, err := candidateRepo.FindByID(context.Background(), candidateID)
+		if err != nil || candidate.PublishedSegmentID == nil {
+			return false
+		}
+		return true
+	}, time.Second, 10*time.Millisecond)
 }
 
 type noopIntentReader struct{}
 
 func (noopIntentReader) FindConsistentUsers(context.Context, string, float64, int, int, int) ([]*analyticsdomain.ConsistentUser, error) {
-	return nil, nil
-}
-
-type inMemoryCandidateRepo struct {
-	byID   map[uuid.UUID]*audiencedomain.SegmentCandidate
-	users  map[uuid.UUID][]*audiencedomain.UserInCandidate
-	linked map[uuid.UUID]uuid.UUID
-}
-
-func newInMemoryCandidateRepo() *inMemoryCandidateRepo {
-	return &inMemoryCandidateRepo{
-		byID: make(map[uuid.UUID]*audiencedomain.SegmentCandidate),
-		users: make(map[uuid.UUID][]*audiencedomain.UserInCandidate),
-		linked: make(map[uuid.UUID]uuid.UUID),
-	}
-}
-
-func (m *inMemoryCandidateRepo) Save(_ context.Context, c *audiencedomain.SegmentCandidate, users []*audiencedomain.UserInCandidate) error {
-	m.byID[c.ID] = c
-	m.users[c.ID] = users
-	return nil
-}
-func (m *inMemoryCandidateRepo) FindByStatus(context.Context, audiencedomain.CandidateStatus) ([]*audiencedomain.SegmentCandidate, error) {
-	return nil, nil
-}
-func (m *inMemoryCandidateRepo) FindByID(_ context.Context, id uuid.UUID) (*audiencedomain.SegmentCandidate, error) {
-	return m.byID[id], nil
-}
-func (m *inMemoryCandidateRepo) GetUsers(_ context.Context, id uuid.UUID) ([]*audiencedomain.UserInCandidate, error) {
-	return m.users[id], nil
-}
-func (m *inMemoryCandidateRepo) UpdateStatus(_ context.Context, id uuid.UUID, status audiencedomain.CandidateStatus, _ uuid.UUID, _ string) error {
-	m.byID[id].Status = status
-	return nil
-}
-func (m *inMemoryCandidateRepo) LinkToSegment(_ context.Context, candidateID, segmentID uuid.UUID) error {
-	m.linked[candidateID] = segmentID
-	return nil
-}
-
-type recordingMembershipRepo struct{}
-
-func (recordingMembershipRepo) BulkInsert(context.Context, uuid.UUID, []*audiencedomain.UserInCandidate) error {
-	return nil
-}
-func (recordingMembershipRepo) FindUsersInSegment(context.Context, uuid.UUID) ([]uuid.UUID, error) {
 	return nil, nil
 }

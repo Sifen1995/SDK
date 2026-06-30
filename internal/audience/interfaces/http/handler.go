@@ -11,8 +11,8 @@ import (
 
 // Handler serves Audiencemart browse endpoints on the ad portal.
 type Handler struct {
-	list        *application.ListService
-	candidates  *application.ListSegmentCandidatesUseCase
+	list       *application.ListService
+	candidates *application.ListSegmentCandidatesUseCase
 }
 
 func NewHandler(list *application.ListService, candidates *application.ListSegmentCandidatesUseCase) *Handler {
@@ -21,7 +21,7 @@ func NewHandler(list *application.ListService, candidates *application.ListSegme
 
 // ListSegments godoc
 // @Summary      List purchasable audience segments
-// @Description  Returns Audiencemart catalog filtered by the advertiser subscription plan. Starter plan returns an empty list with audiencemart_enabled=false.
+// @Description  Returns active Audiencemart catalog segments filtered by the advertiser subscription plan. Starter plan returns an empty list with audiencemart_enabled=false.
 // @Tags         Ad Portal - Audience
 // @Produce      json
 // @Security     BearerAuth
@@ -36,4 +36,36 @@ func (h *Handler) ListSegments(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+// GetSegment godoc
+// @Summary      Get audience segment by ID
+// @Description  Returns a single active Audiencemart segment when the advertiser plan includes Audiencemart.
+// @Tags         Ad Portal - Audience
+// @Produce      json
+// @Security     BearerAuth
+// @Param        segment_id  path  string  true  "Segment ID"
+// @Success      200  {object}  application.SegmentDTO
+// @Failure      403  {object}  platformHTTP.APIError
+// @Failure      404  {object}  platformHTTP.APIError
+// @Router       /ad-portal/audience/segments/{segment_id} [get]
+func (h *Handler) GetSegment(c *gin.Context) {
+	aid, _ := c.Get("advertiser_id")
+	seg, err := h.list.GetForAdvertiser(c.Request.Context(), aid.(string), c.Param("segment_id"))
+	if err != nil {
+		status := http.StatusForbidden
+		switch err.Error() {
+		case "segment not found":
+			status = http.StatusNotFound
+		case "audiencemart not enabled on current plan":
+			status = http.StatusForbidden
+		default:
+			if err.Error() == "no active subscription; subscribe to a plan first" {
+				status = http.StatusForbidden
+			}
+		}
+		platformHTTP.Error(c, status, "get segment failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, seg)
 }

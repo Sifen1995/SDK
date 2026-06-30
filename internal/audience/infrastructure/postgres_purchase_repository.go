@@ -31,3 +31,7 @@ func (r *PurchaseRepository) GetValidForCampaign(ctx context.Context, campaignID
 	}
 	return &purchase, nil
 }
+
+func (r *PurchaseRepository) CreatePurchase(ctx context.Context, purchase *model.SegmentPurchase) error {
+	return r.db.WithContext(ctx).Create(purchase).Error
+}

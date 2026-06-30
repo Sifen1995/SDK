@@ -5,34 +5,38 @@ import (
 	"errors"
 	"log/slog"
 
-	"skykin-platform/internal/audience/domain"
+	adminEvents "skykin-platform/internal/admin/events"
+	"skykin-platform/internal/platform/messaging"
 
 	"github.com/google/uuid"
 )
 
+// RejectCandidateUseCase publishes a candidate rejection for async audience processing.
 type RejectCandidateUseCase struct {
-	candidateRepo domain.CandidateRepository
-	logger        *slog.Logger
+	bus    *messaging.Bus
+	logger *slog.Logger
 }
 
-func NewRejectCandidateUseCase(candidateRepo domain.CandidateRepository, logger *slog.Logger) *RejectCandidateUseCase {
+func NewRejectCandidateUseCase(bus *messaging.Bus, logger *slog.Logger) *RejectCandidateUseCase {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &RejectCandidateUseCase{candidateRepo: candidateRepo, logger: logger}
+	return &RejectCandidateUseCase{bus: bus, logger: logger}
 }
 
 func (uc *RejectCandidateUseCase) Execute(ctx context.Context, candidateID, adminID uuid.UUID, notes string) error {
-	candidate, err := uc.candidateRepo.FindByID(ctx, candidateID)
-	if err != nil {
-		return errors.New("candidate not found")
+	if uc.bus == nil {
+		return errors.New("event bus not configured")
 	}
-	if candidate.Status != domain.CandidateStatusPending {
-		return errors.New("candidate is not pending")
-	}
-	if err := uc.candidateRepo.UpdateStatus(ctx, candidateID, domain.CandidateStatusRejected, adminID, notes); err != nil {
-		return err
-	}
-	uc.logger.Info("candidate rejected", "candidate_id", candidateID)
+	uc.bus.Publish(messaging.Event{
+		Name: adminEvents.TopicCandidateRejected,
+		Ctx:  ctx,
+		Payload: adminEvents.CandidateRejectedEvent{
+			CandidateID: candidateID,
+			AdminID:     adminID,
+			Notes:       notes,
+		},
+	})
+	uc.logger.Info("candidate rejection requested", "candidate_id", candidateID)
 	return nil
 }

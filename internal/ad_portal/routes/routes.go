@@ -12,7 +12,6 @@ import (
 	audienceRoutes "skykin-platform/internal/audience/routes"
 	billingRoutes "skykin-platform/internal/billing/routes"
 	campaignRoutes "skykin-platform/internal/campaigns/routes"
-	audienceInfra "skykin-platform/internal/audience/infrastructure"
 	"skykin-platform/configs"
 	"skykin-platform/internal/platform/bootstrap"
 	"skykin-platform/internal/platform/messaging"
@@ -27,16 +26,21 @@ func Register(r *gin.Engine, db *gorm.DB, cfg *configs.Config, bus *messaging.Bu
 	adRepo := advertiserInfra.NewRepository(db)
 	authHandler := adportalHTTP.NewAuthHandler(advertiserApp.NewAuthService(adRepo, cfg))
 
-	billingMod := billingRoutes.Wire(db)
-	segmentRepo := audienceInfra.NewSegmentRepository(db)
-	audiencePurchases := audienceApp.NewPurchaseService(segmentRepo)
+	billingMod := billingRoutes.Wire(db, bus)
 	audienceMod := audienceRoutes.Wire(db, billingMod.SubRepo)
 
+	bootstrap.RegisterAdminEventConsumers(db, bus, slog.Default())
 	jobs := bootstrap.SetupIntentConsistency(db, cfg, bus, slog.Default())
 	audienceMod.AttachCandidates(audienceApp.NewListSegmentCandidatesUseCase(jobs.CandidateRepo))
 
-	campaignMod := campaignRoutes.Wire(db, billingMod.SubEnforcer, audiencePurchases, billingMod.ChannelRepo)
-	adminMod := adminRoutes.Wire(db, jobs)
+	campaignMod := campaignRoutes.Wire(db, billingMod.SubEnforcer, audienceMod.Purchases, billingMod.ChannelRepo, bus)
+	adminMod := adminRoutes.Wire(
+		jobs, bus,
+		billingMod.PlanService,
+		billingMod.BillingAdmin,
+		audienceMod.Segments,
+		campaignMod.Moderation,
+	)
 	analyticsMod := analyticsRoutes.Wire(db)
 
 	g := r.Group("/api/v1/ad-portal")

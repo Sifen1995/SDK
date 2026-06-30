@@ -9,9 +9,23 @@ import (
 	billingdomain "skykin-platform/internal/billing/domain"
 	billingvalidation "skykin-platform/internal/billing/validation"
 	"skykin-platform/internal/billing/model"
+	adminEvents "skykin-platform/internal/admin/events"
+	"skykin-platform/internal/platform/messaging"
 
 	"gorm.io/gorm"
 )
+
+// CreatePlanCmd carries operator input for a new subscription plan.
+type CreatePlanCmd struct {
+	Name                string
+	MonthlyFeeETB       float64
+	MaxActiveCampaigns  int
+	MaxDailyBudgetETB   float64
+	IncludedImpressions int
+	SMSPlusEnabled      bool
+	AudiencemartEnabled bool
+	CPCDiscountPct      float64
+}
 
 // UpdatePlanCmd carries operator updates to a subscription plan.
 type UpdatePlanCmd struct {
@@ -30,10 +44,55 @@ type UpdatePlanCmd struct {
 // PlanService handles subscription plan reads and updates.
 type PlanService struct {
 	plans billingdomain.SubscriptionRepository
+	bus   *messaging.Bus
 }
 
-func NewPlanService(plans billingdomain.SubscriptionRepository) *PlanService {
-	return &PlanService{plans: plans}
+func NewPlanService(plans billingdomain.SubscriptionRepository, bus *messaging.Bus) *PlanService {
+	return &PlanService{plans: plans, bus: bus}
+}
+
+// CreatePlan creates a subscription plan and publishes an event for default rate seeding.
+func (s *PlanService) CreatePlan(ctx context.Context, cmd CreatePlanCmd) (*model.SubscriptionPlan, error) {
+	if err := billingvalidation.ValidatePlanFields(billingvalidation.PlanFieldsInput{
+		Name:                cmd.Name,
+		MonthlyFeeETB:       cmd.MonthlyFeeETB,
+		MaxActiveCampaigns:  cmd.MaxActiveCampaigns,
+		MaxDailyBudgetETB:   cmd.MaxDailyBudgetETB,
+		IncludedImpressions: cmd.IncludedImpressions,
+		CPCDiscountPct:      cmd.CPCDiscountPct,
+	}); err != nil {
+		return nil, err
+	}
+	if _, err := s.plans.FindPlanByName(ctx, cmd.Name); err == nil {
+		return nil, errors.New("plan with this name already exists")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	plan := &model.SubscriptionPlan{
+		Name:                strings.TrimSpace(cmd.Name),
+		MonthlyFeeETB:       cmd.MonthlyFeeETB,
+		MaxActiveCampaigns:  cmd.MaxActiveCampaigns,
+		MaxDailyBudgetETB:   cmd.MaxDailyBudgetETB,
+		IncludedImpressions: cmd.IncludedImpressions,
+		SMSPlusEnabled:      cmd.SMSPlusEnabled,
+		AudiencemartEnabled: cmd.AudiencemartEnabled,
+		CPCDiscountPct:      cmd.CPCDiscountPct,
+		IsActive:            true,
+	}
+	if err := s.plans.CreatePlan(ctx, plan); err != nil {
+		return nil, err
+	}
+
+	if s.bus != nil {
+		s.bus.Publish(messaging.Event{
+			Name: adminEvents.TopicSubscriptionPlanCreated,
+			Ctx:  ctx,
+			Payload: adminEvents.SubscriptionPlanCreatedEvent{PlanID: plan.ID},
+		})
+	}
+
+	return plan, nil
 }
 
 // GetPlanByID returns any plan by id (including inactive) for operator admin.

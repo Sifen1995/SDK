@@ -50,7 +50,7 @@ func (r *MembershipRepository) insertBatch(ctx context.Context, segmentID uuid.U
 		b.WriteString("(?, ?, ?, ?)")
 		args = append(args, segmentID, u.UserID, u.Confidence, u.DaysActive)
 	}
-	b.WriteString(` ON CONFLICT (segment_id, user_id) DO UPDATE SET confidence = EXCLUDED.confidence, days_active = EXCLUDED.days_active, added_at = NOW()`)
+	b.WriteString(` ON CONFLICT (segment_id, user_id) DO UPDATE SET confidence = EXCLUDED.confidence, days_active = EXCLUDED.days_active, added_at = CURRENT_TIMESTAMP`)
 	return r.db.WithContext(ctx).Exec(b.String(), args...).Error
 }
 

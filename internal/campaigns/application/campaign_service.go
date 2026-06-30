@@ -13,19 +13,21 @@ import (
 	billingdomain "skykin-platform/internal/billing/domain"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
 	campaignvalidation "skykin-platform/internal/campaigns/validation"
+	campaignEvents "skykin-platform/internal/campaigns/events"
 	"skykin-platform/internal/campaigns/infrastructure"
 	"skykin-platform/internal/campaigns/model"
+	"skykin-platform/internal/platform/messaging"
 
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 // CampaignService orchestrates campaign CRUD with subscription and audience checks.
 type CampaignService struct {
-	repo         *infrastructure.Repository
+	repo          *infrastructure.Repository
 	subscriptions *billingapp.SubscriptionEnforcer
-	audience     *audienceapp.PurchaseService
-	channels     billingdomain.ChannelRepository
+	audience      *audienceapp.PurchaseService
+	channels      billingdomain.ChannelRepository
+	bus           *messaging.Bus
 }
 
 func NewCampaignService(
@@ -33,12 +35,14 @@ func NewCampaignService(
 	subscriptions *billingapp.SubscriptionEnforcer,
 	audience *audienceapp.PurchaseService,
 	channels billingdomain.ChannelRepository,
+	bus *messaging.Bus,
 ) *CampaignService {
 	return &CampaignService{
 		repo:          repo,
 		subscriptions: subscriptions,
 		audience:      audience,
 		channels:      channels,
+		bus:           bus,
 	}
 }
 
@@ -114,16 +118,27 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 	c.ValidationStatus = vr.Status
 	c.ValidationNotes = vr.Notes
 
-	// 5. Persist campaign + segment purchase atomically.
-	err = s.repo.Transaction(ctx, func(tx *gorm.DB) error {
-		if err := s.repo.CreateTx(ctx, tx, c); err != nil {
-			return err
-		}
-		return s.audience.ConfirmPurchaseTx(ctx, tx, purchaseQuote, c.ID)
-	})
-	if err != nil {
+	// 5. Persist campaign; segment purchase is recorded asynchronously by audience consumer.
+	if err := s.repo.Create(ctx, c); err != nil {
 		return nil, err
 	}
+
+	if s.bus != nil && purchaseQuote != nil {
+		s.bus.Publish(messaging.Event{
+			Name: campaignEvents.TopicCampaignCreated,
+			Ctx:  ctx,
+			Payload: campaignEvents.CampaignCreatedEvent{
+				CampaignID:   c.ID,
+				AdvertiserID: purchaseQuote.AdvertiserID,
+				SegmentID:    purchaseQuote.SegmentID,
+				AmountPaid:   purchaseQuote.AmountPaid,
+				ValidFrom:    purchaseQuote.ValidFrom,
+				ValidUntil:   purchaseQuote.ValidUntil,
+				HasPurchase:  true,
+			},
+		})
+	}
+
 	return c, nil
 }
 

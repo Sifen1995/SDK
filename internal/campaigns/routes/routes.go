@@ -7,6 +7,7 @@ import (
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignHTTP "skykin-platform/internal/campaigns/interfaces/http"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	"skykin-platform/internal/platform/messaging"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -14,7 +15,8 @@ import (
 
 // Module wires campaign dependencies for the ad portal.
 type Module struct {
-	Handler *campaignHTTP.Handler
+	Handler    *campaignHTTP.Handler
+	Moderation *campaignApp.ModerationService
 }
 
 // Wire constructs the campaigns module.
@@ -23,10 +25,15 @@ func Wire(
 	subEnforcer *billingApp.SubscriptionEnforcer,
 	audiencePurchases *audienceApp.PurchaseService,
 	channels billingdomain.ChannelRepository,
+	bus *messaging.Bus,
 ) *Module {
 	repo := campaignInfra.NewRepository(db)
-	svc := campaignApp.NewCampaignService(repo, subEnforcer, audiencePurchases, channels)
-	return &Module{Handler: campaignHTTP.NewHandler(svc)}
+	svc := campaignApp.NewCampaignService(repo, subEnforcer, audiencePurchases, channels, bus)
+	moderation := campaignApp.NewModerationService(repo, channels, bus)
+	return &Module{
+		Handler:    campaignHTTP.NewHandler(svc),
+		Moderation: moderation,
+	}
 }
 
 // RegisterRead mounts read-only campaign routes.

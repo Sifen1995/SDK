@@ -211,15 +211,6 @@ definitions:
         example: Insufficient user volume for this vertical
         type: string
     type: object
-  internal_admin_interfaces_http.SegmentListResponse:
-    properties:
-      count:
-        type: integer
-      segments:
-        items:
-          $ref: '#/definitions/skykin-platform_internal_audience_model.AudienceSegment'
-        type: array
-    type: object
   internal_admin_interfaces_http.UpdateBillingRateRequest:
     properties:
       is_active:
@@ -659,6 +650,8 @@ definitions:
     properties:
       audiencemart_enabled:
         type: boolean
+      count:
+        type: integer
       plan_name:
         type: string
       segments:
@@ -679,6 +672,8 @@ definitions:
         type: number
       id:
         type: string
+      is_active:
+        type: boolean
       name:
         type: string
       purchasable:
@@ -1145,8 +1140,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Creates an audience segment from a pending candidate and writes
-        segment_memberships.
+      description: Marks the candidate approved and asynchronously provisions the
+        audience segment and memberships.
       parameters:
       - description: Candidate ID
         in: path
@@ -1162,10 +1157,12 @@ paths:
       produces:
       - application/json
       responses:
-        "201":
-          description: Created
+        "202":
+          description: Accepted
           schema:
-            $ref: '#/definitions/skykin-platform_internal_audience_model.AudienceSegment'
+            additionalProperties:
+              type: string
+            type: object
         "400":
           description: Bad Request
           schema:
@@ -1210,14 +1207,15 @@ paths:
       - Ad Portal - Admin
   /ad-portal/admin/audience/segments:
     get:
-      description: Returns all active Audiencemart segments for operator admin review.
+      description: Returns every Audiencemart segment including suspended (inactive)
+        segments for operator admin.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_admin_interfaces_http.SegmentListResponse'
+            $ref: '#/definitions/skykin-platform_internal_audience_application.ListSegmentsResult'
         "500":
           description: Internal Server Error
           schema:
@@ -1252,6 +1250,62 @@ paths:
       security:
       - BearerAuth: []
       summary: Create audience segment
+      tags:
+      - Ad Portal - Admin
+  /ad-portal/admin/audience/segments/{segment_id}:
+    get:
+      description: Returns a single catalog segment including inactive segments for
+        operator review.
+      parameters:
+      - description: Segment ID
+        in: path
+        name: segment_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_audience_model.AudienceSegment'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Get audience segment by ID
+      tags:
+      - Ad Portal - Admin
+  /ad-portal/admin/audience/segments/{segment_id}/suspend:
+    post:
+      description: Deactivates an active catalog segment so it is no longer offered
+        to advertisers. Existing purchases are not affected.
+      parameters:
+      - description: Segment ID
+        in: path
+        name: segment_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_audience_model.AudienceSegment'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Suspend audience segment
       tags:
       - Ad Portal - Admin
   /ad-portal/admin/billing-rates/{id}:
@@ -1561,8 +1615,8 @@ paths:
       - Ad Portal - Admin
   /ad-portal/audience/segments:
     get:
-      description: Returns Audiencemart catalog filtered by the advertiser subscription
-        plan. Starter plan returns an empty list with audiencemart_enabled=false.
+      description: Returns active Audiencemart catalog segments filtered by the advertiser
+        subscription plan. Starter plan returns an empty list with audiencemart_enabled=false.
       produces:
       - application/json
       responses:
@@ -1577,6 +1631,36 @@ paths:
       security:
       - BearerAuth: []
       summary: List purchasable audience segments
+      tags:
+      - Ad Portal - Audience
+  /ad-portal/audience/segments/{segment_id}:
+    get:
+      description: Returns a single active Audiencemart segment when the advertiser
+        plan includes Audiencemart.
+      parameters:
+      - description: Segment ID
+        in: path
+        name: segment_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_audience_application.SegmentDTO'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: Get audience segment by ID
       tags:
       - Ad Portal - Audience
   /ad-portal/campaigns:

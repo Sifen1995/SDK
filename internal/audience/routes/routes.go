@@ -12,28 +12,31 @@ import (
 
 // Module wires audience dependencies for the ad portal.
 type Module struct {
-	listSvc *audienceApp.ListService
-	Handler *audienceHTTP.Handler
+	Segments *audienceApp.ListService
+	Purchases *audienceApp.PurchaseService
+	Handler   *audienceHTTP.Handler
 }
 
 // Wire constructs the audience module.
 func Wire(db *gorm.DB, subRepo *billingInfra.SubscriptionRepository) *Module {
 	segmentRepo := audienceInfra.NewSegmentRepository(db)
-	listSvc := audienceApp.NewListService(segmentRepo, subRepo)
+	segments := audienceApp.NewListService(segmentRepo, subRepo)
 	return &Module{
-		listSvc: listSvc,
-		Handler: audienceHTTP.NewHandler(listSvc, nil),
+		Segments:  segments,
+		Purchases: audienceApp.NewPurchaseService(segmentRepo),
+		Handler:   audienceHTTP.NewHandler(segments, nil),
 	}
 }
 
 // AttachCandidates wires the segment-candidate list use case after analytics bootstrap.
 func (m *Module) AttachCandidates(uc *audienceApp.ListSegmentCandidatesUseCase) {
-	m.Handler = audienceHTTP.NewHandler(m.listSvc, uc)
+	m.Handler = audienceHTTP.NewHandler(m.Segments, uc)
 }
 
 // RegisterRead mounts advertiser-facing audience routes.
 func (m *Module) RegisterRead(g *gin.RouterGroup) {
 	g.GET("/audience/segments", m.Handler.ListSegments)
+	g.GET("/audience/segments/:segment_id", m.Handler.GetSegment)
 }
 
 // RegisterAdmin mounts operator admin audience routes.

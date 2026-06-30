@@ -7,6 +7,7 @@ import (
 	"skykin-platform/configs"
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignConsumers "skykin-platform/internal/campaigns/consumers"
+	campaignEvents "skykin-platform/internal/campaigns/interfaces/events"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
 	deliveryConsumers "skykin-platform/internal/delivery/consumers"
 	eventsInfra "skykin-platform/internal/events/infrastructure"
@@ -15,6 +16,7 @@ import (
 	"skykin-platform/internal/platform/messaging"
 	platformredis "skykin-platform/internal/platform/redis"
 	platformWS "skykin-platform/internal/platform/websocket"
+	rewardsConsumers "skykin-platform/internal/rewards/consumers"
 	rewardsInfra "skykin-platform/internal/rewards/infrastructure"
 	usersInfra "skykin-platform/internal/users/infrastructure"
 	wsConsumers "skykin-platform/internal/websocket/consumers"
@@ -56,7 +58,6 @@ func RegisterDownstreamConsumers(db *gorm.DB, cfg *configs.Config, bus *messagin
 		userRepo,
 		mlClient,
 		intentRepo,
-		rewardRepo,
 		adDelivery,
 		redisClient,
 		bus,
@@ -66,6 +67,8 @@ func RegisterDownstreamConsumers(db *gorm.DB, cfg *configs.Config, bus *messagin
 	wsConsumers.NewIntentPredictedConsumer(hub).Register(bus)
 	wsConsumers.NewRewardCreatedConsumer(bus, hub).Register()
 	campaignConsumers.NewCampaignAdConsumer(hub).Register(bus)
+	campaignEvents.NewDeliveryConsumer(adDelivery, slog.Default()).Register(bus)
+	rewardsConsumers.NewIntentRewardConsumer(rewardRepo, bus, slog.Default()).Register(bus)
 	deliveryConsumers.NewDispatchConsumer(db, adDelivery, hub).Register(bus)
 
 	return &Downstream{Predict: predictUC}

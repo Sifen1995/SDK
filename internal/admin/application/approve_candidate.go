@@ -4,38 +4,25 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 
-	"skykin-platform/internal/audience/domain"
-	"skykin-platform/internal/audience/model"
+	adminEvents "skykin-platform/internal/admin/events"
+	"skykin-platform/internal/platform/messaging"
 
 	"github.com/google/uuid"
 )
 
+// ApproveCandidateUseCase publishes a candidate approval for async audience processing.
 type ApproveCandidateUseCase struct {
-	candidateRepo  domain.CandidateRepository
-	membershipRepo domain.MembershipRepository
-	segments       SegmentPublisher
-	logger         *slog.Logger
+	bus    *messaging.Bus
+	logger *slog.Logger
 }
 
-// SegmentPublisher creates audience segments (implemented by PlanAndSegmentService).
-type SegmentPublisher interface {
-	CreateSegment(ctx context.Context, cmd CreateSegmentCmd) (*model.AudienceSegment, error)
-}
-
-func NewApproveCandidateUseCase(
-	candidateRepo domain.CandidateRepository,
-	membershipRepo domain.MembershipRepository,
-	segments SegmentPublisher,
-	logger *slog.Logger,
-) *ApproveCandidateUseCase {
+func NewApproveCandidateUseCase(bus *messaging.Bus, logger *slog.Logger) *ApproveCandidateUseCase {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &ApproveCandidateUseCase{
-		candidateRepo: candidateRepo, membershipRepo: membershipRepo,
-		segments: segments, logger: logger,
-	}
+	return &ApproveCandidateUseCase{bus: bus, logger: logger}
 }
 
 func (uc *ApproveCandidateUseCase) Execute(
@@ -44,39 +31,29 @@ func (uc *ApproveCandidateUseCase) Execute(
 	adminID uuid.UUID,
 	name, description string,
 	estimatedCPM float64,
-) (*model.AudienceSegment, error) {
-	candidate, err := uc.candidateRepo.FindByID(ctx, candidateID)
-	if err != nil {
-		return nil, errors.New("candidate not found")
+) error {
+	if uc.bus == nil {
+		return errors.New("event bus not configured")
 	}
-	if candidate.Status != domain.CandidateStatusPending {
-		return nil, errors.New("candidate is not pending")
+	if strings.TrimSpace(name) == "" {
+		return errors.New("name is required")
 	}
-	segment, err := uc.segments.CreateSegment(ctx, CreateSegmentCmd{
-		Name: name, Description: description,
-		TopIntentSignals: []string{candidate.IntentName},
-		ApproximateSize: candidate.UserCount, EstimatedCPM: estimatedCPM, IsActive: true,
+	if estimatedCPM <= 0 {
+		return errors.New("estimated_cpm must be > 0")
+	}
+
+	uc.bus.Publish(messaging.Event{
+		Name: adminEvents.TopicCandidateApproved,
+		Ctx:  ctx,
+		Payload: adminEvents.CandidateApprovedEvent{
+			CandidateID:  candidateID,
+			AdminID:      adminID,
+			Name:         name,
+			Description:  description,
+			EstimatedCPM: estimatedCPM,
+		},
 	})
-	if err != nil {
-		return nil, err
-	}
-	segID, err := uuid.Parse(segment.ID)
-	if err != nil {
-		return nil, err
-	}
-	users, err := uc.candidateRepo.GetUsers(ctx, candidateID)
-	if err != nil {
-		return nil, err
-	}
-	if err := uc.membershipRepo.BulkInsert(ctx, segID, users); err != nil {
-		return nil, err
-	}
-	if err := uc.candidateRepo.UpdateStatus(ctx, candidateID, domain.CandidateStatusApproved, adminID, ""); err != nil {
-		return nil, err
-	}
-	if err := uc.candidateRepo.LinkToSegment(ctx, candidateID, segID); err != nil {
-		return nil, err
-	}
-	uc.logger.Info("candidate approved", "candidate_id", candidateID, "segment_id", segID)
-	return segment, nil
+
+	uc.logger.Info("candidate approval requested", "candidate_id", candidateID)
+	return nil
 }

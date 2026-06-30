@@ -52,14 +52,14 @@ func NewSegmentCandidateHandler(approve *adminApp.ApproveCandidateUseCase, rejec
 
 // ApproveSegmentCandidate godoc
 // @Summary      Approve segment candidate and publish segment
-// @Description  Creates an audience segment from a pending candidate and writes segment_memberships.
+// @Description  Marks the candidate approved and asynchronously provisions the audience segment and memberships.
 // @Tags         Ad Portal - Admin
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id    path  string  true  "Candidate ID"
 // @Param        body  body  ApproveSegmentCandidateRequest  true  "Segment details"
-// @Success      201  {object}  skykin-platform_internal_audience_model.AudienceSegment
+// @Success      202  {object}  map[string]string
 // @Failure      400  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/audience/segment-candidates/{id}/approve [post]
 func (h *SegmentCandidateHandler) ApproveSegmentCandidate(c *gin.Context) {
@@ -78,12 +78,14 @@ func (h *SegmentCandidateHandler) ApproveSegmentCandidate(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid admin id", nil)
 		return
 	}
-	segment, err := h.approve.Execute(c.Request.Context(), candidateID, adminID, req.Name, req.Description, req.EstimatedCPM)
-	if err != nil {
+	if err := h.approve.Execute(c.Request.Context(), candidateID, adminID, req.Name, req.Description, req.EstimatedCPM); err != nil {
 		platformHTTP.Error(c, http.StatusBadRequest, "approve failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, segment)
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":      "candidate approved; segment provisioning started",
+		"candidate_id": candidateID.String(),
+	})
 }
 
 // RejectSegmentCandidate godoc

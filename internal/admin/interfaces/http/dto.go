@@ -3,7 +3,6 @@ package http
 import (
 	"time"
 
-	audiencemodel "skykin-platform/internal/audience/model"
 	billingmodel "skykin-platform/internal/billing/model"
 )
 
@@ -66,12 +65,6 @@ type UpdatePlanRequest struct {
 type BillingRateListResponse struct {
 	Rates []interface{} `json:"rates"`
 	Count int           `json:"count"`
-}
-
-// SegmentListResponse wraps catalog segments for admin list endpoints.
-type SegmentListResponse struct {
-	Segments []audiencemodel.AudienceSegment `json:"segments"`
-	Count    int                             `json:"count"`
 }
 
 // AdminPlanListResponse wraps all subscription plans for operator admin.

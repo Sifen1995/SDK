@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"skykin-platform/internal/events/domain"
+	eventsApp "skykin-platform/internal/events/application"
 	intentdomain "skykin-platform/internal/intents/domain"
 	intentEvents "skykin-platform/internal/intents/events"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
@@ -17,10 +18,6 @@ import (
 	platformredis "skykin-platform/internal/platform/redis"
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignEvents "skykin-platform/internal/campaigns/events"
-	rewardsInfra "skykin-platform/internal/rewards/infrastructure"
-	rewardModel "skykin-platform/internal/rewards/model"
-	usersInfra "skykin-platform/internal/users/infrastructure"
-	wsConsumers "skykin-platform/internal/websocket/consumers"
 )
 
 const eventHistoryLimit = 200
@@ -49,10 +46,9 @@ type Reward struct {
 // PredictIntentUseCase loads behavioral history and runs ML intent prediction.
 type PredictIntentUseCase struct {
 	eventRepo  domain.EventRepository
-	userRepo   usersInfra.UserRepository
+	users      eventsApp.UserResolver
 	mlClient   *intentsInfra.MLClient
 	intentRepo intentdomain.IntentRepository
-	rewardRepo rewardsInfra.RewardRepository
 	adDelivery *campaignApp.AdDeliveryService
 	redis      *platformredis.RedisClient
 	bus        *messaging.Bus
@@ -61,10 +57,9 @@ type PredictIntentUseCase struct {
 
 func NewPredictIntentUseCase(
 	eventRepo domain.EventRepository,
-	userRepo usersInfra.UserRepository,
+	users eventsApp.UserResolver,
 	mlClient *intentsInfra.MLClient,
 	intentRepo intentdomain.IntentRepository,
-	rewardRepo rewardsInfra.RewardRepository,
 	adDelivery *campaignApp.AdDeliveryService,
 	redisClient *platformredis.RedisClient,
 	bus *messaging.Bus,
@@ -75,10 +70,9 @@ func NewPredictIntentUseCase(
 	}
 	return &PredictIntentUseCase{
 		eventRepo:  eventRepo,
-		userRepo:   userRepo,
+		users:      users,
 		mlClient:   mlClient,
 		intentRepo: intentRepo,
-		rewardRepo: rewardRepo,
 		adDelivery: adDelivery,
 		redis:      redisClient,
 		bus:        bus,
@@ -140,7 +134,7 @@ func (uc *PredictIntentUseCase) Execute(ctx context.Context, externalUserID stri
 		}, nil
 	}
 
-	user, err := uc.userRepo.FindOrCreate(ctx, externalUserID)
+	user, err := uc.users.FindOrCreate(ctx, externalUserID)
 	if err != nil {
 		return nil, fmt.Errorf("resolve user: %w", err)
 	}
@@ -167,49 +161,15 @@ func (uc *PredictIntentUseCase) Execute(ctx context.Context, externalUserID stri
 	uc.notifyIntentPredicted(ctx, externalUserID, result)
 	uc.deliverCampaignAd(ctx, externalUserID, user.ID, intent.IntentName, intent.Confidence, history)
 
-	if !mlResult.RewardTriggered {
-		return result, nil
-	}
-
-	rule, err := uc.rewardRepo.GetRuleByIntent(ctx, mlResult.Intent)
-	if err != nil {
-		uc.logger.Warn("no reward rule for intent", "intent", mlResult.Intent, "error", err)
-		return result, nil
-	}
-
-	reward := &rewardModel.Reward{
-		UserID:     user.ID,
-		IntentID:   intent.ID,
-		RuleID:     rule.ID,
-		RewardType: rule.RewardType,
-		Amount:     rule.Amount,
-		Currency:   rule.Currency,
-		Status:     "pending",
-		Message:    rule.Message,
-		CreatedAt:  time.Now().UTC(),
-	}
-	if err := uc.rewardRepo.CreateReward(ctx, reward); err != nil {
-		uc.logger.Warn("create reward failed", "user_id", externalUserID, "error", err)
-		return result, nil
-	}
-
-	result.Reward = &Reward{
-		RewardID:   reward.ID,
-		RewardType: reward.RewardType,
-		Amount:     reward.Amount,
-		Currency:   reward.Currency,
-		Message:    reward.Message,
-	}
-
-	if uc.bus != nil {
+	if mlResult.RewardTriggered && uc.bus != nil {
 		uc.bus.Publish(messaging.Event{
-			Name: wsConsumers.RewardCreatedEvent,
+			Name: intentEvents.TopicIntentRewardEligible,
 			Ctx:  ctx,
-			Payload: wsConsumers.RewardCreatedPayload{
+			Payload: intentEvents.IntentRewardEligible{
 				ExternalUserID: externalUserID,
+				InternalUserID: user.ID,
+				IntentID:       intent.ID,
 				IntentName:     intent.IntentName,
-				Confidence:     intent.Confidence,
-				Reward:         reward,
 			},
 		})
 	}
@@ -304,10 +264,6 @@ func (uc *PredictIntentUseCase) deliverCampaignAd(ctx context.Context, externalU
 			Ad:             payload,
 		},
 	})
-	if sessionID == "" {
-		sessionID = "unknown"
-	}
-	_ = uc.adDelivery.LogDispatched(ctx, ad.CampaignID, internalUserID, sessionID)
 	uc.logger.Info("campaign ad queued", "user_id", externalUserID, "intent", intentName, "channel", ad.ChannelCode)
 }
 

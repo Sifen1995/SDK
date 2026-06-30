@@ -5,6 +5,7 @@ import (
 	billingApp "skykin-platform/internal/billing/application"
 	billingInfra "skykin-platform/internal/billing/infrastructure"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	"skykin-platform/internal/platform/messaging"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -17,10 +18,12 @@ type Module struct {
 	SubRepo     *billingInfra.SubscriptionRepository
 	ChannelRepo *billingInfra.ChannelRepository
 	RateRepo    *billingInfra.BillingRateRepository
+	PlanService *billingApp.PlanService
+	BillingAdmin *billingApp.BillingAdminService
 }
 
 // Wire constructs the billing module.
-func Wire(db *gorm.DB) *Module {
+func Wire(db *gorm.DB, bus *messaging.Bus) *Module {
 	subRepo := billingInfra.NewSubscriptionRepository(db)
 	rateRepo := billingInfra.NewBillingRateRepository(db)
 	channelRepo := billingInfra.NewChannelRepository(db)
@@ -28,13 +31,17 @@ func Wire(db *gorm.DB) *Module {
 
 	subEnforcer := billingApp.NewSubscriptionEnforcer(subRepo, channelRepo, campaignRepo)
 	subscriptionSvc := billingApp.NewSubscriptionService(subRepo, channelRepo)
+	planSvc := billingApp.NewPlanService(subRepo, bus)
+	billingAdmin := billingApp.NewBillingAdminService(subRepo, rateRepo)
 
 	return &Module{
-		Handler:     billingHTTP.NewHandler(subscriptionSvc),
-		SubEnforcer: subEnforcer,
-		SubRepo:     subRepo,
-		ChannelRepo: channelRepo,
-		RateRepo:    rateRepo,
+		Handler:      billingHTTP.NewHandler(subscriptionSvc),
+		SubEnforcer:  subEnforcer,
+		SubRepo:      subRepo,
+		ChannelRepo:  channelRepo,
+		RateRepo:     rateRepo,
+		PlanService:  planSvc,
+		BillingAdmin: billingAdmin,
 	}
 }
 

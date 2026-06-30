@@ -1,6 +1,9 @@
 package messaging
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 type Handler func(Event)
 
@@ -23,6 +26,10 @@ func (b *Bus) Subscribe(eventName string, h Handler) {
 }
 
 func (b *Bus) Publish(e Event) {
+	if e.Ctx != nil {
+		e.Ctx = context.WithoutCancel(e.Ctx)
+	}
+
 	b.mu.RLock()
 	handlers := append([]Handler(nil), b.subscribers[e.Name]...)
 	b.mu.RUnlock()

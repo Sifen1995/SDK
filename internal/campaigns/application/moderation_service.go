@@ -6,30 +6,35 @@ import (
 	"fmt"
 	"time"
 
+	adminEvents "skykin-platform/internal/admin/events"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
 	campaignvalidation "skykin-platform/internal/campaigns/validation"
 	billingdomain "skykin-platform/internal/billing/domain"
 	"skykin-platform/internal/campaigns/infrastructure"
 	"skykin-platform/internal/campaigns/model"
+	"skykin-platform/internal/platform/messaging"
 )
 
-// CampaignModerationService handles operator review, approval, and activation of campaigns.
-type CampaignModerationService struct {
+// ModerationService handles operator review, approval, and activation of campaigns.
+type ModerationService struct {
 	repo     *infrastructure.Repository
 	channels billingdomain.ChannelRepository
+	bus      *messaging.Bus
 }
 
-func NewCampaignModerationService(repo *infrastructure.Repository, channels billingdomain.ChannelRepository) *CampaignModerationService {
-	return &CampaignModerationService{repo: repo, channels: channels}
+func NewModerationService(
+	repo *infrastructure.Repository,
+	channels billingdomain.ChannelRepository,
+	bus *messaging.Bus,
+) *ModerationService {
+	return &ModerationService{repo: repo, channels: channels, bus: bus}
 }
 
-// ListPending returns campaigns waiting for operator validation.
-func (s *CampaignModerationService) ListPending(ctx context.Context) ([]model.Campaign, error) {
+func (s *ModerationService) ListPending(ctx context.Context) ([]model.Campaign, error) {
 	return s.repo.ListPendingModeration(ctx)
 }
 
-// Validate approves or rejects a pending campaign after creative checks.
-func (s *CampaignModerationService) Validate(ctx context.Context, campaignID, operatorUserID, action, notes string) (*model.Campaign, error) {
+func (s *ModerationService) Validate(ctx context.Context, campaignID, operatorUserID, action, notes string) (*model.Campaign, error) {
 	c, err := s.repo.Get(ctx, campaignID)
 	if err != nil {
 		return nil, errors.New("campaign not found")
@@ -42,13 +47,15 @@ func (s *CampaignModerationService) Validate(ctx context.Context, campaignID, op
 	}
 
 	now := time.Now().UTC()
+	var channelCode string
 	switch action {
 	case "approve":
 		ch, err := s.channels.GetByID(ctx, c.ChannelID)
 		if err != nil {
 			return nil, errors.New("channel not found")
 		}
-		vr := campaignvalidation.Campaign(c, ch.Code)
+		channelCode = ch.Code
+		vr := campaignvalidation.Campaign(c, channelCode)
 		if vr.Status != "passed" {
 			return nil, fmt.Errorf("cannot approve: %s", vr.Notes)
 		}
@@ -76,11 +83,36 @@ func (s *CampaignModerationService) Validate(ctx context.Context, campaignID, op
 	if err := s.repo.Update(ctx, c); err != nil {
 		return nil, err
 	}
+
+	if s.bus != nil {
+		switch action {
+		case "approve":
+			s.bus.Publish(messaging.Event{
+				Name: adminEvents.TopicCampaignModerationPassed,
+				Ctx:  ctx,
+				Payload: adminEvents.CampaignModerationPassedEvent{
+					CampaignID:     campaignID,
+					OperatorUserID: operatorUserID,
+					ChannelCode:    channelCode,
+				},
+			})
+		case "reject":
+			s.bus.Publish(messaging.Event{
+				Name: adminEvents.TopicCampaignModerationRejected,
+				Ctx:  ctx,
+				Payload: adminEvents.CampaignModerationRejectedEvent{
+					CampaignID:     campaignID,
+					OperatorUserID: operatorUserID,
+					Notes:          notes,
+				},
+			})
+		}
+	}
+
 	return c, nil
 }
 
-// Activate sets is_active=true after operator approval (go-live).
-func (s *CampaignModerationService) Activate(ctx context.Context, campaignID, operatorUserID string) (*model.Campaign, error) {
+func (s *ModerationService) Activate(ctx context.Context, campaignID, operatorUserID string) (*model.Campaign, error) {
 	c, err := s.repo.Get(ctx, campaignID)
 	if err != nil {
 		return nil, errors.New("campaign not found")
@@ -108,5 +140,17 @@ func (s *CampaignModerationService) Activate(ctx context.Context, campaignID, op
 	if err := s.repo.Update(ctx, c); err != nil {
 		return nil, err
 	}
+
+	if s.bus != nil {
+		s.bus.Publish(messaging.Event{
+			Name: adminEvents.TopicCampaignActivated,
+			Ctx:  ctx,
+			Payload: adminEvents.CampaignActivatedEvent{
+				CampaignID:     campaignID,
+				OperatorUserID: operatorUserID,
+			},
+		})
+	}
+
 	return c, nil
 }

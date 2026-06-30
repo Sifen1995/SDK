@@ -40,6 +40,11 @@ func (r *SegmentRepository) Create(ctx context.Context, seg *model.AudienceSegme
 	return r.db.WithContext(ctx).Create(seg).Error
 }
 
+func (r *SegmentRepository) Update(ctx context.Context, seg *model.AudienceSegment) error {
+	seg.UpdatedAt = time.Now().UTC()
+	return r.db.WithContext(ctx).Save(seg).Error
+}
+
 // ListAvailableNow returns catalog segments that are active and within their availability window.
 func (r *SegmentRepository) ListAvailableNow(ctx context.Context, now time.Time) ([]model.AudienceSegment, error) {
 	var list []model.AudienceSegment
@@ -48,5 +53,11 @@ func (r *SegmentRepository) ListAvailableNow(ctx context.Context, now time.Time)
 		Where("available_until IS NULL OR available_until >= ?", now).
 		Order("name asc").
 		Find(&list).Error
+	return list, err
+}
+
+func (r *SegmentRepository) ListAll(ctx context.Context) ([]model.AudienceSegment, error) {
+	var list []model.AudienceSegment
+	err := r.db.WithContext(ctx).Order("name asc").Find(&list).Error
 	return list, err
 }

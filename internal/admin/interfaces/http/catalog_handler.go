@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	adminApp "skykin-platform/internal/admin/application"
+	audienceApp "skykin-platform/internal/audience/application"
 	billingApp "skykin-platform/internal/billing/application"
 	platformHTTP "skykin-platform/internal/platform/http"
 
@@ -13,17 +13,17 @@ import (
 
 // CatalogHandler exposes operator plan, segment, and billing rate management.
 type CatalogHandler struct {
-	catalog *adminApp.PlanAndSegmentService
-	billing *adminApp.BillingAdminService
-	plans   *billingApp.PlanService
+	segments *audienceApp.ListService
+	billing  *billingApp.BillingAdminService
+	plans    *billingApp.PlanService
 }
 
 func NewCatalogHandler(
-	catalog *adminApp.PlanAndSegmentService,
-	billing *adminApp.BillingAdminService,
+	segments *audienceApp.ListService,
+	billing *billingApp.BillingAdminService,
 	plans *billingApp.PlanService,
 ) *CatalogHandler {
-	return &CatalogHandler{catalog: catalog, billing: billing, plans: plans}
+	return &CatalogHandler{segments: segments, billing: billing, plans: plans}
 }
 
 // CreatePlan godoc
@@ -43,7 +43,7 @@ func (h *CatalogHandler) CreatePlan(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
 		return
 	}
-	plan, err := h.catalog.CreatePlan(c.Request.Context(), adminApp.CreatePlanCmd{
+	plan, err := h.plans.CreatePlan(c.Request.Context(), billingApp.CreatePlanCmd{
 		Name:                req.Name,
 		MonthlyFeeETB:       req.MonthlyFeeETB,
 		MaxActiveCampaigns:  req.MaxActiveCampaigns,
@@ -189,7 +189,7 @@ func (h *CatalogHandler) CreateSegment(c *gin.Context) {
 		t := req.AvailableFrom.UTC()
 		availableFrom = &t
 	}
-	seg, err := h.catalog.CreateSegment(c.Request.Context(), adminApp.CreateSegmentCmd{
+	seg, err := h.segments.CreateSegment(c.Request.Context(), audienceApp.CreateSegmentCmd{
 		Name:             req.Name,
 		Description:      req.Description,
 		TopIntentSignals: req.TopIntentSignals,
@@ -208,20 +208,67 @@ func (h *CatalogHandler) CreateSegment(c *gin.Context) {
 
 // ListSegments godoc
 // @Summary      List audience catalog segments
-// @Description  Returns all active Audiencemart segments for operator admin review.
+// @Description  Returns every Audiencemart segment including suspended (inactive) segments for operator admin.
 // @Tags         Ad Portal - Admin
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200  {object}  SegmentListResponse
+// @Success      200  {object}  skykin-platform_internal_audience_application.ListSegmentsResult
 // @Failure      500  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/audience/segments [get]
 func (h *CatalogHandler) ListSegments(c *gin.Context) {
-	segments, err := h.catalog.ListSegments(c.Request.Context())
+	result, err := h.segments.ListAll(c.Request.Context())
 	if err != nil {
 		platformHTTP.Error(c, http.StatusInternalServerError, "list segments failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, SegmentListResponse{Segments: segments, Count: len(segments)})
+	c.JSON(http.StatusOK, result)
+}
+
+// GetSegment godoc
+// @Summary      Get audience segment by ID
+// @Description  Returns a single catalog segment including inactive segments for operator review.
+// @Tags         Ad Portal - Admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        segment_id  path  string  true  "Segment ID"
+// @Success      200  {object}  skykin-platform_internal_audience_model.AudienceSegment
+// @Failure      404  {object}  platformHTTP.APIError
+// @Router       /ad-portal/admin/audience/segments/{segment_id} [get]
+func (h *CatalogHandler) GetSegment(c *gin.Context) {
+	seg, err := h.segments.GetForAdmin(c.Request.Context(), c.Param("segment_id"))
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "segment not found" {
+			status = http.StatusNotFound
+		}
+		platformHTTP.Error(c, status, "get segment failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, seg)
+}
+
+// SuspendSegment godoc
+// @Summary      Suspend audience segment
+// @Description  Deactivates an active catalog segment so it is no longer offered to advertisers. Existing purchases are not affected.
+// @Tags         Ad Portal - Admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        segment_id  path  string  true  "Segment ID"
+// @Success      200  {object}  skykin-platform_internal_audience_model.AudienceSegment
+// @Failure      400  {object}  platformHTTP.APIError
+// @Failure      404  {object}  platformHTTP.APIError
+// @Router       /ad-portal/admin/audience/segments/{segment_id}/suspend [post]
+func (h *CatalogHandler) SuspendSegment(c *gin.Context) {
+	seg, err := h.segments.SuspendSegment(c.Request.Context(), c.Param("segment_id"))
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "segment not found" {
+			status = http.StatusNotFound
+		}
+		platformHTTP.Error(c, status, "suspend segment failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, seg)
 }
 
 // ListBillingRates godoc
@@ -264,7 +311,7 @@ func (h *CatalogHandler) UpdateBillingRate(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
 		return
 	}
-	rate, err := h.billing.UpdateBillingRate(c.Request.Context(), adminApp.UpdateBillingRateCmd{
+	rate, err := h.billing.UpdateBillingRate(c.Request.Context(), billingApp.UpdateBillingRateCmd{
 		RateID:   c.Param("id"),
 		RateETB:  req.RateETB,
 		IsActive: req.IsActive,

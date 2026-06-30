@@ -106,11 +106,12 @@ func (r *CandidateRepository) GetUsers(ctx context.Context, candidateID uuid.UUI
 }
 
 func (r *CandidateRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status domain.CandidateStatus, reviewedBy uuid.UUID, notes string) error {
+	now := time.Now().UTC()
 	return r.db.WithContext(ctx).Exec(`
 		UPDATE segment_candidates
-		SET status = ?, reviewed_by = ?, reviewed_at = NOW(), review_notes = ?
+		SET status = ?, reviewed_by = ?, reviewed_at = ?, review_notes = ?
 		WHERE id = ?
-	`, string(status), reviewedBy, notes, id).Error
+	`, string(status), reviewedBy, now, notes, id).Error
 }
 
 func (r *CandidateRepository) LinkToSegment(ctx context.Context, candidateID, segmentID uuid.UUID) error {
