@@ -33,7 +33,7 @@ import (
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
-// @description Enter your JWT token as: Bearer <token> (developer portal or ad portal)
+// @description Paste the JWT from POST /ad-portal/login (token field only, no "Bearer " prefix needed)
 
 // @securityDefinitions.apikey APIKeyAuth
 // @in header

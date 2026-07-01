@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 
 	"skykin-platform/configs"
@@ -20,7 +19,8 @@ func AdPortalAuthMiddleware(cfg *configs.Config) gin.HandlerFunc {
 			return
 		}
 		var tokenStr string
-		if _, err := fmt.Sscanf(authHeader, "Bearer %s", &tokenStr); err != nil || tokenStr == "" {
+		var ok bool
+		if tokenStr, ok = bearerTokenFromHeader(authHeader); !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "use Bearer <token>"})
 			c.Abort()
 			return

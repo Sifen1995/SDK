@@ -70,8 +70,8 @@ func PortalAuthMiddleware(cfg *configs.Config) gin.HandlerFunc {
 		}
 
 		var tokenStr string
-		_, err := fmt.Sscanf(authHeader, "Bearer %s", &tokenStr)
-		if err != nil || tokenStr == "" {
+		var ok bool
+		if tokenStr, ok = bearerTokenFromHeader(authHeader); !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Invalid Authorization header format. Use 'Bearer <token>'"})
 			c.Abort()
 			return
