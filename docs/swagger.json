@@ -429,7 +429,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                            "$ref": "#/definitions/skykin-platform_internal_audience_domain.AudienceSegment"
                         }
                     },
                     "400": {
@@ -469,7 +469,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                            "$ref": "#/definitions/skykin-platform_internal_audience_domain.AudienceSegment"
                         }
                     },
                     "404": {
@@ -509,7 +509,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                            "$ref": "#/definitions/skykin-platform_internal_audience_domain.AudienceSegment"
                         }
                     },
                     "400": {
@@ -566,7 +566,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_billing_model.BillingRate"
+                            "$ref": "#/definitions/skykin-platform_internal_billing_domain.BillingRate"
                         }
                     },
                     "400": {
@@ -642,7 +642,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
                     },
                     "400": {
@@ -694,7 +694,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
                     },
                     "400": {
@@ -768,7 +768,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                            "$ref": "#/definitions/skykin-platform_internal_billing_domain.SubscriptionPlan"
                         }
                     },
                     "400": {
@@ -808,7 +808,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                            "$ref": "#/definitions/skykin-platform_internal_billing_domain.SubscriptionPlan"
                         }
                     },
                     "404": {
@@ -858,7 +858,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                            "$ref": "#/definitions/skykin-platform_internal_billing_domain.SubscriptionPlan"
                         }
                     },
                     "400": {
@@ -943,7 +943,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                            "$ref": "#/definitions/skykin-platform_internal_billing_domain.SubscriptionPlan"
                         }
                     },
                     "400": {
@@ -1137,7 +1137,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
                     },
                     "400": {
@@ -1182,7 +1182,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
                     }
                 }
@@ -1213,7 +1213,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
                     }
                 }
@@ -1928,7 +1928,7 @@
                 "plans": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                        "$ref": "#/definitions/skykin-platform_internal_billing_domain.SubscriptionPlan"
                     }
                 }
             }
@@ -2756,7 +2756,7 @@
                 }
             }
         },
-        "skykin-platform_internal_audience_model.AudienceSegment": {
+        "skykin-platform_internal_audience_domain.AudienceSegment": {
             "type": "object",
             "properties": {
                 "approximateSize": {
@@ -2775,7 +2775,8 @@
                     "type": "string"
                 },
                 "estimatedCPM": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "id": {
                     "type": "string"
@@ -2789,7 +2790,7 @@
                 "topIntentSignals": {
                     "type": "array",
                     "items": {
-                        "type": "integer"
+                        "type": "string"
                     }
                 },
                 "updatedAt": {
@@ -2944,7 +2945,7 @@
                 }
             }
         },
-        "skykin-platform_internal_billing_model.BillingRate": {
+        "skykin-platform_internal_billing_domain.BillingRate": {
             "type": "object",
             "properties": {
                 "createdAt": {
@@ -2966,18 +2967,20 @@
                     "type": "string"
                 },
                 "rateETB": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 }
             }
         },
-        "skykin-platform_internal_billing_model.SubscriptionPlan": {
+        "skykin-platform_internal_billing_domain.SubscriptionPlan": {
             "type": "object",
             "properties": {
                 "audiencemartEnabled": {
                     "type": "boolean"
                 },
                 "cpcdiscountPct": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "createdAt": {
                     "type": "string"
@@ -2995,10 +2998,12 @@
                     "type": "integer"
                 },
                 "maxDailyBudgetETB": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "monthlyFeeETB": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "name": {
                     "type": "string"
@@ -3008,7 +3013,7 @@
                 }
             }
         },
-        "skykin-platform_internal_campaigns_model.Campaign": {
+        "skykin-platform_internal_campaigns_domain.Campaign": {
             "type": "object",
             "properties": {
                 "advertiserID": {
@@ -3021,23 +3026,22 @@
                     "type": "string"
                 },
                 "budgetSpent": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "canvasJSON": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object",
+                    "additionalProperties": {}
                 },
                 "channelID": {
-                    "description": "ChannelID references channels.id (IN_APP_BANNER, PUSH, SMS_PLUS, …).",
                     "type": "string"
                 },
                 "createdAt": {
                     "type": "string"
                 },
                 "dailyBudgetCap": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "destinationURL": {
                     "type": "string"
@@ -3058,14 +3062,12 @@
                     "type": "string"
                 },
                 "moderatedBy": {
-                    "description": "portal_users.id of the operator",
                     "type": "string"
                 },
                 "moderationNotes": {
                     "type": "string"
                 },
                 "moderationStatus": {
-                    "description": "ModerationStatus is set by operator_admin (pending → approved/rejected).",
                     "type": "string"
                 },
                 "name": {
@@ -3078,7 +3080,6 @@
                     "type": "string"
                 },
                 "segmentID": {
-                    "description": "SegmentID is optional; nil = free intent-only targeting via the targeting job.",
                     "type": "string"
                 },
                 "targetIntent": {
@@ -3088,7 +3089,8 @@
                     "type": "string"
                 },
                 "totalBudgetCap": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "updatedAt": {
                     "type": "string"

@@ -3,8 +3,8 @@ package application
 import (
 	"strings"
 
+	"skykin-platform/internal/campaigns/domain"
 	"skykin-platform/internal/campaigns/infrastructure"
-	"skykin-platform/internal/campaigns/model"
 )
 
 // ChannelLabel returns a human-readable label for portal preview.
@@ -22,7 +22,7 @@ func ChannelLabel(channelCode string) string {
 }
 
 // PreviewCampaign builds a simulator payload for the ad portal preview endpoint.
-func PreviewCampaign(c *model.Campaign, channelCode string) map[string]any {
+func PreviewCampaign(c *domain.Campaign, channelCode string) map[string]any {
 	content, _ := infrastructure.CampaignAdContent(c, channelCode)
 	return map[string]any{
 		"format":        channelCode,

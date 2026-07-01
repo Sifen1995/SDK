@@ -3,7 +3,7 @@ package consumers
 import (
 	"skykin-platform/internal/platform/messaging"
 	platformWS "skykin-platform/internal/platform/websocket"
-	rewardModel "skykin-platform/internal/rewards/model"
+	rewardsdomain "skykin-platform/internal/rewards/domain"
 )
 
 const RewardCreatedEvent = "rewards.created"
@@ -12,7 +12,7 @@ type RewardCreatedPayload struct {
 	ExternalUserID string
 	IntentName     string
 	Confidence     float64
-	Reward         *rewardModel.Reward
+	Reward         *rewardsdomain.Reward
 }
 
 type RewardCreatedConsumer struct {
@@ -45,4 +45,3 @@ func (c *RewardCreatedConsumer) handle(e messaging.Event) {
 		"created_at":  p.Reward.CreatedAt,
 	})
 }
-

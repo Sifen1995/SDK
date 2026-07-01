@@ -10,7 +10,6 @@ import (
 	audiencedomain "skykin-platform/internal/audience/domain"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
 	billingdomain "skykin-platform/internal/billing/domain"
-	"skykin-platform/internal/campaigns/model"
 	deliverydomain "skykin-platform/internal/delivery/domain"
 	intentdomain "skykin-platform/internal/intents/domain"
 	"skykin-platform/internal/platform/messaging"
@@ -69,7 +68,7 @@ func (j *TargetingJob) Run(ctx context.Context) {
 	}
 }
 
-func (j *TargetingJob) matchCampaign(ctx context.Context, campaign *model.Campaign, since time.Time) {
+func (j *TargetingJob) matchCampaign(ctx context.Context, campaign *campaigndomain.Campaign, since time.Time) {
 	if !j.isWithinSchedule(campaign, time.Now().UTC()) {
 		return
 	}
@@ -110,7 +109,7 @@ func (j *TargetingJob) matchCampaign(ctx context.Context, campaign *model.Campai
 }
 
 // isWithinSchedule skips campaigns outside their scheduled window (nil bounds = no limit).
-func (j *TargetingJob) isWithinSchedule(c *model.Campaign, now time.Time) bool {
+func (j *TargetingJob) isWithinSchedule(c *campaigndomain.Campaign, now time.Time) bool {
 	if c.ScheduledStartAt != nil && now.Before(*c.ScheduledStartAt) {
 		return false
 	}
@@ -128,7 +127,7 @@ func (j *TargetingJob) resolveChannelCode(ctx context.Context, channelID string)
 	return channelCodeForBus(ch.Code)
 }
 
-func (j *TargetingJob) tryMatchUser(ctx context.Context, userID, campaignID uuid.UUID, campaign *model.Campaign, cap int, channel string) {
+func (j *TargetingJob) tryMatchUser(ctx context.Context, userID, campaignID uuid.UUID, campaign *campaigndomain.Campaign, cap int, channel string) {
 	delivered, err := j.deliveryRepo.WasDelivered(ctx, userID, campaignID)
 	if err != nil || delivered {
 		return

@@ -9,7 +9,6 @@ import (
 	"skykin-platform/configs"
 	"skykin-platform/internal/ad_portal/domain"
 	"skykin-platform/internal/ad_portal/infrastructure"
-	"skykin-platform/internal/ad_portal/model"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -32,7 +31,7 @@ type portalClaims struct {
 	jwt.RegisteredClaims
 }
 
-func (s *AuthService) Register(ctx context.Context, name, email, password, company, roleSlug string) (*model.PortalUser, error) {
+func (s *AuthService) Register(ctx context.Context, name, email, password, company, roleSlug string) (*domain.PortalUser, error) {
 	if roleSlug == "" {
 		roleSlug = domain.RoleAdvertiser
 	}
@@ -42,7 +41,7 @@ func (s *AuthService) Register(ctx context.Context, name, email, password, compa
 	return s.createPortalUser(ctx, name, email, password, company, roleSlug)
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (string, *model.PortalUser, error) {
+func (s *AuthService) Login(ctx context.Context, email, password string) (string, *domain.PortalUser, error) {
 	u, err := s.repo.GetPortalUserByEmail(ctx, email)
 	if err != nil {
 		return "", nil, errors.New("invalid credentials")
@@ -60,7 +59,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	return token, u, nil
 }
 
-func (s *AuthService) signToken(u *model.PortalUser) (string, error) {
+func (s *AuthService) signToken(u *domain.PortalUser) (string, error) {
 	claims := portalClaims{
 		PortalUserID: u.ID,
 		AdvertiserID: u.AccountAdvertiserID(),
@@ -102,7 +101,7 @@ func (s *AuthService) EnsureOperatorAdmin(ctx context.Context, email, password, 
 	if err != nil {
 		return err
 	}
-	u := &model.PortalUser{
+	u := &domain.PortalUser{
 		Email:        email,
 		PasswordHash: string(hash),
 		Name:         name,
@@ -112,11 +111,11 @@ func (s *AuthService) EnsureOperatorAdmin(ctx context.Context, email, password, 
 	return s.repo.CreatePortalUser(ctx, u)
 }
 
-func (s *AuthService) Me(ctx context.Context, portalUserID string) (*model.PortalUser, error) {
+func (s *AuthService) Me(ctx context.Context, portalUserID string) (*domain.PortalUser, error) {
 	return s.repo.GetPortalUserByID(ctx, portalUserID)
 }
 
-func UserResponse(u *model.PortalUser) map[string]any {
+func UserResponse(u *domain.PortalUser) map[string]any {
 	resp := map[string]any{
 		"id":            u.ID,
 		"email":         u.Email,
@@ -132,7 +131,7 @@ func UserResponse(u *model.PortalUser) map[string]any {
 	return resp
 }
 
-func (s *AuthService) CreateOperatorUser(ctx context.Context, name, email, password, roleSlug, company string) (*model.PortalUser, error) {
+func (s *AuthService) CreateOperatorUser(ctx context.Context, name, email, password, roleSlug, company string) (*domain.PortalUser, error) {
 	if roleSlug != domain.RoleAdvertiser && roleSlug != domain.RoleReadOnlyAnalyst && roleSlug != domain.RoleOperatorAdmin {
 		return nil, fmt.Errorf("invalid role")
 	}
@@ -145,7 +144,7 @@ func (s *AuthService) CreateOperatorUser(ctx context.Context, name, email, passw
 		if err != nil {
 			return nil, err
 		}
-		u := &model.PortalUser{
+		u := &domain.PortalUser{
 			Email: email, PasswordHash: string(hash), Name: name, RoleID: role.ID, IsActive: true,
 		}
 		if err := s.repo.CreatePortalUser(ctx, u); err != nil {
@@ -156,7 +155,7 @@ func (s *AuthService) CreateOperatorUser(ctx context.Context, name, email, passw
 	return s.createPortalUser(ctx, name, email, password, company, roleSlug)
 }
 
-func (s *AuthService) createPortalUser(ctx context.Context, name, email, password, company, roleSlug string) (*model.PortalUser, error) {
+func (s *AuthService) createPortalUser(ctx context.Context, name, email, password, company, roleSlug string) (*domain.PortalUser, error) {
 	if company == "" {
 		return nil, errors.New("company_name is required")
 	}
@@ -168,8 +167,8 @@ func (s *AuthService) createPortalUser(ctx context.Context, name, email, passwor
 	if err != nil {
 		return nil, err
 	}
-	adv := &model.Advertiser{CompanyName: company}
-	u := &model.PortalUser{
+	adv := &domain.Advertiser{CompanyName: company}
+	u := &domain.PortalUser{
 		Email:        email,
 		PasswordHash: string(hash),
 		Name:         name,
@@ -177,9 +176,6 @@ func (s *AuthService) createPortalUser(ctx context.Context, name, email, passwor
 		IsActive:     true,
 	}
 
-	// Create advertiser (or reuse existing by company name) and portal user
-	// inside a single DB transaction to avoid orphaned advertisers and
-	// duplicate advertiser rows.
 	if err := s.repo.CreateAdvertiserAndPortalUser(ctx, adv, u); err != nil {
 		return nil, err
 	}

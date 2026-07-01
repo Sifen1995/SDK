@@ -4,7 +4,6 @@ import (
 	"context"
 
 	audiencedomain "skykin-platform/internal/audience/domain"
-	"skykin-platform/internal/audience/model"
 	campaignEvents "skykin-platform/internal/campaigns/events"
 )
 
@@ -21,7 +20,7 @@ func (uc *RecordSegmentPurchaseUseCase) Execute(ctx context.Context, evt campaig
 	if !evt.HasPurchase {
 		return nil
 	}
-	return uc.purchases.CreatePurchase(ctx, &model.SegmentPurchase{
+	return uc.purchases.CreatePurchase(ctx, &audiencedomain.SegmentPurchase{
 		AdvertiserID: evt.AdvertiserID,
 		SegmentID:    evt.SegmentID,
 		CampaignID:   evt.CampaignID,

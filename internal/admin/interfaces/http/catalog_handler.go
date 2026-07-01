@@ -34,7 +34,7 @@ func NewCatalogHandler(
 // @Produce      json
 // @Security     BearerAuth
 // @Param        body  body  CreatePlanRequest  true  "Plan"
-// @Success      201   {object}  skykin-platform_internal_billing_model.SubscriptionPlan
+// @Success      201   {object}  skykin-platform_internal_billing_domain.SubscriptionPlan
 // @Failure      400   {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/plans [post]
 func (h *CatalogHandler) CreatePlan(c *gin.Context) {
@@ -85,7 +85,7 @@ func (h *CatalogHandler) ListPlans(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        plan_id  path  string  true  "Plan ID"
-// @Success      200  {object}  skykin-platform_internal_billing_model.SubscriptionPlan
+// @Success      200  {object}  skykin-platform_internal_billing_domain.SubscriptionPlan
 // @Failure      404  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/plans/{plan_id} [get]
 func (h *CatalogHandler) GetPlan(c *gin.Context) {
@@ -110,7 +110,7 @@ func (h *CatalogHandler) GetPlan(c *gin.Context) {
 // @Security     BearerAuth
 // @Param        plan_id  path  string  true  "Plan ID"
 // @Param        body     body  UpdatePlanRequest  true  "Plan update"
-// @Success      200  {object}  skykin-platform_internal_billing_model.SubscriptionPlan
+// @Success      200  {object}  skykin-platform_internal_billing_domain.SubscriptionPlan
 // @Failure      400  {object}  platformHTTP.APIError
 // @Failure      404  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/plans/{plan_id} [patch]
@@ -150,7 +150,7 @@ func (h *CatalogHandler) UpdatePlan(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        plan_id  path  string  true  "Plan ID"
-// @Success      200  {object}  skykin-platform_internal_billing_model.SubscriptionPlan
+// @Success      200  {object}  skykin-platform_internal_billing_domain.SubscriptionPlan
 // @Failure      400  {object}  platformHTTP.APIError
 // @Failure      404  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/plans/{plan_id}/suspend [post]
@@ -175,7 +175,7 @@ func (h *CatalogHandler) SuspendPlan(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        body  body  CreateSegmentRequest  true  "Segment"
-// @Success      201   {object}  skykin-platform_internal_audience_model.AudienceSegment
+// @Success      201   {object}  skykin-platform_internal_audience_domain.AudienceSegment
 // @Failure      400   {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/audience/segments [post]
 func (h *CatalogHandler) CreateSegment(c *gin.Context) {
@@ -231,7 +231,7 @@ func (h *CatalogHandler) ListSegments(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        segment_id  path  string  true  "Segment ID"
-// @Success      200  {object}  skykin-platform_internal_audience_model.AudienceSegment
+// @Success      200  {object}  skykin-platform_internal_audience_domain.AudienceSegment
 // @Failure      404  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/audience/segments/{segment_id} [get]
 func (h *CatalogHandler) GetSegment(c *gin.Context) {
@@ -254,7 +254,7 @@ func (h *CatalogHandler) GetSegment(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        segment_id  path  string  true  "Segment ID"
-// @Success      200  {object}  skykin-platform_internal_audience_model.AudienceSegment
+// @Success      200  {object}  skykin-platform_internal_audience_domain.AudienceSegment
 // @Failure      400  {object}  platformHTTP.APIError
 // @Failure      404  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/audience/segments/{segment_id}/suspend [post]
@@ -301,7 +301,7 @@ func (h *CatalogHandler) ListBillingRates(c *gin.Context) {
 // @Security     BearerAuth
 // @Param        id    path  string  true  "Billing rate ID"
 // @Param        body  body  UpdateBillingRateRequest  true  "Rate update"
-// @Success      200  {object}  skykin-platform_internal_billing_model.BillingRate
+// @Success      200  {object}  skykin-platform_internal_billing_domain.BillingRate
 // @Failure      400  {object}  platformHTTP.APIError
 // @Failure      404  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/billing-rates/{id} [patch]

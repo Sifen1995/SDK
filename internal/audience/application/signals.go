@@ -1,25 +1,17 @@
 package application
 
 import (
-	"encoding/json"
 	"fmt"
 
-	"skykin-platform/internal/audience/model"
+	"skykin-platform/internal/audience/domain"
 )
 
-// ParseIntentSignals unmarshals top_intent_signals JSON into intent slug strings.
-func ParseIntentSignals(seg *model.AudienceSegment) ([]string, error) {
+// ParseIntentSignals returns top_intent_signals from a segment definition.
+func ParseIntentSignals(seg *domain.AudienceSegment) ([]string, error) {
 	if seg == nil || len(seg.TopIntentSignals) == 0 {
 		return nil, fmt.Errorf("segment has no intent signals")
 	}
-	var signals []string
-	if err := json.Unmarshal(seg.TopIntentSignals, &signals); err != nil {
-		return nil, fmt.Errorf("invalid top_intent_signals: %w", err)
-	}
-	if len(signals) == 0 {
-		return nil, fmt.Errorf("segment has no intent signals")
-	}
-	return signals, nil
+	return seg.TopIntentSignals, nil
 }
 
 // TargetIntentAllowed returns true when targetIntent appears in the segment signal list.

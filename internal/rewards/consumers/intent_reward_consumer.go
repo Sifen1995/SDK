@@ -6,20 +6,19 @@ import (
 	"time"
 
 	intentEvents "skykin-platform/internal/intents/events"
+	rewardsdomain "skykin-platform/internal/rewards/domain"
 	"skykin-platform/internal/platform/messaging"
 	wsConsumers "skykin-platform/internal/websocket/consumers"
-	"skykin-platform/internal/rewards/infrastructure"
-	"skykin-platform/internal/rewards/model"
 )
 
 // IntentRewardConsumer creates reward rows when intent prediction qualifies.
 type IntentRewardConsumer struct {
-	rewards infrastructure.RewardRepository
+	rewards rewardsdomain.RewardRepository
 	bus     *messaging.Bus
 	log     *slog.Logger
 }
 
-func NewIntentRewardConsumer(rewards infrastructure.RewardRepository, bus *messaging.Bus, log *slog.Logger) *IntentRewardConsumer {
+func NewIntentRewardConsumer(rewards rewardsdomain.RewardRepository, bus *messaging.Bus, log *slog.Logger) *IntentRewardConsumer {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -47,7 +46,7 @@ func (c *IntentRewardConsumer) handle(e messaging.Event) {
 		return
 	}
 
-	reward := &model.Reward{
+	reward := &rewardsdomain.Reward{
 		UserID:     evt.InternalUserID,
 		IntentID:   evt.IntentID,
 		RuleID:     rule.ID,

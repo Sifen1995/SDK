@@ -26,7 +26,7 @@ func NewHandler(svc *application.CampaignService) *Handler {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        body  body      CreateCampaignRequest  true  "Campaign + creative"
-// @Success      201   {object}  skykin-platform_internal_campaigns_model.Campaign
+// @Success      201   {object}  skykin-platform_internal_campaigns_domain.Campaign
 // @Failure      400   {object}  platformHTTP.APIError
 // @Failure      403   {object}  platformHTTP.APIError
 // @Router       /ad-portal/campaigns [post]
@@ -104,7 +104,7 @@ func (h *Handler) ListCampaigns(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id   path  string  true  "Campaign ID"
-// @Success      200  {object}  skykin-platform_internal_campaigns_model.Campaign
+// @Success      200  {object}  skykin-platform_internal_campaigns_domain.Campaign
 // @Router       /ad-portal/campaigns/{id} [get]
 func (h *Handler) GetCampaign(c *gin.Context) {
 	aid, _ := c.Get("advertiser_id")
@@ -123,7 +123,7 @@ func (h *Handler) GetCampaign(c *gin.Context) {
 // @Tags         Ad Portal - Campaigns
 // @Security     BearerAuth
 // @Param        id   path  string  true  "Campaign ID"
-// @Success      200  {object}  skykin-platform_internal_campaigns_model.Campaign
+// @Success      200  {object}  skykin-platform_internal_campaigns_domain.Campaign
 // @Router       /ad-portal/campaigns/{id}/activate [post]
 func (h *Handler) ActivateCampaign(c *gin.Context) {
 	aid, _ := c.Get("advertiser_id")

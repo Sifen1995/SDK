@@ -435,7 +435,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                            "$ref": "#/definitions/skykin-platform_internal_audience_domain.AudienceSegment"
                         }
                     },
                     "400": {
@@ -475,7 +475,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                            "$ref": "#/definitions/skykin-platform_internal_audience_domain.AudienceSegment"
                         }
                     },
                     "404": {
@@ -515,7 +515,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_audience_model.AudienceSegment"
+                            "$ref": "#/definitions/skykin-platform_internal_audience_domain.AudienceSegment"
                         }
                     },
                     "400": {
@@ -572,7 +572,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_billing_model.BillingRate"
+                            "$ref": "#/definitions/skykin-platform_internal_billing_domain.BillingRate"
                         }
                     },
                     "400": {
@@ -648,7 +648,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
                     },
                     "400": {
@@ -700,7 +700,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
                     },
                     "400": {
@@ -774,7 +774,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                            "$ref": "#/definitions/skykin-platform_internal_billing_domain.SubscriptionPlan"
                         }
                     },
                     "400": {
@@ -814,7 +814,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                            "$ref": "#/definitions/skykin-platform_internal_billing_domain.SubscriptionPlan"
                         }
                     },
                     "404": {
@@ -864,7 +864,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                            "$ref": "#/definitions/skykin-platform_internal_billing_domain.SubscriptionPlan"
                         }
                     },
                     "400": {
@@ -949,7 +949,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                            "$ref": "#/definitions/skykin-platform_internal_billing_domain.SubscriptionPlan"
                         }
                     },
                     "400": {
@@ -1143,7 +1143,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
                     },
                     "400": {
@@ -1188,7 +1188,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
                     }
                 }
@@ -1219,7 +1219,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_campaigns_model.Campaign"
+                            "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
                     }
                 }
@@ -1934,7 +1934,7 @@ const docTemplate = `{
                 "plans": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/skykin-platform_internal_billing_model.SubscriptionPlan"
+                        "$ref": "#/definitions/skykin-platform_internal_billing_domain.SubscriptionPlan"
                     }
                 }
             }
@@ -2762,7 +2762,7 @@ const docTemplate = `{
                 }
             }
         },
-        "skykin-platform_internal_audience_model.AudienceSegment": {
+        "skykin-platform_internal_audience_domain.AudienceSegment": {
             "type": "object",
             "properties": {
                 "approximateSize": {
@@ -2781,7 +2781,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "estimatedCPM": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "id": {
                     "type": "string"
@@ -2795,7 +2796,7 @@ const docTemplate = `{
                 "topIntentSignals": {
                     "type": "array",
                     "items": {
-                        "type": "integer"
+                        "type": "string"
                     }
                 },
                 "updatedAt": {
@@ -2950,7 +2951,7 @@ const docTemplate = `{
                 }
             }
         },
-        "skykin-platform_internal_billing_model.BillingRate": {
+        "skykin-platform_internal_billing_domain.BillingRate": {
             "type": "object",
             "properties": {
                 "createdAt": {
@@ -2972,18 +2973,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "rateETB": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 }
             }
         },
-        "skykin-platform_internal_billing_model.SubscriptionPlan": {
+        "skykin-platform_internal_billing_domain.SubscriptionPlan": {
             "type": "object",
             "properties": {
                 "audiencemartEnabled": {
                     "type": "boolean"
                 },
                 "cpcdiscountPct": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "createdAt": {
                     "type": "string"
@@ -3001,10 +3004,12 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "maxDailyBudgetETB": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "monthlyFeeETB": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "name": {
                     "type": "string"
@@ -3014,7 +3019,7 @@ const docTemplate = `{
                 }
             }
         },
-        "skykin-platform_internal_campaigns_model.Campaign": {
+        "skykin-platform_internal_campaigns_domain.Campaign": {
             "type": "object",
             "properties": {
                 "advertiserID": {
@@ -3027,23 +3032,22 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "budgetSpent": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "canvasJSON": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object",
+                    "additionalProperties": {}
                 },
                 "channelID": {
-                    "description": "ChannelID references channels.id (IN_APP_BANNER, PUSH, SMS_PLUS, …).",
                     "type": "string"
                 },
                 "createdAt": {
                     "type": "string"
                 },
                 "dailyBudgetCap": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "destinationURL": {
                     "type": "string"
@@ -3064,14 +3068,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "moderatedBy": {
-                    "description": "portal_users.id of the operator",
                     "type": "string"
                 },
                 "moderationNotes": {
                     "type": "string"
                 },
                 "moderationStatus": {
-                    "description": "ModerationStatus is set by operator_admin (pending → approved/rejected).",
                     "type": "string"
                 },
                 "name": {
@@ -3084,7 +3086,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "segmentID": {
-                    "description": "SegmentID is optional; nil = free intent-only targeting via the targeting job.",
                     "type": "string"
                 },
                 "targetIntent": {
@@ -3094,7 +3095,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "totalBudgetCap": {
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "updatedAt": {
                     "type": "string"

@@ -6,16 +6,16 @@ import (
 	"time"
 
 	"skykin-platform/configs"
-	advertisermodel "skykin-platform/internal/ad_portal/model"
-	audiencemodel "skykin-platform/internal/audience/model"
-	authmodel "skykin-platform/internal/auth/model"
-	billingmodel "skykin-platform/internal/billing/model"
-	campaignmodel "skykin-platform/internal/campaigns/model"
-	deliverymodel "skykin-platform/internal/delivery/model"
+	adportalpersistence "skykin-platform/internal/ad_portal/infrastructure/persistence"
+	audiencepersistence "skykin-platform/internal/audience/infrastructure/persistence"
+	authpersistence "skykin-platform/internal/auth/infrastructure/persistence"
+	billingpersistence "skykin-platform/internal/billing/infrastructure/persistence"
+	campaignpersistence "skykin-platform/internal/campaigns/infrastructure/persistence"
+	deliverypersistence "skykin-platform/internal/delivery/infrastructure/persistence"
 	eventpersistence "skykin-platform/internal/events/infrastructure/persistence"
-	intentmodel "skykin-platform/internal/intents/model"
-	rewardmodel "skykin-platform/internal/rewards/model"
-	usermodel "skykin-platform/internal/users/model"
+	intentpersistence "skykin-platform/internal/intents/infrastructure/persistence"
+	rewardpersistence "skykin-platform/internal/rewards/infrastructure/persistence"
+	userpersistence "skykin-platform/internal/users/infrastructure/persistence"
 
 	"gorm.io/datatypes"
 	gormpg "gorm.io/driver/postgres"
@@ -55,29 +55,31 @@ func ConnectDB(cfg *configs.Config) (*gorm.DB, error) {
 func Migrate(db *gorm.DB) error {
 	db.Exec(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`)
 
+	alignPersistenceTimestamps(db)
+
 	if err := db.AutoMigrate(
-		&usermodel.Users{},
+		&userpersistence.UserRow{},
 		&eventpersistence.EventRecord{},
-		&intentmodel.Intent{},
-		&rewardmodel.RewardRule{},
-		&rewardmodel.Reward{},
-		&authmodel.Developer{},
-		&authmodel.Application{},
-		&authmodel.APIKey{},
-		&advertisermodel.Role{},
-		&advertisermodel.Advertiser{},
-		&advertisermodel.PortalUser{},
-		&campaignmodel.Campaign{},
-		&campaignmodel.DeliveryLog{},
-		&deliverymodel.DeliveryJob{},
-		&billingmodel.Channel{},
-		&billingmodel.SubscriptionPlan{},
-		&billingmodel.AdvertiserSubscription{},
-		&billingmodel.BillingRate{},
-		&billingmodel.BillingEvent{},
-		&billingmodel.Invoice{},
-		&audiencemodel.AudienceSegment{},
-		&audiencemodel.SegmentPurchase{},
+		&intentpersistence.IntentRow{},
+		&rewardpersistence.RewardRuleRow{},
+		&rewardpersistence.RewardRow{},
+		&authpersistence.DeveloperRow{},
+		&authpersistence.ApplicationRow{},
+		&authpersistence.APIKeyRow{},
+		&adportalpersistence.RoleRow{},
+		&adportalpersistence.AdvertiserRow{},
+		&adportalpersistence.PortalUserRow{},
+		&campaignpersistence.CampaignRow{},
+		&campaignpersistence.DeliveryLogRow{},
+		&deliverypersistence.DeliveryJobRow{},
+		&billingpersistence.ChannelRow{},
+		&billingpersistence.SubscriptionPlanRow{},
+		&billingpersistence.AdvertiserSubscriptionRow{},
+		&billingpersistence.BillingRateRow{},
+		&billingpersistence.BillingEventRow{},
+		&billingpersistence.InvoiceRow{},
+		&audiencepersistence.AudienceSegmentRow{},
+		&audiencepersistence.SegmentPurchaseRow{},
 	); err != nil {
 		return err
 	}
@@ -92,8 +94,19 @@ func Migrate(db *gorm.DB) error {
 	return nil
 }
 
+// alignPersistenceTimestamps backfills null audit columns before AutoMigrate adds NOT NULL constraints.
+func alignPersistenceTimestamps(db *gorm.DB) {
+	stmts := []string{
+		`UPDATE reward_rules SET created_at = NOW() WHERE created_at IS NULL`,
+		`UPDATE rewards SET created_at = NOW() WHERE created_at IS NULL`,
+	}
+	for _, stmt := range stmts {
+		_ = db.Exec(stmt).Error
+	}
+}
+
 func seedPortalRoles(db *gorm.DB) {
-	roles := []advertisermodel.Role{
+	roles := []adportalpersistence.RoleRow{
 		{Slug: "operator_admin", DisplayName: "Operator Admin"},
 		{Slug: "advertiser", DisplayName: "Advertiser"},
 		{Slug: "read_only_analyst", DisplayName: "Read-Only Analyst"},
@@ -105,7 +118,7 @@ func seedPortalRoles(db *gorm.DB) {
 }
 
 func seedRewardRules(db *gorm.DB) {
-	rules := []rewardmodel.RewardRule{
+	rules := []rewardpersistence.RewardRuleRow{
 		{IntentName: "fashion_interest", RewardType: "coins", Amount: 20.00, Currency: "COINS", Message: "Fashion explorer! You earned 20 Coins!", IsActive: true},
 		{IntentName: "crypto_interest", RewardType: "coins", Amount: 50.00, Currency: "COINS", Message: "Crypto enthusiast! You earned 50 Coins!", IsActive: true},
 		{IntentName: "food_interest", RewardType: "cashback", Amount: 15.00, Currency: "ETB", Message: "Foodie reward: 15 ETB cashback!", IsActive: true},
@@ -123,7 +136,7 @@ func seedRewardRules(db *gorm.DB) {
 
 // seedBillingCatalog ensures channels and subscription plans exist (idempotent).
 func seedBillingCatalog(db *gorm.DB) {
-	channels := []billingmodel.Channel{
+	channels := []billingpersistence.ChannelRow{
 		{Code: "IN_APP_BANNER", Name: "In-App Banner", Description: "Banner ads shown inside host apps"},
 		{Code: "PUSH", Name: "Push Notification", Description: "Push notification delivery"},
 		{Code: "SMS_PLUS", Name: "SMS+", Description: "Rich SMS with image and CTA", IsPremium: true},
@@ -133,7 +146,7 @@ func seedBillingCatalog(db *gorm.DB) {
 		db.Where("code = ?", ch.Code).FirstOrCreate(&ch)
 	}
 
-	plans := []billingmodel.SubscriptionPlan{
+	plans := []billingpersistence.SubscriptionPlanRow{
 		{Name: "Starter", MonthlyFeeETB: 5000, MaxActiveCampaigns: 3, MaxDailyBudgetETB: 500, IncludedImpressions: 10000},
 		{Name: "Growth", MonthlyFeeETB: 15000, MaxActiveCampaigns: 10, MaxDailyBudgetETB: 2000, IncludedImpressions: 50000, SMSPlusEnabled: true, AudiencemartEnabled: true, CPCDiscountPct: 5},
 		{Name: "Enterprise", MonthlyFeeETB: 50000, MaxActiveCampaigns: 100, MaxDailyBudgetETB: 10000, IncludedImpressions: 200000, SMSPlusEnabled: true, AudiencemartEnabled: true, CPCDiscountPct: 15},
@@ -147,40 +160,31 @@ func seedBillingCatalog(db *gorm.DB) {
 // seedAudienceSegments inserts catalog Audiencemart cohorts (idempotent by name).
 func seedAudienceSegments(db *gorm.DB) {
 	now := time.Now().UTC()
-	segments := []audiencemodel.AudienceSegment{
-		{
-			Name: "Fashion Enthusiasts", Description: "Users showing strong fashion and lifestyle purchase intent",
-			TopIntentSignals: datatypes.JSON(`["fashion_interest"]`), ApproximateSize: 12500, EstimatedCPM: 4.50,
-			AvailableFrom: now, IsActive: true,
-		},
-		{
-			Name: "Crypto & Fintech", Description: "Users interested in crypto trading and fintech products",
-			TopIntentSignals: datatypes.JSON(`["crypto_interest","fintech_interest"]`), ApproximateSize: 8200, EstimatedCPM: 6.00,
-			AvailableFrom: now, IsActive: true,
-		},
-		{
-			Name: "Food & Dining", Description: "Food delivery and restaurant discovery intent",
-			TopIntentSignals: datatypes.JSON(`["food_interest"]`), ApproximateSize: 15000, EstimatedCPM: 3.25,
-			AvailableFrom: now, IsActive: true,
-		},
-		{
-			Name: "Mobile Gamers", Description: "Gaming and in-app engagement intent",
-			TopIntentSignals: datatypes.JSON(`["gaming_interest"]`), ApproximateSize: 21000, EstimatedCPM: 2.75,
-			AvailableFrom: now, IsActive: true,
-		},
-		{
-			Name: "Lifelong Learners", Description: "Education and upskilling intent",
-			TopIntentSignals: datatypes.JSON(`["education_interest"]`), ApproximateSize: 9800, EstimatedCPM: 3.80,
-			AvailableFrom: now, IsActive: true,
-		},
-		{
-			Name: "Broad Reach", Description: "General engagement across mixed verticals",
-			TopIntentSignals: datatypes.JSON(`["general_interest","fashion_interest","food_interest"]`), ApproximateSize: 45000, EstimatedCPM: 1.50,
-			AvailableFrom: now, IsActive: true,
-		},
+	segments := []struct {
+		name        string
+		description string
+		signals     string
+		size        int
+		cpm         float64
+	}{
+		{"Fashion Enthusiasts", "Users showing strong fashion and lifestyle purchase intent", `["fashion_interest"]`, 12500, 4.50},
+		{"Crypto & Fintech", "Users interested in crypto trading and fintech products", `["crypto_interest","fintech_interest"]`, 8200, 6.00},
+		{"Food & Dining", "Food delivery and restaurant discovery intent", `["food_interest"]`, 15000, 3.25},
+		{"Mobile Gamers", "Gaming and in-app engagement intent", `["gaming_interest"]`, 21000, 2.75},
+		{"Lifelong Learners", "Education and upskilling intent", `["education_interest"]`, 9800, 3.80},
+		{"Broad Reach", "General engagement across mixed verticals", `["general_interest","fashion_interest","food_interest"]`, 45000, 1.50},
 	}
 	for _, seg := range segments {
-		db.Where("name = ?", seg.Name).FirstOrCreate(&seg)
+		row := audiencepersistence.AudienceSegmentRow{
+			Name:             seg.name,
+			Description:      seg.description,
+			TopIntentSignals: datatypes.JSON(seg.signals),
+			ApproximateSize:  seg.size,
+			EstimatedCPM:     seg.cpm,
+			AvailableFrom:    now,
+			IsActive:         true,
+		}
+		db.Where("name = ?", seg.name).FirstOrCreate(&row)
 	}
 	log.Println("audience segments seeded")
 }

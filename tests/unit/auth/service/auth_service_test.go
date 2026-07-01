@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"skykin-platform/configs"
+	"skykin-platform/internal/auth/domain"
 	dto "skykin-platform/internal/auth/dto"
-	model "skykin-platform/internal/auth/model"
 	authService "skykin-platform/internal/auth/service"
 
 	"github.com/google/uuid"
@@ -14,36 +14,34 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// MockAuthRepository manually mimics our DB layer behavior for pure logic isolation
 type MockAuthRepository struct {
-	GetDeveloperByEmailFunc        func(ctx context.Context, email string) (*model.Developer, error)
-	CreateDeveloperFunc            func(ctx context.Context, dev *model.Developer) error
-	CreateApplicationFunc          func(ctx context.Context, app *model.Application) error
-	CreateAPIKeyFunc               func(ctx context.Context, key *model.APIKey) error
-	VerifyAPIKeyFunc               func(ctx context.Context, token string) (*model.APIKey, *model.Application, error)
-	GetApplicationsByDeveloperFunc func(ctx context.Context, devID string) ([]model.Application, error)
+	GetDeveloperByEmailFunc          func(ctx context.Context, email string) (*domain.Developer, error)
+	CreateDeveloperFunc              func(ctx context.Context, dev *domain.Developer) error
+	CreateApplicationFunc            func(ctx context.Context, app *domain.Application) error
+	CreateAPIKeyFunc                 func(ctx context.Context, key *domain.APIKey) error
+	VerifyAPIKeyFunc                 func(ctx context.Context, token string) (*domain.APIKey, *domain.Application, error)
+	GetApplicationsByDeveloperFunc   func(ctx context.Context, devID string) ([]domain.Application, error)
 }
 
-func (m *MockAuthRepository) GetDeveloperByEmail(ctx context.Context, email string) (*model.Developer, error) {
+func (m *MockAuthRepository) GetDeveloperByEmail(ctx context.Context, email string) (*domain.Developer, error) {
 	return m.GetDeveloperByEmailFunc(ctx, email)
 }
-func (m *MockAuthRepository) CreateDeveloper(ctx context.Context, dev *model.Developer) error {
+func (m *MockAuthRepository) CreateDeveloper(ctx context.Context, dev *domain.Developer) error {
 	return m.CreateDeveloperFunc(ctx, dev)
 }
-func (m *MockAuthRepository) CreateApplication(ctx context.Context, app *model.Application) error {
+func (m *MockAuthRepository) CreateApplication(ctx context.Context, app *domain.Application) error {
 	return m.CreateApplicationFunc(ctx, app)
 }
-func (m *MockAuthRepository) CreateAPIKey(ctx context.Context, key *model.APIKey) error {
+func (m *MockAuthRepository) CreateAPIKey(ctx context.Context, key *domain.APIKey) error {
 	return m.CreateAPIKeyFunc(ctx, key)
 }
-func (m *MockAuthRepository) VerifyAPIKey(ctx context.Context, token string) (*model.APIKey, *model.Application, error) {
+func (m *MockAuthRepository) VerifyAPIKey(ctx context.Context, token string) (*domain.APIKey, *domain.Application, error) {
 	return m.VerifyAPIKeyFunc(ctx, token)
 }
-func (m *MockAuthRepository) GetApplicationsByDeveloper(ctx context.Context, devID string) ([]model.Application, error) {
+func (m *MockAuthRepository) GetApplicationsByDeveloper(ctx context.Context, devID string) ([]domain.Application, error) {
 	return m.GetApplicationsByDeveloperFunc(ctx, devID)
 }
 
-// TEST CASE 1: Successful Login Token Generation
 func TestLoginDeveloper_Success(t *testing.T) {
 	mockRepo := &MockAuthRepository{}
 	cfg := &configs.Config{JwtSecret: "test_secret_key"}
@@ -52,9 +50,8 @@ func TestLoginDeveloper_Success(t *testing.T) {
 	plainPassword := "securePassword123"
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(plainPassword), bcrypt.DefaultCost)
 
-	// Stub the repository to return a valid developer profile setup
-	mockRepo.GetDeveloperByEmailFunc = func(ctx context.Context, email string) (*model.Developer, error) {
-		return &model.Developer{
+	mockRepo.GetDeveloperByEmailFunc = func(ctx context.Context, email string) (*domain.Developer, error) {
+		return &domain.Developer{
 			ID:           uuid.New(),
 			Name:         "Sifen Getachew",
 			Email:        "sifen@skykin.com",
@@ -75,7 +72,6 @@ func TestLoginDeveloper_Success(t *testing.T) {
 	assert.Equal(t, "Sifen Getachew", response.Developer["name"])
 }
 
-// TEST CASE 2: Login Failure on Bad Password
 func TestLoginDeveloper_InvalidPassword(t *testing.T) {
 	mockRepo := &MockAuthRepository{}
 	cfg := &configs.Config{JwtSecret: "test_secret_key"}
@@ -83,8 +79,8 @@ func TestLoginDeveloper_InvalidPassword(t *testing.T) {
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correctPassword"), bcrypt.DefaultCost)
 
-	mockRepo.GetDeveloperByEmailFunc = func(ctx context.Context, email string) (*model.Developer, error) {
-		return &model.Developer{
+	mockRepo.GetDeveloperByEmailFunc = func(ctx context.Context, email string) (*domain.Developer, error) {
+		return &domain.Developer{
 			ID:           uuid.New(),
 			Email:        "sifen@skykin.com",
 			PasswordHash: string(hashedPassword),

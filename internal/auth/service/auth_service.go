@@ -7,8 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"skykin-platform/internal/auth/domain"
 	"skykin-platform/internal/auth/dto"
-	"skykin-platform/internal/auth/model"
 	"skykin-platform/internal/auth/repository"
 	"time"
 
@@ -21,10 +21,10 @@ import (
 )
 
 type AuthService interface {
-	RegisterDeveloper(ctx context.Context, req dto.DeveloperRegisterRequest) (*model.Developer, error)
+	RegisterDeveloper(ctx context.Context, req dto.DeveloperRegisterRequest) (*domain.Developer, error)
 	RegisterApplication(ctx context.Context, devID string, req dto.ApplicationCreateRequest) (*dto.ApplicationResponse, *dto.APIKeyCredentialResponse, error)
 	GetApplications(ctx context.Context, devID string) ([]dto.ApplicationResponse, error)
-	AuthenticateSDKKey(ctx context.Context, token string) (*model.Application, error)
+	AuthenticateSDKKey(ctx context.Context, token string) (*domain.Application, error)
 	LoginDeveloper(ctx context.Context, req dto.DeveloperLoginRequest) (*dto.LoginResponse, error)
 }
 
@@ -48,13 +48,13 @@ type mountaineerClaims struct {
 	jwt.RegisteredClaims
 }
 
-func (s *authService) RegisterDeveloper(ctx context.Context, req dto.DeveloperRegisterRequest) (*model.Developer, error) {
+func (s *authService) RegisterDeveloper(ctx context.Context, req dto.DeveloperRegisterRequest) (*domain.Developer, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process security credentials: %w", err)
 	}
 
-	dev := &model.Developer{
+	dev := &domain.Developer{
 		Name:         req.Name,
 		Email:        req.Email,
 		PasswordHash: string(hashedPassword),
@@ -72,7 +72,7 @@ func (s *authService) RegisterApplication(ctx context.Context, devID string, req
 		return nil, nil, fmt.Errorf("invalid developer id format")
 	}
 
-	app := &model.Application{
+	app := &domain.Application{
 		DeveloperID: devUUID,
 		AppName:     req.AppName,
 		Platform:    req.Platform,
@@ -84,24 +84,20 @@ func (s *authService) RegisterApplication(ctx context.Context, devID string, req
 		return nil, nil, err
 	}
 
-	// 1. Generate Plaintext Publishable Key (Used for X-API-Key header lookup)
 	pBytes := make([]byte, 20)
 	rand.Read(pBytes)
 	pubKey := fmt.Sprintf("pk_live_%s", hex.EncodeToString(pBytes))
 
-	// 2. Generate Plaintext Secret Key (Used for client-side HMAC signature computations)
 	sBytes := make([]byte, 32)
 	rand.Read(sBytes)
 	secretKey := fmt.Sprintf("sk_secret_%s", hex.EncodeToString(sBytes))
 
-	// 3. Hash BOTH keys before persisting into DB
 	hashedPubKey := hashKey(pubKey)
 	hashedSecretKey := hashKey(secretKey)
 
-	// Save the keys (adjust your api_keys table fields or save values cleanly)
-	apiKeyRecord := &model.APIKey{
+	apiKeyRecord := &domain.APIKey{
 		ApplicationID:  app.ID,
-		KeyValue:       hashedPubKey, // Persist only the SHA-256 footprint
+		KeyValue:       hashedPubKey,
 		SecretKeyValue: hashedSecretKey,
 		IsActive:       true,
 		RateLimit:      120,
@@ -110,9 +106,6 @@ func (s *authService) RegisterApplication(ctx context.Context, devID string, req
 	if err := s.repo.CreateAPIKey(ctx, apiKeyRecord); err != nil {
 		return nil, nil, err
 	}
-
-	// NOTE: You will also store the hashedSecretKey string in your app context or credentials store
-	// so the HMAC middleware can query it later to compute signatures.
 
 	return &dto.ApplicationResponse{
 			ID:        app.ID.String(),
@@ -123,12 +116,12 @@ func (s *authService) RegisterApplication(ctx context.Context, devID string, req
 			CreatedAt: app.CreatedAt,
 		}, &dto.APIKeyCredentialResponse{
 			ApplicationID:  app.ID.String(),
-			PublishableKey: pubKey,    // Plain text returned *only* now
-			RawSecretKey:   secretKey, // Plain text returned *only* now
+			PublishableKey: pubKey,
+			RawSecretKey:   secretKey,
 			RateLimit:      apiKeyRecord.RateLimit,
 		}, nil
 }
-func (s *authService) AuthenticateSDKKey(ctx context.Context, token string) (*model.Application, error) {
+func (s *authService) AuthenticateSDKKey(ctx context.Context, token string) (*domain.Application, error) {
 	key, app, err := s.repo.VerifyAPIKey(ctx, token)
 	if err != nil {
 		return nil, errors.New("invalid or revoked SDK credentials")
@@ -141,29 +134,25 @@ func (s *authService) AuthenticateSDKKey(ctx context.Context, token string) (*mo
 	return app, nil
 }
 func (s *authService) LoginDeveloper(ctx context.Context, req dto.DeveloperLoginRequest) (*dto.LoginResponse, error) {
-	// 1. Fetch the developer profile matching the email address
 	dev, err := s.repo.GetDeveloperByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, errors.New("invalid email address or account password credentials")
 	}
 
-	// 2. Perform secure bcrypt verification challenge against stored password hash
 	err = bcrypt.CompareHashAndPassword([]byte(dev.PasswordHash), []byte(req.Password))
 	if err != nil {
 		return nil, errors.New("invalid email address or account password credentials")
 	}
 
-	// 3. Create the payload Claims for the JWT
 	claims := mountaineerClaims{
 		DeveloperID: dev.ID.String(),
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Valid for 24 Hours
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
 	}
 
-	// 4. Generate and sign the token using the secret signature key
 	tokenPayload := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedToken, err := tokenPayload.SignedString([]byte(s.cfg.JwtSecret))
 	if err != nil {

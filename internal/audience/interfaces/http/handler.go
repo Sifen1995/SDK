@@ -54,15 +54,8 @@ func (h *Handler) GetSegment(c *gin.Context) {
 	seg, err := h.list.GetForAdvertiser(c.Request.Context(), aid.(string), c.Param("segment_id"))
 	if err != nil {
 		status := http.StatusForbidden
-		switch err.Error() {
-		case "segment not found":
+		if err.Error() == "segment not found" {
 			status = http.StatusNotFound
-		case "audiencemart not enabled on current plan":
-			status = http.StatusForbidden
-		default:
-			if err.Error() == "no active subscription; subscribe to a plan first" {
-				status = http.StatusForbidden
-			}
 		}
 		platformHTTP.Error(c, status, "get segment failed", err.Error())
 		return

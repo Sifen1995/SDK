@@ -7,7 +7,6 @@ import (
 	"time"
 
 	billingdomain "skykin-platform/internal/billing/domain"
-	"skykin-platform/internal/billing/model"
 
 	"gorm.io/gorm"
 )
@@ -122,7 +121,7 @@ func (s *SubscriptionService) Subscribe(ctx context.Context, advertiserID, planI
 	}
 
 	start, end := billingdomain.SubscriptionPeriod(time.Now())
-	sub := &model.AdvertiserSubscription{
+	sub := &billingdomain.AdvertiserSubscription{
 		AdvertiserID:       advertiserID,
 		PlanID:             plan.ID,
 		Status:             "active",
@@ -137,7 +136,7 @@ func (s *SubscriptionService) Subscribe(ctx context.Context, advertiserID, planI
 	return &dto, nil
 }
 
-func toPlanDTO(p *model.SubscriptionPlan) PlanDTO {
+func toPlanDTO(p *billingdomain.SubscriptionPlan) PlanDTO {
 	return PlanDTO{
 		ID:                  p.ID,
 		Name:                p.Name,
@@ -151,7 +150,7 @@ func toPlanDTO(p *model.SubscriptionPlan) PlanDTO {
 	}
 }
 
-func toSubscriptionDTO(sub *model.AdvertiserSubscription) SubscriptionDTO {
+func toSubscriptionDTO(sub *billingdomain.AdvertiserSubscription) SubscriptionDTO {
 	return SubscriptionDTO{
 		ID:                 sub.ID,
 		Plan:               toPlanDTO(&sub.Plan),

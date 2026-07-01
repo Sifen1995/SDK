@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -15,10 +14,7 @@ import (
 	campaignvalidation "skykin-platform/internal/campaigns/validation"
 	campaignEvents "skykin-platform/internal/campaigns/events"
 	"skykin-platform/internal/campaigns/infrastructure"
-	"skykin-platform/internal/campaigns/model"
 	"skykin-platform/internal/platform/messaging"
-
-	"gorm.io/datatypes"
 )
 
 // CampaignService orchestrates campaign CRUD with subscription and audience checks.
@@ -47,7 +43,7 @@ func NewCampaignService(
 }
 
 // Create validates subscription entitlements, campaign fields, and optionally records a segment purchase.
-func (s *CampaignService) Create(ctx context.Context, advertiserID, role string, cmd CreateCampaignCommand) (*model.Campaign, error) {
+func (s *CampaignService) Create(ctx context.Context, advertiserID, role string, cmd CreateCampaignCommand) (*campaigndomain.Campaign, error) {
 	if !adportaldomain.CanWrite(role) {
 		return nil, errors.New("forbidden")
 	}
@@ -81,10 +77,9 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 		}
 	}
 
-	canvas := datatypes.JSON([]byte("{}"))
+	canvas := map[string]any{}
 	if cmd.CanvasJSON != nil {
-		raw, _ := json.Marshal(cmd.CanvasJSON)
-		canvas = datatypes.JSON(raw)
+		canvas = cmd.CanvasJSON
 	}
 
 	segmentID := cmd.SegmentID
@@ -92,7 +87,7 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 		segmentID = nil
 	}
 
-	c := &model.Campaign{
+	c := &campaigndomain.Campaign{
 		AdvertiserID:       advertiserID,
 		Name:               cmd.Name,
 		TargetIntent:       cmd.TargetIntent,
@@ -142,7 +137,7 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 	return c, nil
 }
 
-func (s *CampaignService) List(ctx context.Context, advertiserID, role string) ([]model.Campaign, error) {
+func (s *CampaignService) List(ctx context.Context, advertiserID, role string) ([]campaigndomain.Campaign, error) {
 	if !adportaldomain.CanRead(role) {
 		return nil, errors.New("forbidden")
 	}
@@ -152,7 +147,7 @@ func (s *CampaignService) List(ctx context.Context, advertiserID, role string) (
 	return s.repo.ListByAdvertiser(ctx, advertiserID)
 }
 
-func (s *CampaignService) Get(ctx context.Context, advertiserID, role, id string) (*model.Campaign, error) {
+func (s *CampaignService) Get(ctx context.Context, advertiserID, role, id string) (*campaigndomain.Campaign, error) {
 	if !adportaldomain.CanRead(role) {
 		return nil, errors.New("forbidden")
 	}
@@ -166,7 +161,7 @@ func (s *CampaignService) Get(ctx context.Context, advertiserID, role, id string
 	return c, nil
 }
 
-func (s *CampaignService) Activate(ctx context.Context, advertiserID, role, id string) (*model.Campaign, error) {
+func (s *CampaignService) Activate(ctx context.Context, advertiserID, role, id string) (*campaigndomain.Campaign, error) {
 	if !adportaldomain.CanWrite(role) {
 		return nil, errors.New("forbidden")
 	}

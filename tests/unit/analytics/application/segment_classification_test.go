@@ -12,7 +12,6 @@ import (
 	analyticsdomain "skykin-platform/internal/analytics/domain"
 	audienceApp "skykin-platform/internal/audience/application"
 	audiencedomain "skykin-platform/internal/audience/domain"
-	"skykin-platform/internal/audience/model"
 	"skykin-platform/internal/platform/messaging"
 
 	"github.com/google/uuid"
@@ -111,10 +110,10 @@ func (m *mockMembershipRepo) FindUsersInSegment(context.Context, uuid.UUID) ([]u
 }
 
 type mockCatalog struct {
-	segment *model.AudienceSegment
+	segment *audiencedomain.AudienceSegment
 }
 
-func (m *mockCatalog) CreateSegment(_ context.Context, cmd audienceApp.CreateSegmentCmd) (*model.AudienceSegment, error) {
+func (m *mockCatalog) CreateSegment(_ context.Context, cmd audienceApp.CreateSegmentCmd) (*audiencedomain.AudienceSegment, error) {
 	return m.segment, nil
 }
 

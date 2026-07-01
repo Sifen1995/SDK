@@ -3,7 +3,7 @@ package http
 import (
 	"time"
 
-	billingmodel "skykin-platform/internal/billing/model"
+	billingdomain "skykin-platform/internal/billing/domain"
 )
 
 // ValidateCampaignRequest is the operator approve/reject payload.
@@ -69,6 +69,6 @@ type BillingRateListResponse struct {
 
 // AdminPlanListResponse wraps all subscription plans for operator admin.
 type AdminPlanListResponse struct {
-	Plans []billingmodel.SubscriptionPlan `json:"plans"`
+	Plans []billingdomain.SubscriptionPlan `json:"plans"`
 	Count int                             `json:"count"`
 }

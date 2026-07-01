@@ -4,10 +4,10 @@ import (
 	"context"
 
 	campaignApp "skykin-platform/internal/campaigns/application"
-	"skykin-platform/internal/delivery/model"
+	"skykin-platform/internal/delivery/infrastructure/persistence"
+	userpersistence "skykin-platform/internal/users/infrastructure/persistence"
 	"skykin-platform/internal/platform/messaging"
 	platformWS "skykin-platform/internal/platform/websocket"
-	usermodel "skykin-platform/internal/users/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -43,11 +43,11 @@ func (c *DispatchConsumer) handle(e messaging.Event) {
 		ctx = context.Background()
 	}
 	campaignID, _ := payload["campaign_id"].(uuid.UUID)
-	_ = c.db.WithContext(ctx).Create(&model.DeliveryJob{
+	_ = c.db.WithContext(ctx).Create(&persistence.DeliveryJobRow{
 		UserID: userID.String(), CampaignID: campaignID.String(),
 	}).Error
 
-	var user usermodel.Users
+	var user userpersistence.UserRow
 	if err := c.db.WithContext(ctx).Where("id = ?", userID.String()).First(&user).Error; err != nil {
 		return
 	}

@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,10 +9,8 @@ import (
 
 	adminEvents "skykin-platform/internal/admin/events"
 	"skykin-platform/internal/audience/domain"
-	"skykin-platform/internal/audience/model"
 
 	"github.com/google/uuid"
-	"gorm.io/datatypes"
 )
 
 // ProcessApprovedCandidateUseCase materializes an audience segment from an approved candidate.
@@ -62,16 +59,11 @@ func (uc *ProcessApprovedCandidateUseCase) Execute(ctx context.Context, evt admi
 		userCount = candidate.UserCount
 	}
 
-	signalsJSON, err := json.Marshal([]string{intentName})
-	if err != nil {
-		return fmt.Errorf("marshal intent signals: %w", err)
-	}
-
-	seg := &model.AudienceSegment{
+	seg := &domain.AudienceSegment{
 		ID:               uuid.New().String(),
 		Name:             evt.Name,
 		Description:      evt.Description,
-		TopIntentSignals: datatypes.JSON(signalsJSON),
+		TopIntentSignals: []string{intentName},
 		ApproximateSize:  userCount,
 		EstimatedCPM:     evt.EstimatedCPM,
 		AvailableFrom:    time.Now().UTC(),

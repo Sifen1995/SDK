@@ -12,7 +12,7 @@ import (
 
 // Module wires audience dependencies for the ad portal.
 type Module struct {
-	Segments *audienceApp.ListService
+	Segments  *audienceApp.ListService
 	Purchases *audienceApp.PurchaseService
 	Handler   *audienceHTTP.Handler
 }

@@ -44,7 +44,7 @@ func (h *CampaignHandler) ListPendingCampaigns(c *gin.Context) {
 // @Security     BearerAuth
 // @Param        id    path  string                 true  "Campaign ID"
 // @Param        body  body  ValidateCampaignRequest  true  "approve or reject"
-// @Success      200   {object}  skykin-platform_internal_campaigns_model.Campaign
+// @Success      200   {object}  skykin-platform_internal_campaigns_domain.Campaign
 // @Failure      400   {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/campaigns/{id}/validate [post]
 func (h *CampaignHandler) ValidateCampaign(c *gin.Context) {
@@ -69,7 +69,7 @@ func (h *CampaignHandler) ValidateCampaign(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id   path  string  true  "Campaign ID"
-// @Success      200  {object}  skykin-platform_internal_campaigns_model.Campaign
+// @Success      200  {object}  skykin-platform_internal_campaigns_domain.Campaign
 // @Failure      400  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/campaigns/{id}/activate [post]
 func (h *CampaignHandler) ActivateCampaign(c *gin.Context) {

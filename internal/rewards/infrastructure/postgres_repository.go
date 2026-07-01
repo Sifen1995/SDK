@@ -5,49 +5,45 @@ import (
 	"fmt"
 	"sync"
 
-	"skykin-platform/internal/rewards/model"
+	rewardsdomain "skykin-platform/internal/rewards/domain"
+	"skykin-platform/internal/rewards/infrastructure/persistence"
 
 	"gorm.io/gorm"
 )
 
-type RewardRepository interface {
-	GetRuleByIntent(ctx context.Context, intent string) (*model.RewardRule, error)
-	CreateReward(ctx context.Context, reward *model.Reward) error
-	RefreshRules(ctx context.Context) error
-}
-
 type postgresRewardRepository struct {
 	db    *gorm.DB
-	rules map[string]model.RewardRule
+	rules map[string]rewardsdomain.RewardRule
 	mu    sync.RWMutex
 }
 
-func NewRewardRepository(db *gorm.DB) RewardRepository {
+func NewRewardRepository(db *gorm.DB) rewardsdomain.RewardRepository {
 	repo := &postgresRewardRepository{
 		db:    db,
-		rules: make(map[string]model.RewardRule),
+		rules: make(map[string]rewardsdomain.RewardRule),
 	}
 	_ = repo.RefreshRules(context.Background())
 	return repo
 }
 
 func (r *postgresRewardRepository) RefreshRules(ctx context.Context) error {
-	var activeRules []model.RewardRule
-	if err := r.db.WithContext(ctx).Where("is_active = ?", true).Find(&activeRules).Error; err != nil {
+	var rows []persistence.RewardRuleRow
+	if err := r.db.WithContext(ctx).Where("is_active = ?", true).Find(&rows).Error; err != nil {
 		return err
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.rules = make(map[string]model.RewardRule)
-	for _, rule := range activeRules {
+	r.rules = make(map[string]rewardsdomain.RewardRule)
+	for _, row := range rows {
+		rule := *row.ToDomain()
 		r.rules[rule.IntentName] = rule
 	}
 	return nil
 }
 
-func (r *postgresRewardRepository) GetRuleByIntent(ctx context.Context, intent string) (*model.RewardRule, error) {
+func (r *postgresRewardRepository) GetRuleByIntent(ctx context.Context, intent string) (*rewardsdomain.RewardRule, error) {
 	r.mu.RLock()
 	rule, exists := r.rules[intent]
 	r.mu.RUnlock()
@@ -58,6 +54,11 @@ func (r *postgresRewardRepository) GetRuleByIntent(ctx context.Context, intent s
 	return &rule, nil
 }
 
-func (r *postgresRewardRepository) CreateReward(ctx context.Context, reward *model.Reward) error {
-	return r.db.WithContext(ctx).Create(reward).Error
+func (r *postgresRewardRepository) CreateReward(ctx context.Context, reward *rewardsdomain.Reward) error {
+	row := persistence.RewardRowFromDomain(reward)
+	if err := r.db.WithContext(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	*reward = *row.ToDomain()
+	return nil
 }

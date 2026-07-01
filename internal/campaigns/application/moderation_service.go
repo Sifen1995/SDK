@@ -11,7 +11,6 @@ import (
 	campaignvalidation "skykin-platform/internal/campaigns/validation"
 	billingdomain "skykin-platform/internal/billing/domain"
 	"skykin-platform/internal/campaigns/infrastructure"
-	"skykin-platform/internal/campaigns/model"
 	"skykin-platform/internal/platform/messaging"
 )
 
@@ -30,11 +29,11 @@ func NewModerationService(
 	return &ModerationService{repo: repo, channels: channels, bus: bus}
 }
 
-func (s *ModerationService) ListPending(ctx context.Context) ([]model.Campaign, error) {
+func (s *ModerationService) ListPending(ctx context.Context) ([]campaigndomain.Campaign, error) {
 	return s.repo.ListPendingModeration(ctx)
 }
 
-func (s *ModerationService) Validate(ctx context.Context, campaignID, operatorUserID, action, notes string) (*model.Campaign, error) {
+func (s *ModerationService) Validate(ctx context.Context, campaignID, operatorUserID, action, notes string) (*campaigndomain.Campaign, error) {
 	c, err := s.repo.Get(ctx, campaignID)
 	if err != nil {
 		return nil, errors.New("campaign not found")
@@ -112,7 +111,7 @@ func (s *ModerationService) Validate(ctx context.Context, campaignID, operatorUs
 	return c, nil
 }
 
-func (s *ModerationService) Activate(ctx context.Context, campaignID, operatorUserID string) (*model.Campaign, error) {
+func (s *ModerationService) Activate(ctx context.Context, campaignID, operatorUserID string) (*campaigndomain.Campaign, error) {
 	c, err := s.repo.Get(ctx, campaignID)
 	if err != nil {
 		return nil, errors.New("campaign not found")

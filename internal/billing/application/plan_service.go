@@ -8,7 +8,6 @@ import (
 
 	billingdomain "skykin-platform/internal/billing/domain"
 	billingvalidation "skykin-platform/internal/billing/validation"
-	"skykin-platform/internal/billing/model"
 	adminEvents "skykin-platform/internal/admin/events"
 	"skykin-platform/internal/platform/messaging"
 
@@ -52,7 +51,7 @@ func NewPlanService(plans billingdomain.SubscriptionRepository, bus *messaging.B
 }
 
 // CreatePlan creates a subscription plan and publishes an event for default rate seeding.
-func (s *PlanService) CreatePlan(ctx context.Context, cmd CreatePlanCmd) (*model.SubscriptionPlan, error) {
+func (s *PlanService) CreatePlan(ctx context.Context, cmd CreatePlanCmd) (*billingdomain.SubscriptionPlan, error) {
 	if err := billingvalidation.ValidatePlanFields(billingvalidation.PlanFieldsInput{
 		Name:                cmd.Name,
 		MonthlyFeeETB:       cmd.MonthlyFeeETB,
@@ -69,7 +68,7 @@ func (s *PlanService) CreatePlan(ctx context.Context, cmd CreatePlanCmd) (*model
 		return nil, err
 	}
 
-	plan := &model.SubscriptionPlan{
+	plan := &billingdomain.SubscriptionPlan{
 		Name:                strings.TrimSpace(cmd.Name),
 		MonthlyFeeETB:       cmd.MonthlyFeeETB,
 		MaxActiveCampaigns:  cmd.MaxActiveCampaigns,
@@ -96,7 +95,7 @@ func (s *PlanService) CreatePlan(ctx context.Context, cmd CreatePlanCmd) (*model
 }
 
 // GetPlanByID returns any plan by id (including inactive) for operator admin.
-func (s *PlanService) GetPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error) {
+func (s *PlanService) GetPlanByID(ctx context.Context, planID string) (*billingdomain.SubscriptionPlan, error) {
 	if err := billingvalidation.ValidatePlanID(planID); err != nil {
 		return nil, err
 	}
@@ -111,12 +110,12 @@ func (s *PlanService) GetPlanByID(ctx context.Context, planID string) (*model.Su
 }
 
 // ListAllPlans returns every subscription plan for operator admin (active and inactive).
-func (s *PlanService) ListAllPlans(ctx context.Context) ([]model.SubscriptionPlan, error) {
+func (s *PlanService) ListAllPlans(ctx context.Context) ([]billingdomain.SubscriptionPlan, error) {
 	return s.plans.ListAllPlans(ctx)
 }
 
 // SuspendPlan deactivates an active subscription plan so it is hidden from advertisers.
-func (s *PlanService) SuspendPlan(ctx context.Context, planID string) (*model.SubscriptionPlan, error) {
+func (s *PlanService) SuspendPlan(ctx context.Context, planID string) (*billingdomain.SubscriptionPlan, error) {
 	if err := billingvalidation.ValidatePlanID(planID); err != nil {
 		return nil, err
 	}
@@ -138,7 +137,7 @@ func (s *PlanService) SuspendPlan(ctx context.Context, planID string) (*model.Su
 }
 
 // UpdatePlan updates mutable plan fields for operator admin.
-func (s *PlanService) UpdatePlan(ctx context.Context, cmd UpdatePlanCmd) (*model.SubscriptionPlan, error) {
+func (s *PlanService) UpdatePlan(ctx context.Context, cmd UpdatePlanCmd) (*billingdomain.SubscriptionPlan, error) {
 	if err := billingvalidation.ValidatePlanID(cmd.PlanID); err != nil {
 		return nil, err
 	}

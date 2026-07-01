@@ -7,7 +7,7 @@ import (
 	"skykin-platform/configs"
 	analyticsdomain "skykin-platform/internal/analytics/domain"
 	intentdomain "skykin-platform/internal/intents/domain"
-	"skykin-platform/internal/intents/model"
+	"skykin-platform/internal/intents/infrastructure/persistence"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -22,11 +22,12 @@ func NewIntentRepository(db *gorm.DB, cfg *configs.Config) intentdomain.IntentRe
 	return &intentRepository{db: db, config: cfg}
 }
 
-func (r *intentRepository) Create(ctx context.Context, intent *model.Intent) (*model.Intent, error) {
-	if err := r.db.WithContext(ctx).Create(intent).Error; err != nil {
+func (r *intentRepository) Create(ctx context.Context, intent *intentdomain.Intent) (*intentdomain.Intent, error) {
+	row := persistence.IntentRowFromDomain(intent)
+	if err := r.db.WithContext(ctx).Create(row).Error; err != nil {
 		return nil, err
 	}
-	return intent, nil
+	return row.ToDomain(), nil
 }
 
 func (r *intentRepository) FindUsersWithIntent(

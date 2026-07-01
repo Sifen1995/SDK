@@ -13,7 +13,6 @@ import (
 	intentdomain "skykin-platform/internal/intents/domain"
 	intentEvents "skykin-platform/internal/intents/events"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
-	intentModel "skykin-platform/internal/intents/model"
 	"skykin-platform/internal/platform/messaging"
 	platformredis "skykin-platform/internal/platform/redis"
 	campaignApp "skykin-platform/internal/campaigns/application"
@@ -139,7 +138,7 @@ func (uc *PredictIntentUseCase) Execute(ctx context.Context, externalUserID stri
 		return nil, fmt.Errorf("resolve user: %w", err)
 	}
 
-	intent, err := uc.intentRepo.Create(ctx, &intentModel.Intent{
+	intent, err := uc.intentRepo.Create(ctx, &intentdomain.Intent{
 		UserID:     user.ID,
 		IntentName: mlResult.Intent,
 		Confidence: mlResult.Confidence,

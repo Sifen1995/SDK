@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	campaigndomain "skykin-platform/internal/campaigns/domain"
 	"skykin-platform/internal/campaigns/infrastructure"
-	"skykin-platform/internal/campaigns/model"
 )
 
 // AdDeliveryService builds WebSocket ad payloads for matched intents.
@@ -50,10 +50,10 @@ func (s *AdDeliveryService) BuildAdForIntent(ctx context.Context, intent string)
 }
 
 func (s *AdDeliveryService) LogDispatched(ctx context.Context, campaignID, userID, sessionID string) error {
-	return s.repo.LogDelivery(ctx, &model.DeliveryLog{
+	return s.repo.LogDelivery(ctx, &campaigndomain.DeliveryLog{
 		CampaignID:     campaignID,
 		UserID:         userID,
 		SessionID:      sessionID,
-		DeliveryStatus: model.DeliveryDispatched,
+		DeliveryStatus: campaigndomain.DeliveryDispatched,
 	})
 }

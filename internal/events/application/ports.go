@@ -3,7 +3,7 @@ package application
 import (
 	"context"
 
-	"skykin-platform/internal/users/model"
+	"skykin-platform/internal/users/domain"
 )
 
 // DedupStore prevents duplicate event ingestion within a TTL window.
@@ -18,5 +18,5 @@ type EventPublisher interface {
 
 // UserResolver resolves SDK external user IDs to internal UUIDs.
 type UserResolver interface {
-	FindOrCreate(ctx context.Context, externalUserID string) (*model.Users, error)
+	FindOrCreate(ctx context.Context, externalUserID string) (*domain.User, error)
 }

@@ -3,42 +3,40 @@ package domain
 import (
 	"context"
 	"time"
-
-	"skykin-platform/internal/billing/model"
 )
 
 // SubscriptionContext is returned after a successful subscription gate check.
 type SubscriptionContext struct {
 	SubscriptionID string
-	Plan           model.SubscriptionPlan
+	Plan           SubscriptionPlan
 }
 
 // SubscriptionRepository loads advertiser plans and manages subscriptions.
 type SubscriptionRepository interface {
-	GetActiveByAdvertiser(ctx context.Context, advertiserID string) (*model.AdvertiserSubscription, error)
-	GetPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error)
-	FindPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error)
-	GetPlanByName(ctx context.Context, name string) (*model.SubscriptionPlan, error)
-	FindPlanByName(ctx context.Context, name string) (*model.SubscriptionPlan, error)
-	ListActivePlans(ctx context.Context) ([]model.SubscriptionPlan, error)
-	ListAllPlans(ctx context.Context) ([]model.SubscriptionPlan, error)
-	CreatePlan(ctx context.Context, plan *model.SubscriptionPlan) error
-	UpdatePlan(ctx context.Context, plan *model.SubscriptionPlan) error
-	CreateSubscription(ctx context.Context, sub *model.AdvertiserSubscription) error
+	GetActiveByAdvertiser(ctx context.Context, advertiserID string) (*AdvertiserSubscription, error)
+	GetPlanByID(ctx context.Context, planID string) (*SubscriptionPlan, error)
+	FindPlanByID(ctx context.Context, planID string) (*SubscriptionPlan, error)
+	GetPlanByName(ctx context.Context, name string) (*SubscriptionPlan, error)
+	FindPlanByName(ctx context.Context, name string) (*SubscriptionPlan, error)
+	ListActivePlans(ctx context.Context) ([]SubscriptionPlan, error)
+	ListAllPlans(ctx context.Context) ([]SubscriptionPlan, error)
+	CreatePlan(ctx context.Context, plan *SubscriptionPlan) error
+	UpdatePlan(ctx context.Context, plan *SubscriptionPlan) error
+	CreateSubscription(ctx context.Context, sub *AdvertiserSubscription) error
 }
 
 // BillingRateRepository manages per-plan usage rates.
 type BillingRateRepository interface {
-	ListByPlanID(ctx context.Context, planID string) ([]model.BillingRate, error)
-	GetByID(ctx context.Context, id string) (*model.BillingRate, error)
-	UpdateRate(ctx context.Context, id string, rateETB float64, isActive bool) (*model.BillingRate, error)
-	CreateBatch(ctx context.Context, rates []model.BillingRate) error
+	ListByPlanID(ctx context.Context, planID string) ([]BillingRate, error)
+	GetByID(ctx context.Context, id string) (*BillingRate, error)
+	UpdateRate(ctx context.Context, id string, rateETB float64, isActive bool) (*BillingRate, error)
+	CreateBatch(ctx context.Context, rates []BillingRate) error
 }
 
 // ChannelRepository loads delivery channels for entitlement checks.
 type ChannelRepository interface {
-	GetByID(ctx context.Context, id string) (*model.Channel, error)
-	ListActive(ctx context.Context) ([]model.Channel, error)
+	GetByID(ctx context.Context, id string) (*Channel, error)
+	ListActive(ctx context.Context) ([]Channel, error)
 }
 
 // CampaignQuotaReader counts campaigns for plan limit enforcement.

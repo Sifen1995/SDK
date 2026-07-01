@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,10 +9,8 @@ import (
 
 	audiencedomain "skykin-platform/internal/audience/domain"
 	audiencevalidation "skykin-platform/internal/audience/validation"
-	"skykin-platform/internal/audience/model"
 	billingdomain "skykin-platform/internal/billing/domain"
 
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -126,7 +123,7 @@ func (s *ListService) GetForAdvertiser(ctx context.Context, advertiserID, segmen
 }
 
 // GetForAdmin returns any catalog segment by id for operator review.
-func (s *ListService) GetForAdmin(ctx context.Context, segmentID string) (*model.AudienceSegment, error) {
+func (s *ListService) GetForAdmin(ctx context.Context, segmentID string) (*audiencedomain.AudienceSegment, error) {
 	if err := audiencevalidation.ValidateSegmentID(segmentID); err != nil {
 		return nil, err
 	}
@@ -141,7 +138,7 @@ func (s *ListService) GetForAdmin(ctx context.Context, segmentID string) (*model
 }
 
 // CreateSegment adds a new Audiencemart catalog segment.
-func (s *ListService) CreateSegment(ctx context.Context, cmd CreateSegmentCmd) (*model.AudienceSegment, error) {
+func (s *ListService) CreateSegment(ctx context.Context, cmd CreateSegmentCmd) (*audiencedomain.AudienceSegment, error) {
 	if err := audiencevalidation.ValidateCreateSegment(audiencevalidation.CreateSegmentInput{
 		Name:             cmd.Name,
 		TopIntentSignals: cmd.TopIntentSignals,
@@ -156,20 +153,15 @@ func (s *ListService) CreateSegment(ctx context.Context, cmd CreateSegmentCmd) (
 		return nil, err
 	}
 
-	signalsJSON, err := json.Marshal(cmd.TopIntentSignals)
-	if err != nil {
-		return nil, fmt.Errorf("invalid intent signals: %w", err)
-	}
-
 	availableFrom := time.Now().UTC()
 	if cmd.AvailableFrom != nil {
 		availableFrom = cmd.AvailableFrom.UTC()
 	}
 
-	seg := &model.AudienceSegment{
+	seg := &audiencedomain.AudienceSegment{
 		Name:             strings.TrimSpace(cmd.Name),
 		Description:      strings.TrimSpace(cmd.Description),
-		TopIntentSignals: datatypes.JSON(signalsJSON),
+		TopIntentSignals: cmd.TopIntentSignals,
 		ApproximateSize:  cmd.ApproximateSize,
 		EstimatedCPM:     cmd.EstimatedCPM,
 		AvailableFrom:    availableFrom,
@@ -183,7 +175,7 @@ func (s *ListService) CreateSegment(ctx context.Context, cmd CreateSegmentCmd) (
 }
 
 // SuspendSegment deactivates an active catalog segment so it is hidden from advertisers.
-func (s *ListService) SuspendSegment(ctx context.Context, segmentID string) (*model.AudienceSegment, error) {
+func (s *ListService) SuspendSegment(ctx context.Context, segmentID string) (*audiencedomain.AudienceSegment, error) {
 	if err := audiencevalidation.ValidateSegmentID(segmentID); err != nil {
 		return nil, err
 	}
@@ -204,7 +196,7 @@ func (s *ListService) SuspendSegment(ctx context.Context, segmentID string) (*mo
 	return seg, nil
 }
 
-func isSegmentAvailable(seg *model.AudienceSegment, now time.Time) bool {
+func isSegmentAvailable(seg *audiencedomain.AudienceSegment, now time.Time) bool {
 	if !seg.IsActive || seg.AvailableFrom.After(now) {
 		return false
 	}
@@ -214,15 +206,13 @@ func isSegmentAvailable(seg *model.AudienceSegment, now time.Time) bool {
 	return true
 }
 
-func toSegmentDTO(seg *model.AudienceSegment, purchasable bool) SegmentDTO {
-	var signals []string
-	_ = json.Unmarshal(seg.TopIntentSignals, &signals)
+func toSegmentDTO(seg *audiencedomain.AudienceSegment, purchasable bool) SegmentDTO {
 	price := seg.EstimatedCPM * float64(impressionBundle) / 1000.0
 	return SegmentDTO{
 		ID:               seg.ID,
 		Name:             seg.Name,
 		Description:      seg.Description,
-		TopIntentSignals: signals,
+		TopIntentSignals: seg.TopIntentSignals,
 		ApproximateSize:  seg.ApproximateSize,
 		EstimatedCPM:     seg.EstimatedCPM,
 		EstimatedPrice:   price,

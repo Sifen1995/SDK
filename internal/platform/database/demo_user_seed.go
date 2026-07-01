@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	intentmodel "skykin-platform/internal/intents/model"
-	usermodel "skykin-platform/internal/users/model"
+	intentpersistence "skykin-platform/internal/intents/infrastructure/persistence"
+	userpersistence "skykin-platform/internal/users/infrastructure/persistence"
 
 	"gorm.io/gorm"
 )
@@ -37,9 +37,9 @@ func seedFashionCohort(db *gorm.DB) {
 			extID = fmt.Sprintf("demo-fashion-user-%02d", i+1)
 		}
 		phone := phones[i]
-		user := usermodel.Users{ExternalUserID: extID, PhoneNumber: &phone}
+		user := userpersistence.UserRow{ExternalUserID: extID, PhoneNumber: &phone}
 		if err := db.Where("external_user_id = ?", extID).
-			Attrs(usermodel.Users{PhoneNumber: &phone}).
+			Attrs(userpersistence.UserRow{PhoneNumber: &phone}).
 			FirstOrCreate(&user).Error; err != nil {
 			log.Printf("demo fashion user seed (non-fatal): %v", err)
 			continue
@@ -52,18 +52,17 @@ func seedFashionCohort(db *gorm.DB) {
 
 func seedFashionIntentsForUser(db *gorm.DB, userID string, now time.Time, offset int) {
 	var existing int64
-	db.Model(&intentmodel.Intent{}).
+	db.Model(&intentpersistence.IntentRow{}).
 		Where("user_id = ? AND intent_name = ?", userID, "fashion_interest").
 		Count(&existing)
 	if existing >= 6 {
 		return
 	}
 
-	// 6 distinct days within lookback; last activity 1–3 days ago (within max_age_days=7).
-	confidence := 0.82 + float64(offset%5)*0.02 // 0.82 – 0.90
+	confidence := 0.82 + float64(offset%5)*0.02
 	for day := 1; day <= 6; day++ {
 		createdAt := now.AddDate(0, 0, -(day + offset%3)).Truncate(24 * time.Hour).Add(time.Duration(9+day) * time.Hour)
-		if err := db.Create(&intentmodel.Intent{
+		if err := db.Create(&intentpersistence.IntentRow{
 			UserID: userID, IntentName: "fashion_interest",
 			Confidence: confidence, CreatedAt: createdAt,
 		}).Error; err != nil {

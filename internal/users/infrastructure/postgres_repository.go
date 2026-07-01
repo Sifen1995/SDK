@@ -3,31 +3,28 @@ package infrastructure
 import (
 	"context"
 
-	"skykin-platform/internal/users/model"
+	"skykin-platform/internal/users/domain"
+	"skykin-platform/internal/users/infrastructure/persistence"
 
 	"gorm.io/gorm"
 )
-
-type UserRepository interface {
-	FindOrCreate(ctx context.Context, externalUserID string) (*model.Users, error)
-}
 
 type postgresUserRepository struct {
 	db *gorm.DB
 }
 
-func NewUserRepository(db *gorm.DB) UserRepository {
+func NewUserRepository(db *gorm.DB) domain.UserRepository {
 	return &postgresUserRepository{db: db}
 }
 
-func (r *postgresUserRepository) FindOrCreate(ctx context.Context, externalUserID string) (*model.Users, error) {
-	var user model.Users
+func (r *postgresUserRepository) FindOrCreate(ctx context.Context, externalUserID string) (*domain.User, error) {
+	var row persistence.UserRow
 	err := r.db.WithContext(ctx).
 		Where("external_user_id = ?", externalUserID).
-		FirstOrCreate(&user, model.Users{ExternalUserID: externalUserID}).
+		FirstOrCreate(&row, persistence.UserRow{ExternalUserID: externalUserID}).
 		Error
 	if err != nil {
 		return nil, err
 	}
-	return &user, nil
+	return row.ToDomain(), nil
 }

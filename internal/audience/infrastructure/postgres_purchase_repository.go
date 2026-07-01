@@ -5,7 +5,7 @@ import (
 	"time"
 
 	audiencedomain "skykin-platform/internal/audience/domain"
-	"skykin-platform/internal/audience/model"
+	"skykin-platform/internal/audience/infrastructure/persistence"
 
 	"gorm.io/gorm"
 )
@@ -21,17 +21,23 @@ func NewPurchaseRepository(db *gorm.DB) *PurchaseRepository {
 var _ audiencedomain.PurchaseRepository = (*PurchaseRepository)(nil)
 
 // GetValidForCampaign returns an active segment purchase for the campaign, if any.
-func (r *PurchaseRepository) GetValidForCampaign(ctx context.Context, campaignID string, now time.Time) (*model.SegmentPurchase, error) {
-	var purchase model.SegmentPurchase
+func (r *PurchaseRepository) GetValidForCampaign(ctx context.Context, campaignID string, now time.Time) (*audiencedomain.SegmentPurchase, error) {
+	var row persistence.SegmentPurchaseRow
 	err := r.db.WithContext(ctx).
 		Where("campaign_id = ? AND valid_from <= ? AND valid_until >= ?", campaignID, now, now).
-		First(&purchase).Error
+		First(&row).Error
 	if err != nil {
 		return nil, err
 	}
-	return &purchase, nil
+	return row.ToDomain(), nil
 }
 
-func (r *PurchaseRepository) CreatePurchase(ctx context.Context, purchase *model.SegmentPurchase) error {
-	return r.db.WithContext(ctx).Create(purchase).Error
+func (r *PurchaseRepository) CreatePurchase(ctx context.Context, purchase *audiencedomain.SegmentPurchase) error {
+	row := persistence.SegmentPurchaseRowFromDomain(purchase)
+	if err := r.db.WithContext(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	purchase.ID = row.ID
+	purchase.CreatedAt = row.CreatedAt
+	return nil
 }

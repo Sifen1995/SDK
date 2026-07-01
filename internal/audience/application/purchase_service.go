@@ -7,8 +7,8 @@ import (
 	"time"
 
 	audiencedomain "skykin-platform/internal/audience/domain"
-	"skykin-platform/internal/audience/model"
-	billingmodel "skykin-platform/internal/billing/model"
+	"skykin-platform/internal/audience/infrastructure/persistence"
+	billingdomain "skykin-platform/internal/billing/domain"
 
 	"gorm.io/gorm"
 )
@@ -38,7 +38,7 @@ func NewPurchaseService(segments audiencedomain.SegmentRepository) *PurchaseServ
 }
 
 // PreparePurchase validates the segment is available and the plan allows Audiencemart.
-func (s *PurchaseService) PreparePurchase(ctx context.Context, advertiserID, segmentID string, plan billingmodel.SubscriptionPlan) (*PurchaseQuote, error) {
+func (s *PurchaseService) PreparePurchase(ctx context.Context, advertiserID, segmentID string, plan billingdomain.SubscriptionPlan) (*PurchaseQuote, error) {
 	if !plan.AudiencemartEnabled {
 		return nil, fmt.Errorf("plan %q does not include Audiencemart", plan.Name)
 	}
@@ -67,7 +67,7 @@ func (s *PurchaseService) ValidateTargetIntent(ctx context.Context, segmentID, t
 
 func (s *PurchaseService) prepareFromSegment(
 	advertiserID, segmentID string,
-	seg *model.AudienceSegment,
+	seg *audiencedomain.AudienceSegment,
 ) (*PurchaseQuote, error) {
 	now := time.Now().UTC()
 	if !seg.IsActive {
@@ -98,7 +98,7 @@ func (s *PurchaseService) ConfirmPurchaseTx(ctx context.Context, tx *gorm.DB, qu
 	if quote == nil {
 		return nil
 	}
-	purchase := &model.SegmentPurchase{
+	purchase := &audiencedomain.SegmentPurchase{
 		AdvertiserID: quote.AdvertiserID,
 		SegmentID:    quote.SegmentID,
 		CampaignID:   campaignID,
@@ -106,5 +106,6 @@ func (s *PurchaseService) ConfirmPurchaseTx(ctx context.Context, tx *gorm.DB, qu
 		ValidFrom:    quote.ValidFrom,
 		ValidUntil:   quote.ValidUntil,
 	}
-	return tx.WithContext(ctx).Create(purchase).Error
+	row := persistence.SegmentPurchaseRowFromDomain(purchase)
+	return tx.WithContext(ctx).Create(row).Error
 }

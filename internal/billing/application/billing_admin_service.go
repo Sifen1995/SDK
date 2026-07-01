@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	billingdomain "skykin-platform/internal/billing/domain"
-	billingmodel "skykin-platform/internal/billing/model"
 
 	"gorm.io/gorm"
 )
@@ -31,7 +30,7 @@ func NewBillingAdminService(
 }
 
 // ListBillingRates returns all rates configured for a plan.
-func (s *BillingAdminService) ListBillingRates(ctx context.Context, planID string) ([]billingmodel.BillingRate, error) {
+func (s *BillingAdminService) ListBillingRates(ctx context.Context, planID string) ([]billingdomain.BillingRate, error) {
 	if _, err := s.planRepo.GetPlanByID(ctx, planID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("plan not found")
@@ -42,7 +41,7 @@ func (s *BillingAdminService) ListBillingRates(ctx context.Context, planID strin
 }
 
 // UpdateBillingRate updates rate_etb and is_active for a billing rate row.
-func (s *BillingAdminService) UpdateBillingRate(ctx context.Context, cmd UpdateBillingRateCmd) (*billingmodel.BillingRate, error) {
+func (s *BillingAdminService) UpdateBillingRate(ctx context.Context, cmd UpdateBillingRateCmd) (*billingdomain.BillingRate, error) {
 	if cmd.RateID == "" {
 		return nil, errors.New("rate id is required")
 	}

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	audiencedomain "skykin-platform/internal/audience/domain"
-	"skykin-platform/internal/campaigns/model"
+	campaigndomain "skykin-platform/internal/campaigns/domain"
 
 	"github.com/google/uuid"
 )
@@ -29,7 +29,7 @@ func NewTargetingResolver(segments audiencedomain.SegmentRepository, purchases a
 // ResolveUserIDs returns candidate user IDs for a campaign, respecting segment entitlements.
 func (r *TargetingResolver) ResolveUserIDs(
 	ctx context.Context,
-	campaign *model.Campaign,
+	campaign *campaigndomain.Campaign,
 	intents IntentUserFinder,
 	minConfidence float64,
 	since time.Time,

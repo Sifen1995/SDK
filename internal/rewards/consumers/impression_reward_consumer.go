@@ -3,9 +3,8 @@ package consumers
 import (
 	"time"
 
-	rewardModel "skykin-platform/internal/rewards/model"
-	rewardsInfra "skykin-platform/internal/rewards/infrastructure"
-	usersInfra "skykin-platform/internal/users/infrastructure"
+	rewardsdomain "skykin-platform/internal/rewards/domain"
+	usersdomain "skykin-platform/internal/users/domain"
 	"skykin-platform/internal/platform/messaging"
 	wsConsumers "skykin-platform/internal/websocket/consumers"
 )
@@ -21,12 +20,12 @@ type RewardEvaluationPayload struct {
 }
 
 type RewardConsumer struct {
-	rewardRepo rewardsInfra.RewardRepository
-	userRepo   usersInfra.UserRepository
+	rewardRepo rewardsdomain.RewardRepository
+	userRepo   usersdomain.UserRepository
 	bus        *messaging.Bus
 }
 
-func NewRewardConsumer(rewardRepo rewardsInfra.RewardRepository, userRepo usersInfra.UserRepository, bus *messaging.Bus) *RewardConsumer {
+func NewRewardConsumer(rewardRepo rewardsdomain.RewardRepository, userRepo usersdomain.UserRepository, bus *messaging.Bus) *RewardConsumer {
 	return &RewardConsumer{rewardRepo: rewardRepo, userRepo: userRepo, bus: bus}
 }
 
@@ -50,7 +49,7 @@ func (c *RewardConsumer) handle(e messaging.Event) {
 		return
 	}
 
-	reward := &rewardModel.Reward{
+	reward := &rewardsdomain.Reward{
 		UserID:     user.ID,
 		IntentID:   p.IntentID,
 		RuleID:     rule.ID,

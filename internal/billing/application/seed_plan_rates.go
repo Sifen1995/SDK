@@ -4,7 +4,6 @@ import (
 	"context"
 
 	billingdomain "skykin-platform/internal/billing/domain"
-	"skykin-platform/internal/billing/model"
 )
 
 // SeedDefaultPlanRates initializes default billing rates for a newly created plan.
@@ -20,9 +19,9 @@ func SeedDefaultPlanRates(ctx context.Context, rateRepo billingdomain.BillingRat
 		{"signup", "CPA", 25.0},
 		{"purchase", "REV_SHARE", 5.0},
 	}
-	rates := make([]model.BillingRate, 0, len(defaults))
+	rates := make([]billingdomain.BillingRate, 0, len(defaults))
 	for _, d := range defaults {
-		rates = append(rates, model.BillingRate{
+		rates = append(rates, billingdomain.BillingRate{
 			PlanID:    planID,
 			EventType: d.eventType,
 			Model:     d.model,

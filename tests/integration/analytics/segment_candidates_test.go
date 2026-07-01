@@ -31,7 +31,7 @@ import (
 
 func setupSegmentTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 	stmts := []string{
 		`CREATE TABLE segment_candidates (

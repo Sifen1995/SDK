@@ -3,7 +3,7 @@ package validation
 import (
 	"strings"
 
-	"skykin-platform/internal/campaigns/model"
+	"skykin-platform/internal/campaigns/domain"
 )
 
 // Result is stored on the campaign row as validation_status / validation_notes.
@@ -13,7 +13,7 @@ type Result struct {
 }
 
 // Campaign checks creative fields against the resolved channel code.
-func Campaign(c *model.Campaign, channelCode string) Result {
+func Campaign(c *domain.Campaign, channelCode string) Result {
 	code := strings.ToUpper(strings.TrimSpace(channelCode))
 	switch code {
 	case "IN_APP_BANNER", "NATIVE_FEED":
