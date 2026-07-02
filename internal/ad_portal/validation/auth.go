@@ -8,7 +8,7 @@ import (
 )
 
 // Register validates ad portal self-registration fields.
-func Register(name, email, password, company, role string) (normalizedEmail string, err error) {
+func Register(name, email, password string) (normalizedEmail string, err error) {
 	if strings.TrimSpace(name) == "" {
 		return "", errors.New("name is required")
 	}
@@ -18,12 +18,6 @@ func Register(name, email, password, company, role string) (normalizedEmail stri
 	}
 	if err := platformvalidation.Password(password); err != nil {
 		return "", err
-	}
-	if strings.TrimSpace(company) == "" {
-		return "", errors.New("company_name is required")
-	}
-	if role != "" && role != "advertiser" && role != "read_only_analyst" {
-		return "", errors.New("registration only allowed for advertiser or read_only_analyst roles")
 	}
 	return normalizedEmail, nil
 }

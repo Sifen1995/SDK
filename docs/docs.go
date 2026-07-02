@@ -127,7 +127,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Starts an asynchronous scan of intent signals. Findings are published as events for audience module to persist as candidates.",
+                "description": "Scans intent signals, merges new users into existing matching segments, refreshes pending candidates, or creates new candidates only when needed.",
                 "produces": [
                     "application/json"
                 ],
@@ -136,13 +136,10 @@ const docTemplate = `{
                 ],
                 "summary": "Run intent consistency analysis",
                 "responses": {
-                    "202": {
-                        "description": "Accepted",
+                    "200": {
+                        "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/skykin-platform_internal_analytics_application.RunReport"
                         }
                     },
                     "401": {
@@ -153,6 +150,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -967,6 +970,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/ad-portal/admin/sdk-users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns paginated SDK users enriched with each user's most recent intent prediction when available.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "List SDK users with latest intent",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_admin_application.GetUsersResult"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/admin/users": {
             "post": {
                 "security": [
@@ -999,7 +1053,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.RegisterResponse"
+                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.MeResponse"
                         }
                     },
                     "403": {
@@ -1781,11 +1835,17 @@ const docTemplate = `{
         "internal_ad_portal_interfaces_http.AdPortalLoginResponse": {
             "type": "object",
             "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
                 "token": {
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO"
+                    "$ref": "#/definitions/skykin-platform_internal_ad_portal_application.UserInfo"
                 }
             }
         },
@@ -1884,44 +1944,42 @@ const docTemplate = `{
         "internal_ad_portal_interfaces_http.RegisterRequest": {
             "type": "object",
             "required": [
-                "company_name",
                 "email",
                 "name",
                 "password"
             ],
             "properties": {
-                "company_name": {
-                    "type": "string",
-                    "example": "Acme Inc"
-                },
                 "email": {
-                    "type": "string",
-                    "example": "advertiser@test.com"
+                    "type": "string"
                 },
                 "name": {
                     "type": "string",
-                    "example": "Jane Doe"
+                    "maxLength": 100,
+                    "minLength": 2
                 },
                 "password": {
                     "type": "string",
-                    "minLength": 8,
-                    "example": "SecurePass1!"
-                },
-                "role": {
-                    "type": "string",
-                    "enum": [
-                        "advertiser",
-                        "read_only_analyst"
-                    ],
-                    "example": "advertiser"
+                    "minLength": 8
                 }
             }
         },
         "internal_ad_portal_interfaces_http.RegisterResponse": {
             "type": "object",
             "properties": {
-                "user": {
-                    "$ref": "#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO"
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
                 }
             }
         },
@@ -2492,6 +2550,97 @@ const docTemplate = `{
                 "user_id": {
                     "type": "string",
                     "example": "user_test_batch_001"
+                }
+            }
+        },
+        "skykin-platform_internal_ad_portal_application.UserInfo": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_admin_application.GetUsersResult": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "per_page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_admin_application.UserWithIntent"
+                    }
+                }
+            }
+        },
+        "skykin-platform_internal_admin_application.IntentSummary": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "type": "number"
+                },
+                "intent_name": {
+                    "type": "string"
+                },
+                "predicted_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_admin_application.UserWithIntent": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "external_user_id": {
+                    "type": "string"
+                },
+                "latest_intent": {
+                    "$ref": "#/definitions/skykin-platform_internal_admin_application.IntentSummary"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "skykin-platform_internal_analytics_application.RunReport": {
+            "type": "object",
+            "properties": {
+                "candidates_created": {
+                    "type": "integer"
+                },
+                "candidates_updated": {
+                    "type": "integer"
+                },
+                "intents_skipped": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "segments_enriched": {
+                    "type": "integer"
+                },
+                "users_added_to_segments": {
+                    "type": "integer"
                 }
             }
         },
@@ -3197,7 +3346,7 @@ const docTemplate = `{
             "in": "header"
         },
         "BearerAuth": {
-            "description": "Enter your JWT token as: Bearer \u003ctoken\u003e (developer portal or ad portal)",
+            "description": "Paste the JWT from POST /ad-portal/login (token field only, no \"Bearer \" prefix needed)",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"

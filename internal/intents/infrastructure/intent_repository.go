@@ -36,28 +36,11 @@ func (r *intentRepository) FindUsersWithIntent(
 	minConfidence float64,
 	since time.Time,
 ) ([]uuid.UUID, error) {
-	var userIDs []string
-	err := r.db.WithContext(ctx).Raw(`
-		SELECT DISTINCT ON (user_id) user_id::text
-		FROM intents
-		WHERE intent_name = ? AND confidence >= ? AND created_at >= ?
-		ORDER BY user_id, created_at DESC
-	`, intentName, minConfidence, since).Scan(&userIDs).Error
-	if err != nil {
-		return nil, err
-	}
-	out := make([]uuid.UUID, 0, len(userIDs))
-	for _, id := range userIDs {
-		parsed, err := uuid.Parse(id)
-		if err != nil {
-			continue
-		}
-		out = append(out, parsed)
-	}
-	return out, nil
+	return r.findDistinctUsersWithFilter(ctx, func(q *gorm.DB) *gorm.DB {
+		return q.Where("intent_name = ? AND confidence >= ? AND created_at >= ?", intentName, minConfidence, since)
+	})
 }
 
-// FindUsersWithAnyIntent returns distinct users with a recent prediction for any listed intent.
 func (r *intentRepository) FindUsersWithAnyIntent(
 	ctx context.Context,
 	intentNames []string,
@@ -67,25 +50,81 @@ func (r *intentRepository) FindUsersWithAnyIntent(
 	if len(intentNames) == 0 {
 		return nil, nil
 	}
-	var userIDs []string
-	err := r.db.WithContext(ctx).Raw(`
-		SELECT DISTINCT ON (user_id) user_id::text
-		FROM intents
-		WHERE intent_name IN ? AND confidence >= ? AND created_at >= ?
-		ORDER BY user_id, created_at DESC
-	`, intentNames, minConfidence, since).Scan(&userIDs).Error
+	return r.findDistinctUsersWithFilter(ctx, func(q *gorm.DB) *gorm.DB {
+		return q.Where("intent_name IN ? AND confidence >= ? AND created_at >= ?", intentNames, minConfidence, since)
+	})
+}
+
+func (r *intentRepository) findDistinctUsersWithFilter(
+	ctx context.Context,
+	apply func(*gorm.DB) *gorm.DB,
+) ([]uuid.UUID, error) {
+	filtered := apply(r.db.WithContext(ctx).Model(&persistence.IntentRow{}))
+	sub := filtered.
+		Select("user_id, MAX(created_at) AS created_at").
+		Group("user_id")
+
+	var rows []struct {
+		UserID string
+	}
+	err := r.db.WithContext(ctx).
+		Table("intents").
+		Select("intents.user_id").
+		Joins("INNER JOIN (?) AS latest ON intents.user_id = latest.user_id AND intents.created_at = latest.created_at", sub).
+		Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
-	out := make([]uuid.UUID, 0, len(userIDs))
-	for _, id := range userIDs {
-		parsed, err := uuid.Parse(id)
+
+	out := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		parsed, err := uuid.Parse(row.UserID)
 		if err != nil {
 			continue
 		}
 		out = append(out, parsed)
 	}
 	return out, nil
+}
+
+func (r *intentRepository) FindLatestByUserIDs(
+	ctx context.Context,
+	userIDs []uuid.UUID,
+) (map[uuid.UUID]*intentdomain.Intent, error) {
+	if len(userIDs) == 0 {
+		return map[uuid.UUID]*intentdomain.Intent{}, nil
+	}
+
+	ids := make([]string, len(userIDs))
+	for i, id := range userIDs {
+		ids[i] = id.String()
+	}
+
+	sub := r.db.WithContext(ctx).
+		Model(&persistence.IntentRow{}).
+		Select("user_id, MAX(created_at) AS created_at").
+		Where("user_id IN ?", ids).
+		Group("user_id")
+
+	var rows []persistence.IntentRow
+	err := r.db.WithContext(ctx).
+		Table("intents").
+		Joins("INNER JOIN (?) AS latest ON intents.user_id = latest.user_id AND intents.created_at = latest.created_at", sub).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[uuid.UUID]*intentdomain.Intent, len(rows))
+	for i := range rows {
+		d := rows[i].ToDomain()
+		uid, err := uuid.Parse(d.UserID)
+		if err != nil {
+			continue
+		}
+		result[uid] = d
+	}
+	return result, nil
 }
 
 // ConsistencyReader exposes sustained-intent queries for segment classification.
@@ -116,6 +155,9 @@ func (r *intentRepository) findConsistentUsers(
 	minDays int,
 	maxAgeDays int,
 ) ([]*analyticsdomain.ConsistentUser, error) {
+	lookbackSince := time.Now().AddDate(0, 0, -lookbackDays)
+	maxAgeSince := time.Now().AddDate(0, 0, -maxAgeDays)
+
 	type row struct {
 		UserID        uuid.UUID
 		DaysActive    int
@@ -123,25 +165,22 @@ func (r *intentRepository) findConsistentUsers(
 		LastSeenAt    time.Time
 	}
 	var rows []row
-	err := r.db.WithContext(ctx).Raw(`
-		SELECT
+	err := r.db.WithContext(ctx).
+		Model(&persistence.IntentRow{}).
+		Select(`
 			user_id,
-			COUNT(DISTINCT DATE(created_at))   AS days_active,
+			COUNT(DISTINCT DATE(created_at)) AS days_active,
 			ROUND(AVG(confidence)::numeric, 3) AS avg_confidence,
-			MAX(created_at)                    AS last_seen_at
-		FROM intents
-		WHERE intent_name  = ?
-		AND   confidence  >= ?
-		AND   created_at  >= NOW() - make_interval(days => ?::int)
-		GROUP BY user_id
-		HAVING
-			COUNT(DISTINCT DATE(created_at)) >= ?
-			AND MAX(created_at) >= NOW() - make_interval(days => ?::int)
-		ORDER BY days_active DESC, avg_confidence DESC
-	`, intentName, minConf, lookbackDays, minDays, maxAgeDays).Scan(&rows).Error
+			MAX(created_at) AS last_seen_at`).
+		Where("intent_name = ? AND confidence >= ? AND created_at >= ?", intentName, minConf, lookbackSince).
+		Group("user_id").
+		Having("COUNT(DISTINCT DATE(created_at)) >= ? AND MAX(created_at) >= ?", minDays, maxAgeSince).
+		Order("days_active DESC, avg_confidence DESC").
+		Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
+
 	out := make([]*analyticsdomain.ConsistentUser, 0, len(rows))
 	for i := range rows {
 		out = append(out, &analyticsdomain.ConsistentUser{

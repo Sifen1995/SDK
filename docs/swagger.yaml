@@ -2,10 +2,14 @@ basePath: /api/v1
 definitions:
   internal_ad_portal_interfaces_http.AdPortalLoginResponse:
     properties:
+      expires_at:
+        type: string
+      refresh_token:
+        type: string
       token:
         type: string
       user:
-        $ref: '#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO'
+        $ref: '#/definitions/skykin-platform_internal_ad_portal_application.UserInfo'
     type: object
   internal_ad_portal_interfaces_http.CreateUserRequest:
     properties:
@@ -74,35 +78,32 @@ definitions:
     type: object
   internal_ad_portal_interfaces_http.RegisterRequest:
     properties:
-      company_name:
-        example: Acme Inc
-        type: string
       email:
-        example: advertiser@test.com
         type: string
       name:
-        example: Jane Doe
+        maxLength: 100
+        minLength: 2
         type: string
       password:
-        example: SecurePass1!
         minLength: 8
         type: string
-      role:
-        enum:
-        - advertiser
-        - read_only_analyst
-        example: advertiser
-        type: string
     required:
-    - company_name
     - email
     - name
     - password
     type: object
   internal_ad_portal_interfaces_http.RegisterResponse:
     properties:
-      user:
-        $ref: '#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO'
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
     type: object
   internal_admin_interfaces_http.AdminPlanListResponse:
     properties:
@@ -507,6 +508,65 @@ definitions:
         type: string
     required:
     - user_id
+    type: object
+  skykin-platform_internal_ad_portal_application.UserInfo:
+    properties:
+      id:
+        type: string
+      role:
+        type: string
+    type: object
+  skykin-platform_internal_admin_application.GetUsersResult:
+    properties:
+      page:
+        type: integer
+      per_page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+      users:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_admin_application.UserWithIntent'
+        type: array
+    type: object
+  skykin-platform_internal_admin_application.IntentSummary:
+    properties:
+      confidence:
+        type: number
+      intent_name:
+        type: string
+      predicted_at:
+        type: string
+    type: object
+  skykin-platform_internal_admin_application.UserWithIntent:
+    properties:
+      created_at:
+        type: string
+      external_user_id:
+        type: string
+      latest_intent:
+        $ref: '#/definitions/skykin-platform_internal_admin_application.IntentSummary'
+      user_id:
+        type: string
+    type: object
+  skykin-platform_internal_analytics_application.RunReport:
+    properties:
+      candidates_created:
+        type: integer
+      candidates_updated:
+        type: integer
+      intents_skipped:
+        items:
+          type: string
+        type: array
+      message:
+        type: string
+      segments_enriched:
+        type: integer
+      users_added_to_segments:
+        type: integer
     type: object
   skykin-platform_internal_analytics_domain.CampaignDetail:
     properties:
@@ -1046,23 +1106,25 @@ paths:
       - Ad Portal - Admin Analytics
   /ad-portal/admin/analytics/intent-consistency/run:
     post:
-      description: Starts an asynchronous scan of intent signals. Findings are published
-        as events for audience module to persist as candidates.
+      description: Scans intent signals, merges new users into existing matching segments,
+        refreshes pending candidates, or creates new candidates only when needed.
       produces:
       - application/json
       responses:
-        "202":
-          description: Accepted
+        "200":
+          description: OK
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/skykin-platform_internal_analytics_application.RunReport'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
         "403":
           description: Forbidden
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
       security:
@@ -1587,6 +1649,39 @@ paths:
       summary: Suspend subscription plan
       tags:
       - Ad Portal - Admin
+  /ad-portal/admin/sdk-users:
+    get:
+      description: Returns paginated SDK users enriched with each user's most recent
+        intent prediction when available.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_admin_application.GetUsersResult'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - BearerAuth: []
+      summary: List SDK users with latest intent
+      tags:
+      - Ad Portal - Admin
   /ad-portal/admin/users:
     post:
       consumes:
@@ -1604,7 +1699,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_ad_portal_interfaces_http.RegisterResponse'
+            $ref: '#/definitions/internal_ad_portal_interfaces_http.MeResponse'
         "403":
           description: Forbidden
           schema:
@@ -2110,8 +2205,8 @@ securityDefinitions:
     name: X-API-Key
     type: apiKey
   BearerAuth:
-    description: 'Enter your JWT token as: Bearer <token> (developer portal or ad
-      portal)'
+    description: Paste the JWT from POST /ad-portal/login (token field only, no "Bearer
+      " prefix needed)
     in: header
     name: Authorization
     type: apiKey

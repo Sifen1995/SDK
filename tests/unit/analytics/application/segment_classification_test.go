@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 type mockIntentReader struct {
@@ -34,25 +35,29 @@ func (m *mockIntentReader) FindConsistentUsers(
 }
 
 type mockCandidateRepo struct {
-	byID   map[uuid.UUID]*audiencedomain.SegmentCandidate
-	users  map[uuid.UUID][]*audiencedomain.UserInCandidate
-	saved  []*audiencedomain.SegmentCandidate
-	status map[uuid.UUID]audiencedomain.CandidateStatus
-	linked map[uuid.UUID]uuid.UUID
+	byID    map[uuid.UUID]*audiencedomain.SegmentCandidate
+	byIntent map[string]*audiencedomain.SegmentCandidate
+	users   map[uuid.UUID][]*audiencedomain.UserInCandidate
+	saved   []*audiencedomain.SegmentCandidate
+	updated []uuid.UUID
+	status  map[uuid.UUID]audiencedomain.CandidateStatus
+	linked  map[uuid.UUID]uuid.UUID
 }
 
 func newMockCandidateRepo() *mockCandidateRepo {
 	return &mockCandidateRepo{
-		byID: make(map[uuid.UUID]*audiencedomain.SegmentCandidate),
-		users: make(map[uuid.UUID][]*audiencedomain.UserInCandidate),
-		status: make(map[uuid.UUID]audiencedomain.CandidateStatus),
-		linked: make(map[uuid.UUID]uuid.UUID),
+		byID:     make(map[uuid.UUID]*audiencedomain.SegmentCandidate),
+		byIntent: make(map[string]*audiencedomain.SegmentCandidate),
+		users:    make(map[uuid.UUID][]*audiencedomain.UserInCandidate),
+		status:   make(map[uuid.UUID]audiencedomain.CandidateStatus),
+		linked:   make(map[uuid.UUID]uuid.UUID),
 	}
 }
 
 func (m *mockCandidateRepo) Save(_ context.Context, c *audiencedomain.SegmentCandidate, users []*audiencedomain.UserInCandidate) error {
 	m.saved = append(m.saved, c)
 	m.byID[c.ID] = c
+	m.byIntent[c.IntentName] = c
 	m.users[c.ID] = users
 	return nil
 }
@@ -75,6 +80,22 @@ func (m *mockCandidateRepo) FindByID(_ context.Context, id uuid.UUID) (*audience
 	return c, nil
 }
 
+func (m *mockCandidateRepo) FindPendingByIntentName(_ context.Context, intentName string) (*audiencedomain.SegmentCandidate, error) {
+	c, ok := m.byIntent[intentName]
+	if !ok || c.Status != audiencedomain.CandidateStatusPending {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return c, nil
+}
+
+func (m *mockCandidateRepo) UpdateFromFinding(_ context.Context, id uuid.UUID, c *audiencedomain.SegmentCandidate, users []*audiencedomain.UserInCandidate) error {
+	m.updated = append(m.updated, id)
+	m.byID[id] = c
+	m.byIntent[c.IntentName] = c
+	m.users[id] = users
+	return nil
+}
+
 func (m *mockCandidateRepo) GetUsers(_ context.Context, candidateID uuid.UUID) ([]*audiencedomain.UserInCandidate, error) {
 	return m.users[candidateID], nil
 }
@@ -93,66 +114,197 @@ func (m *mockCandidateRepo) LinkToSegment(_ context.Context, candidateID, segmen
 }
 
 type mockMembershipRepo struct {
-	inserted []uuid.UUID
+	inserted map[uuid.UUID]struct{}
 	segment  uuid.UUID
+}
+
+func newMockMembershipRepo() *mockMembershipRepo {
+	return &mockMembershipRepo{inserted: make(map[uuid.UUID]struct{})}
 }
 
 func (m *mockMembershipRepo) BulkInsert(_ context.Context, segmentID uuid.UUID, users []*audiencedomain.UserInCandidate) error {
 	m.segment = segmentID
 	for _, u := range users {
-		m.inserted = append(m.inserted, u.UserID)
+		m.inserted[u.UserID] = struct{}{}
 	}
 	return nil
 }
 
-func (m *mockMembershipRepo) FindUsersInSegment(context.Context, uuid.UUID) ([]uuid.UUID, error) {
-	return m.inserted, nil
+func (m *mockMembershipRepo) FindUsersInSegment(_ context.Context, _ uuid.UUID) ([]uuid.UUID, error) {
+	out := make([]uuid.UUID, 0, len(m.inserted))
+	for id := range m.inserted {
+		out = append(out, id)
+	}
+	return out, nil
 }
 
-type mockCatalog struct {
-	segment *audiencedomain.AudienceSegment
+func (m *mockMembershipRepo) CountMembers(_ context.Context, _ uuid.UUID) (int, error) {
+	return len(m.inserted), nil
 }
 
-func (m *mockCatalog) CreateSegment(_ context.Context, cmd audienceApp.CreateSegmentCmd) (*audiencedomain.AudienceSegment, error) {
-	return m.segment, nil
+type mockSegmentRepo struct {
+	segments map[string]*audiencedomain.AudienceSegment
+	updated  []*audiencedomain.AudienceSegment
 }
 
-func TestAnalyzeIntentConsistency_PublishesFindings(t *testing.T) {
+func newMockSegmentRepo() *mockSegmentRepo {
+	return &mockSegmentRepo{segments: make(map[string]*audiencedomain.AudienceSegment)}
+}
+
+func (m *mockSegmentRepo) GetByID(context.Context, string) (*audiencedomain.AudienceSegment, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockSegmentRepo) GetByName(context.Context, string) (*audiencedomain.AudienceSegment, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockSegmentRepo) Create(context.Context, *audiencedomain.AudienceSegment) error {
+	return errors.New("not implemented")
+}
+
+func (m *mockSegmentRepo) Update(_ context.Context, seg *audiencedomain.AudienceSegment) error {
+	m.updated = append(m.updated, seg)
+	return nil
+}
+
+func (m *mockSegmentRepo) ListAvailableNow(_ context.Context, _ time.Time) ([]audiencedomain.AudienceSegment, error) {
+	out := make([]audiencedomain.AudienceSegment, 0, len(m.segments))
+	for _, seg := range m.segments {
+		if seg.IsActive {
+			out = append(out, *seg)
+		}
+	}
+	return out, nil
+}
+
+func (m *mockSegmentRepo) ListAll(context.Context) ([]audiencedomain.AudienceSegment, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockSegmentRepo) FindActiveByIntentSignal(_ context.Context, intentName string, _ time.Time) (*audiencedomain.AudienceSegment, error) {
+	seg, ok := m.segments[intentName]
+	if !ok || !seg.IsActive {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return seg, nil
+}
+
+type mockProcessor struct {
+	calls int
+}
+
+func (m *mockProcessor) Process(_ context.Context, finding analyticsdomain.IntentConsistencyFinding) (analyticsApp.FindingProcessResult, error) {
+	m.calls++
+	return analyticsApp.FindingProcessResult{
+		Action: "created_candidate", IntentName: finding.IntentName, UsersAdded: finding.UserCount,
+	}, nil
+}
+
+func TestAnalyzeIntentConsistency_ProcessesFindings(t *testing.T) {
 	users := []*analyticsdomain.ConsistentUser{
 		{UserID: uuid.New(), Confidence: 0.80, DaysActive: 6, LastSeenAt: time.Now()},
 		{UserID: uuid.New(), Confidence: 0.90, DaysActive: 8, LastSeenAt: time.Now()},
 	}
-	var received []analyticsdomain.IntentConsistencyFinding
-	bus := messaging.NewBus()
-	done := make(chan struct{}, 1)
-	bus.Subscribe(analyticsdomain.TopicIntentConsistencyFinding, func(e messaging.Event) {
-		received = append(received, e.Payload.(analyticsdomain.IntentConsistencyFinding))
-		done <- struct{}{}
-	})
+	processor := &mockProcessor{}
 	cfg := analyticsdomain.ClassificationConfig{IntentClasses: []string{"coffee_interest"}}
 	uc := analyticsApp.NewAnalyzeIntentConsistencyUseCase(
 		&mockIntentReader{byIntent: map[string][]*analyticsdomain.ConsistentUser{"coffee_interest": users}},
-		cfg, bus, nil,
+		cfg, processor, nil,
 	)
-	require.NoError(t, uc.Run(context.Background()))
-	<-done
-	require.Len(t, received, 1)
-	assert.Equal(t, "coffee_interest", received[0].IntentName)
-	assert.Equal(t, 2, received[0].UserCount)
+	report, err := uc.Run(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 1, processor.calls)
+	require.Equal(t, 1, report.CandidatesCreated)
 }
 
-func TestSaveCandidateFromFinding(t *testing.T) {
+func TestProcessIntentFinding_CreatesCandidateWhenNoMatch(t *testing.T) {
 	repo := newMockCandidateRepo()
-	uc := audienceApp.NewSaveCandidateFromFindingUseCase(repo, nil)
+	segRepo := newMockSegmentRepo()
+	memRepo := newMockMembershipRepo()
+	uc := audienceApp.NewProcessIntentFindingUseCase(segRepo, memRepo, repo, nil)
 	finding := analyticsdomain.IntentConsistencyFinding{
 		FindingID: uuid.New(), IntentName: "crypto_interest", UserCount: 1,
 		AvgConfidence: 0.9, AvgDaysActive: 6, MinDaysActive: 5, LookbackDays: 30,
 		ScannedAt: time.Now().UTC(),
 		Users: []*analyticsdomain.ConsistentUser{{UserID: uuid.New(), Confidence: 0.9, DaysActive: 6}},
 	}
-	require.NoError(t, uc.Execute(context.Background(), finding))
+	outcome, err := uc.Execute(context.Background(), finding)
+	require.NoError(t, err)
+	assert.Equal(t, "created_candidate", outcome.Action)
 	require.Len(t, repo.saved, 1)
-	assert.Equal(t, audiencedomain.CandidateStatusPending, repo.saved[0].Status)
+}
+
+func TestProcessIntentFinding_MergesIntoExistingSegment(t *testing.T) {
+	repo := newMockCandidateRepo()
+	segRepo := newMockSegmentRepo()
+	memRepo := newMockMembershipRepo()
+	segID := uuid.New()
+	existingUser := uuid.New()
+	newUser := uuid.New()
+	memRepo.inserted[existingUser] = struct{}{}
+	segRepo.segments["crypto_interest"] = &audiencedomain.AudienceSegment{
+		ID: segID.String(), TopIntentSignals: []string{"crypto_interest"}, IsActive: true,
+	}
+	uc := audienceApp.NewProcessIntentFindingUseCase(segRepo, memRepo, repo, nil)
+	finding := analyticsdomain.IntentConsistencyFinding{
+		FindingID: uuid.New(), IntentName: "crypto_interest", UserCount: 1,
+		AvgConfidence: 0.9, ScannedAt: time.Now().UTC(),
+		Users: []*analyticsdomain.ConsistentUser{{UserID: newUser, Confidence: 0.9, DaysActive: 6}},
+	}
+	outcome, err := uc.Execute(context.Background(), finding)
+	require.NoError(t, err)
+	assert.Equal(t, "merged_segment", outcome.Action)
+	assert.Equal(t, 1, outcome.UsersAdded)
+	assert.Len(t, repo.saved, 0)
+	_, ok := memRepo.inserted[newUser]
+	assert.True(t, ok)
+}
+
+func TestProcessIntentFinding_SkipsWhenNoNewUsers(t *testing.T) {
+	repo := newMockCandidateRepo()
+	segRepo := newMockSegmentRepo()
+	memRepo := newMockMembershipRepo()
+	segID := uuid.New()
+	existingUser := uuid.New()
+	memRepo.inserted[existingUser] = struct{}{}
+	segRepo.segments["crypto_interest"] = &audiencedomain.AudienceSegment{
+		ID: segID.String(), TopIntentSignals: []string{"crypto_interest"}, IsActive: true,
+	}
+	uc := audienceApp.NewProcessIntentFindingUseCase(segRepo, memRepo, repo, nil)
+	finding := analyticsdomain.IntentConsistencyFinding{
+		FindingID: uuid.New(), IntentName: "crypto_interest", UserCount: 1,
+		ScannedAt: time.Now().UTC(),
+		Users:     []*analyticsdomain.ConsistentUser{{UserID: existingUser, Confidence: 0.9, DaysActive: 6}},
+	}
+	outcome, err := uc.Execute(context.Background(), finding)
+	require.NoError(t, err)
+	assert.Equal(t, "skipped_no_new_users", outcome.Action)
+	assert.Len(t, repo.saved, 0)
+}
+
+func TestProcessIntentFinding_UpdatesPendingCandidate(t *testing.T) {
+	repo := newMockCandidateRepo()
+	pendingID := uuid.New()
+	repo.byIntent["fashion_interest"] = &audiencedomain.SegmentCandidate{
+		ID: pendingID, IntentName: "fashion_interest", Status: audiencedomain.CandidateStatusPending,
+	}
+	segRepo := newMockSegmentRepo()
+	memRepo := newMockMembershipRepo()
+	uc := audienceApp.NewProcessIntentFindingUseCase(segRepo, memRepo, repo, nil)
+	finding := analyticsdomain.IntentConsistencyFinding{
+		FindingID: uuid.New(), IntentName: "fashion_interest", UserCount: 2,
+		AvgConfidence: 0.85, ScannedAt: time.Now().UTC(),
+		Users: []*analyticsdomain.ConsistentUser{
+			{UserID: uuid.New(), Confidence: 0.85, DaysActive: 6},
+			{UserID: uuid.New(), Confidence: 0.85, DaysActive: 6},
+		},
+	}
+	outcome, err := uc.Execute(context.Background(), finding)
+	require.NoError(t, err)
+	assert.Equal(t, "updated_candidate", outcome.Action)
+	assert.Len(t, repo.saved, 0)
+	assert.Len(t, repo.updated, 1)
 }
 
 func TestApproveCandidate_Success(t *testing.T) {

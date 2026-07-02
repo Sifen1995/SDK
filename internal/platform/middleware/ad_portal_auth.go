@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AdPortalAuthMiddleware(cfg *configs.Config) gin.HandlerFunc {
+func AdPortalAuthMiddleware(cfg *configs.Config, auth *application.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -18,9 +18,8 @@ func AdPortalAuthMiddleware(cfg *configs.Config) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		var tokenStr string
-		var ok bool
-		if tokenStr, ok = bearerTokenFromHeader(authHeader); !ok {
+		tokenStr, ok := bearerTokenFromHeader(authHeader)
+		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "use Bearer <token>"})
 			c.Abort()
 			return
@@ -31,10 +30,15 @@ func AdPortalAuthMiddleware(cfg *configs.Config) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		c.Set("portal_user_id", claims.PortalUserID)
-		c.Set("advertiser_id", claims.AdvertiserID)
+		u, err := auth.Me(c.Request.Context(), claims.UserID)
+		if err != nil || u == nil || !u.IsActive {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			c.Abort()
+			return
+		}
+		c.Set("portal_user_id", claims.UserID)
+		c.Set("advertiser_id", u.AccountAdvertiserID())
 		c.Set("portal_role", claims.Role)
-		c.Set("portal_email", claims.Email)
 		c.Next()
 	}
 }
@@ -80,7 +84,7 @@ func RequirePortalRead() gin.HandlerFunc {
 	}
 }
 
-// AccountAdvertiserID returns the company scope for campaign APIs (from JWT advertiser_id).
+// AccountAdvertiserID returns the company scope for campaign APIs (loaded from DB in auth middleware).
 func AccountAdvertiserID(c *gin.Context) string {
 	id, _ := c.Get("advertiser_id")
 	s, _ := id.(string)

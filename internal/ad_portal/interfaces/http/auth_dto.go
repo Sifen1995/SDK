@@ -1,11 +1,9 @@
 package http
 
 type RegisterRequest struct {
-	Name        string `json:"name" binding:"required" example:"Jane Doe"`
-	Email       string `json:"email" binding:"required,email" example:"advertiser@test.com"`
-	Password    string `json:"password" binding:"required,min=8" example:"SecurePass1!"`
-	CompanyName string `json:"company_name" binding:"required" example:"Acme Inc"`
-	Role        string `json:"role" enums:"advertiser,read_only_analyst" example:"advertiser"`
+	Name     string `json:"name" binding:"required,min=2,max=100"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
 }
 
 type LoginRequest struct {

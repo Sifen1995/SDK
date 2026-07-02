@@ -28,3 +28,31 @@ func (r *postgresUserRepository) FindOrCreate(ctx context.Context, externalUserI
 	}
 	return row.ToDomain(), nil
 }
+
+func (r *postgresUserRepository) FindAll(
+	ctx context.Context,
+	limit int,
+	offset int,
+) ([]*domain.User, int64, error) {
+	var total int64
+	if err := r.db.WithContext(ctx).
+		Model(&persistence.UserRow{}).
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var rows []persistence.UserRow
+	if err := r.db.WithContext(ctx).
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+
+	users := make([]*domain.User, len(rows))
+	for i := range rows {
+		users[i] = rows[i].ToDomain()
+	}
+	return users, total, nil
+}

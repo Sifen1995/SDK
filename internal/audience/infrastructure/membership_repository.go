@@ -54,6 +54,18 @@ func (r *MembershipRepository) insertBatch(ctx context.Context, segmentID uuid.U
 	return r.db.WithContext(ctx).Exec(b.String(), args...).Error
 }
 
+func (r *MembershipRepository) CountMembers(ctx context.Context, segmentID uuid.UUID) (int, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Table("segment_memberships").
+		Where("segment_id = ?", segmentID).
+		Count(&count).Error
+	if err != nil {
+		return 0, fmt.Errorf("count segment members: %w", err)
+	}
+	return int(count), nil
+}
+
 func (r *MembershipRepository) FindUsersInSegment(ctx context.Context, segmentID uuid.UUID) ([]uuid.UUID, error) {
 	var ids []uuid.UUID
 	err := r.db.WithContext(ctx).Raw(`

@@ -14,6 +14,8 @@ type SegmentRepository interface {
 	// ListAvailableNow returns active segments within their availability window.
 	ListAvailableNow(ctx context.Context, now time.Time) ([]AudienceSegment, error)
 	ListAll(ctx context.Context) ([]AudienceSegment, error)
+	// FindActiveByIntentSignal returns an active catalog segment whose signals include intentName.
+	FindActiveByIntentSignal(ctx context.Context, intentName string, now time.Time) (*AudienceSegment, error)
 }
 
 // PurchaseRepository reads and writes segment purchase entitlements.

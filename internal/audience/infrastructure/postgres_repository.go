@@ -106,3 +106,29 @@ func toDomainSegments(rows []persistence.AudienceSegmentRow) ([]audiencedomain.A
 	}
 	return out, nil
 }
+
+func (r *SegmentRepository) FindActiveByIntentSignal(
+	ctx context.Context,
+	intentName string,
+	now time.Time,
+) (*audiencedomain.AudienceSegment, error) {
+	segments, err := r.ListAvailableNow(ctx, now)
+	if err != nil {
+		return nil, err
+	}
+	for i := range segments {
+		if segmentContainsIntent(segments[i].TopIntentSignals, intentName) {
+			return &segments[i], nil
+		}
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
+func segmentContainsIntent(signals []string, intentName string) bool {
+	for _, s := range signals {
+		if s == intentName {
+			return true
+		}
+	}
+	return false
+}

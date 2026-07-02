@@ -95,6 +95,46 @@ func (r *CandidateRepository) FindByID(ctx context.Context, id uuid.UUID) (*doma
 	return mapCandidateRow(&row), nil
 }
 
+func (r *CandidateRepository) FindPendingByIntentName(ctx context.Context, intentName string) (*domain.SegmentCandidate, error) {
+	var row candidateRow
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT id, intent_name, user_count, avg_confidence, avg_days_active,
+		       min_days_active, lookback_days, status, scanned_at,
+		       reviewed_by, reviewed_at, review_notes, published_segment_id
+		FROM segment_candidates
+		WHERE intent_name = ? AND status = 'pending'
+		ORDER BY scanned_at DESC
+		LIMIT 1
+	`, intentName).Scan(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	if row.ID == uuid.Nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return mapCandidateRow(&row), nil
+}
+
+func (r *CandidateRepository) UpdateFromFinding(
+	ctx context.Context,
+	id uuid.UUID,
+	c *domain.SegmentCandidate,
+	users []*domain.UserInCandidate,
+) error {
+	err := r.db.WithContext(ctx).Exec(`
+		UPDATE segment_candidates
+		SET user_count = ?, avg_confidence = ?, avg_days_active = ?,
+		    min_days_active = ?, lookback_days = ?, scanned_at = ?
+		WHERE id = ? AND status = 'pending'
+	`, c.UserCount, c.AvgConfidence, c.AvgDaysActive,
+		c.MinDaysActive, c.LookbackDays, c.ScannedAt, id).Error
+	if err != nil {
+		return err
+	}
+	r.users.Store(id.String(), users)
+	return nil
+}
+
 func (r *CandidateRepository) GetUsers(ctx context.Context, candidateID uuid.UUID) ([]*domain.UserInCandidate, error) {
 	_ = ctx
 	val, ok := r.users.Load(candidateID.String())

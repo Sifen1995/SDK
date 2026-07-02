@@ -1,8 +1,6 @@
 package http
 
 import (
-	"context"
-	"log/slog"
 	"net/http"
 
 	adminApp "skykin-platform/internal/admin/application"
@@ -23,21 +21,22 @@ func NewAnalyticsHandler(analyzeUC *analyticsApp.AnalyzeIntentConsistencyUseCase
 
 // TriggerIntentConsistency godoc
 // @Summary      Run intent consistency analysis
-// @Description  Starts an asynchronous scan of intent signals. Findings are published as events for audience module to persist as candidates.
+// @Description  Scans intent signals, merges new users into existing matching segments, refreshes pending candidates, or creates new candidates only when needed.
 // @Tags         Ad Portal - Admin Analytics
 // @Produce      json
 // @Security     BearerAuth
-// @Success      202  {object}  map[string]string
+// @Success      200  {object}  analyticsApp.RunReport
 // @Failure      401  {object}  platformHTTP.APIError
 // @Failure      403  {object}  platformHTTP.APIError
+// @Failure      500  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/analytics/intent-consistency/run [post]
 func (h *AnalyticsHandler) TriggerIntentConsistency(c *gin.Context) {
-	go func() {
-		if err := h.analyzeUC.Run(context.Background()); err != nil {
-			slog.Default().Error("intent consistency analysis failed", "error", err)
-		}
-	}()
-	c.JSON(http.StatusAccepted, gin.H{"message": "intent consistency analysis started"})
+	report, err := h.analyzeUC.Run(c.Request.Context())
+	if err != nil {
+		platformHTTP.Error(c, http.StatusInternalServerError, "intent consistency analysis failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, report)
 }
 
 // SegmentCandidateHandler handles admin approval workflow for audience segment candidates.

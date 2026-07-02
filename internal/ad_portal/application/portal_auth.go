@@ -11,8 +11,9 @@ import (
 	"skykin-platform/internal/ad_portal/infrastructure"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 )
+
+const accessTokenTTL = 24 * time.Hour
 
 type AuthService struct {
 	repo *infrastructure.Repository
@@ -23,92 +24,56 @@ func NewAuthService(repo *infrastructure.Repository, cfg *configs.Config) *AuthS
 	return &AuthService{repo: repo, cfg: cfg}
 }
 
-type portalClaims struct {
-	PortalUserID string `json:"portal_user_id"`
-	AdvertiserID string `json:"advertiser_id"`
-	Role         string `json:"role"`
-	Email        string `json:"email"`
-	jwt.RegisteredClaims
+type RegisterResult struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	Role      string `json:"role"`
+	CreatedAt string `json:"created_at"`
 }
 
-func (s *AuthService) Register(ctx context.Context, name, email, password, company, roleSlug string) (*domain.PortalUser, error) {
-	if roleSlug == "" {
-		roleSlug = domain.RoleAdvertiser
-	}
-	if roleSlug != domain.RoleAdvertiser && roleSlug != domain.RoleReadOnlyAnalyst {
-		return nil, errors.New("registration only allowed for advertiser or read_only_analyst roles")
-	}
-	return s.createPortalUser(ctx, name, email, password, company, roleSlug)
+type UserInfo struct {
+	ID   string `json:"id"`
+	Role string `json:"role"`
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (string, *domain.PortalUser, error) {
-	u, err := s.repo.GetPortalUserByEmail(ctx, email)
+type LoginResult struct {
+	Token        string   `json:"token"`
+	RefreshToken string   `json:"refresh_token"`
+	ExpiresAt    string   `json:"expires_at"`
+	User         UserInfo `json:"user"`
+}
+
+func (s *AuthService) Register(ctx context.Context, name, email, password string) (*RegisterResult, error) {
+	u, err := s.createPortalUser(ctx, name, email, password, name, domain.RoleAdvertiser)
 	if err != nil {
-		return "", nil, errors.New("invalid credentials")
+		return nil, err
 	}
-	if !u.IsActive {
-		return "", nil, errors.New("account is disabled")
-	}
-	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
-		return "", nil, errors.New("invalid credentials")
-	}
-	token, err := s.signToken(u)
-	if err != nil {
-		return "", nil, err
-	}
-	return token, u, nil
+	return registerResultFromUser(u), nil
 }
 
-func (s *AuthService) signToken(u *domain.PortalUser) (string, error) {
-	claims := portalClaims{
-		PortalUserID: u.ID,
-		AdvertiserID: u.AccountAdvertiserID(),
-		Role:         u.RoleSlug(),
-		Email:        u.Email,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
+func registerResultFromUser(u *domain.PortalUser) *RegisterResult {
+	return &RegisterResult{
+		ID:        u.ID,
+		Email:     u.Email,
+		Name:      u.Name,
+		Role:      u.RoleSlug(),
+		CreatedAt: u.CreatedAt.Format(time.RFC3339),
 	}
-	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString([]byte(s.cfg.JwtSecret))
 }
 
-func ParsePortalToken(cfg *configs.Config, tokenStr string) (*portalClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenStr, &portalClaims{}, func(t *jwt.Token) (interface{}, error) {
+func ParsePortalToken(cfg *configs.Config, tokenStr string) (*PortalClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &PortalClaims{}, func(t *jwt.Token) (interface{}, error) {
 		return []byte(cfg.JwtSecret), nil
 	})
 	if err != nil || !token.Valid {
 		return nil, errors.New("invalid token")
 	}
-	claims, ok := token.Claims.(*portalClaims)
+	claims, ok := token.Claims.(*PortalClaims)
 	if !ok {
 		return nil, errors.New("invalid claims")
 	}
 	return claims, nil
-}
-
-func (s *AuthService) EnsureOperatorAdmin(ctx context.Context, email, password, name, company string) error {
-	_, err := s.repo.GetPortalUserByEmail(ctx, email)
-	if err == nil {
-		return nil
-	}
-	role, err := s.repo.GetRoleBySlug(ctx, domain.RoleOperatorAdmin)
-	if err != nil {
-		return err
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-	u := &domain.PortalUser{
-		Email:        email,
-		PasswordHash: string(hash),
-		Name:         name,
-		RoleID:       role.ID,
-		IsActive:     true,
-	}
-	return s.repo.CreatePortalUser(ctx, u)
 }
 
 func (s *AuthService) Me(ctx context.Context, portalUserID string) (*domain.PortalUser, error) {
@@ -136,48 +101,7 @@ func (s *AuthService) CreateOperatorUser(ctx context.Context, name, email, passw
 		return nil, fmt.Errorf("invalid role")
 	}
 	if roleSlug == domain.RoleOperatorAdmin {
-		role, err := s.repo.GetRoleBySlug(ctx, roleSlug)
-		if err != nil {
-			return nil, err
-		}
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-		if err != nil {
-			return nil, err
-		}
-		u := &domain.PortalUser{
-			Email: email, PasswordHash: string(hash), Name: name, RoleID: role.ID, IsActive: true,
-		}
-		if err := s.repo.CreatePortalUser(ctx, u); err != nil {
-			return nil, err
-		}
-		return s.repo.GetPortalUserByID(ctx, u.ID)
+		return s.createOperatorAdminUser(ctx, name, email, password, roleSlug)
 	}
 	return s.createPortalUser(ctx, name, email, password, company, roleSlug)
-}
-
-func (s *AuthService) createPortalUser(ctx context.Context, name, email, password, company, roleSlug string) (*domain.PortalUser, error) {
-	if company == "" {
-		return nil, errors.New("company_name is required")
-	}
-	role, err := s.repo.GetRoleBySlug(ctx, roleSlug)
-	if err != nil {
-		return nil, fmt.Errorf("invalid role")
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-	adv := &domain.Advertiser{CompanyName: company}
-	u := &domain.PortalUser{
-		Email:        email,
-		PasswordHash: string(hash),
-		Name:         name,
-		RoleID:       role.ID,
-		IsActive:     true,
-	}
-
-	if err := s.repo.CreateAdvertiserAndPortalUser(ctx, adv, u); err != nil {
-		return nil, err
-	}
-	return s.repo.GetPortalUserByID(ctx, u.ID)
 }

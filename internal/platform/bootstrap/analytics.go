@@ -8,11 +8,9 @@ import (
 	analyticsApp "skykin-platform/internal/analytics/application"
 	analyticsdomain "skykin-platform/internal/analytics/domain"
 	audienceApp "skykin-platform/internal/audience/application"
-	audienceConsumers "skykin-platform/internal/audience/consumers"
 	audienceInfra "skykin-platform/internal/audience/infrastructure"
 	"skykin-platform/configs"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
-	"skykin-platform/internal/platform/messaging"
 
 	"gorm.io/gorm"
 )
@@ -23,19 +21,24 @@ type IntentConsistencyJobs struct {
 	CandidateRepo *audienceInfra.CandidateRepository
 }
 
-// SetupIntentConsistency wires analysis, event publishing, and audience consumer.
-func SetupIntentConsistency(db *gorm.DB, cfg *configs.Config, bus *messaging.Bus, logger *slog.Logger) *IntentConsistencyJobs {
+// SetupIntentConsistency wires analysis and synchronous finding processing in audience.
+func SetupIntentConsistency(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *IntentConsistencyJobs {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	candidateRepo := audienceInfra.NewCandidateRepository(db)
+	segmentRepo := audienceInfra.NewSegmentRepository(db)
+	membershipRepo := audienceInfra.NewMembershipRepository(db)
 	intentRepo := intentsInfra.NewConsistencyReader(db, cfg)
 
-	analyzeUC := analyticsApp.NewAnalyzeIntentConsistencyUseCase(
-		intentRepo, analyticsdomain.DefaultConfig(), bus, logger,
+	processUC := audienceApp.NewProcessIntentFindingUseCase(
+		segmentRepo, membershipRepo, candidateRepo, logger,
 	)
-	saveUC := audienceApp.NewSaveCandidateFromFindingUseCase(candidateRepo, logger)
-	audienceConsumers.NewFindingConsumer(saveUC, logger).Register(bus)
+	processor := audienceApp.NewFindingProcessorAdapter(processUC)
+
+	analyzeUC := analyticsApp.NewAnalyzeIntentConsistencyUseCase(
+		intentRepo, analyticsdomain.DefaultConfig(), processor, logger,
+	)
 
 	return &IntentConsistencyJobs{AnalyzeUC: analyzeUC, CandidateRepo: candidateRepo}
 }
@@ -49,7 +52,7 @@ func StartIntentConsistencyJobs(jobs *IntentConsistencyJobs, logger *slog.Logger
 		logger = slog.Default()
 	}
 	run := func() {
-		if err := jobs.AnalyzeUC.Run(context.Background()); err != nil {
+		if _, err := jobs.AnalyzeUC.Run(context.Background()); err != nil {
 			logger.Error("intent consistency analysis failed", "error", err)
 		}
 	}

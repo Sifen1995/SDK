@@ -1,4 +1,4 @@
-package consumers
+package application
 
 import (
 	"context"
@@ -10,16 +10,17 @@ import (
 )
 
 // FindingConsumer persists segment candidates when analytics publishes intent consistency findings.
+// Deprecated: findings are processed synchronously by AnalyzeIntentConsistencyUseCase.
 type FindingConsumer struct {
-	save *audienceApp.SaveCandidateFromFindingUseCase
-	log  *slog.Logger
+	process *audienceApp.ProcessIntentFindingUseCase
+	log     *slog.Logger
 }
 
-func NewFindingConsumer(save *audienceApp.SaveCandidateFromFindingUseCase, log *slog.Logger) *FindingConsumer {
+func NewFindingConsumer(process *audienceApp.ProcessIntentFindingUseCase, log *slog.Logger) *FindingConsumer {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &FindingConsumer{save: save, log: log}
+	return &FindingConsumer{process: process, log: log}
 }
 
 func (c *FindingConsumer) Register(bus *messaging.Bus) {
@@ -36,7 +37,7 @@ func (c *FindingConsumer) handle(e messaging.Event) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if err := c.save.Execute(ctx, finding); err != nil {
-		c.log.Error("save candidate from finding failed", "intent", finding.IntentName, "error", err)
+	if _, err := c.process.Execute(ctx, finding); err != nil {
+		c.log.Error("process intent finding failed", "intent", finding.IntentName, "error", err)
 	}
 }

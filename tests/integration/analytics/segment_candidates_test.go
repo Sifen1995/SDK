@@ -99,8 +99,10 @@ func TestAudience_ListSegmentCandidates_HTTP(t *testing.T) {
 }
 
 func TestAdmin_TriggerIntentConsistency_HTTP(t *testing.T) {
-	bus := messaging.NewBus()
-	uc := analyticsApp.NewAnalyzeIntentConsistencyUseCase(&noopIntentReader{}, analyticsdomain.ClassificationConfig{}, bus, slog.Default())
+	processor := &mockProcessor{}
+	uc := analyticsApp.NewAnalyzeIntentConsistencyUseCase(
+		&noopIntentReader{}, analyticsdomain.ClassificationConfig{}, processor, slog.Default(),
+	)
 	handler := adminHTTP.NewAnalyticsHandler(uc)
 
 	gin.SetMode(gin.TestMode)
@@ -111,7 +113,25 @@ func TestAdmin_TriggerIntentConsistency_HTTP(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusAccepted, w.Code)
+	require.Equal(t, http.StatusOK, w.Code)
+	var body analyticsApp.RunReport
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	assert.Equal(t, "Scan complete. No new segment candidates.", body.Message)
+}
+
+type noopIntentReader struct{}
+
+func (noopIntentReader) FindConsistentUsers(context.Context, string, float64, int, int, int) ([]*analyticsdomain.ConsistentUser, error) {
+	return nil, nil
+}
+
+type mockProcessor struct {
+	calls int
+}
+
+func (m *mockProcessor) Process(_ context.Context, _ analyticsdomain.IntentConsistencyFinding) (analyticsApp.FindingProcessResult, error) {
+	m.calls++
+	return analyticsApp.FindingProcessResult{}, nil
 }
 
 func TestAdmin_ApproveSegmentCandidate_HTTP(t *testing.T) {
@@ -152,10 +172,4 @@ func TestAdmin_ApproveSegmentCandidate_HTTP(t *testing.T) {
 		}
 		return true
 	}, time.Second, 10*time.Millisecond)
-}
-
-type noopIntentReader struct{}
-
-func (noopIntentReader) FindConsistentUsers(context.Context, string, float64, int, int, int) ([]*analyticsdomain.ConsistentUser, error) {
-	return nil, nil
 }

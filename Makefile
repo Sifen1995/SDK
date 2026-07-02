@@ -19,7 +19,7 @@ register-test:
 	@EMAIL="test-$$(date +%s)@example.com"; \
 	curl -sf -X POST http://localhost:8081/api/v1/ad-portal/register \
 		-H 'Content-Type: application/json' \
-		-d "{\"name\":\"Test User\",\"email\":\"$$EMAIL\",\"password\":\"SecurePass1!\",\"company_name\":\"Test Co\",\"role\":\"advertiser\"}" | jq .
+		-d "{\"name\":\"Test User\",\"email\":\"$$EMAIL\",\"password\":\"SecurePass1!\"}" | jq .
 
 # Build the main API binary (optional; not used by Docker workflow)
 build:

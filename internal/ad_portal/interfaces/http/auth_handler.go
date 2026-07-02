@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 
 	"skykin-platform/internal/ad_portal/application"
@@ -33,17 +34,17 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
 		return
 	}
-	email, err := adportalvalidation.Register(req.Name, req.Email, req.Password, req.CompanyName, req.Role)
+	email, err := adportalvalidation.Register(req.Name, req.Email, req.Password)
 	if err != nil {
 		platformHTTP.Error(c, http.StatusBadRequest, "validation failed", err.Error())
 		return
 	}
-	u, err := h.auth.Register(c.Request.Context(), req.Name, email, req.Password, req.CompanyName, req.Role)
+	result, err := h.auth.Register(c.Request.Context(), req.Name, email, req.Password)
 	if err != nil {
 		platformHTTP.Error(c, http.StatusBadRequest, "registration failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"user": application.UserResponse(u)})
+	c.JSON(http.StatusCreated, result)
 }
 
 // Login godoc
@@ -66,12 +67,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "validation failed", err.Error())
 		return
 	}
-	token, u, err := h.auth.Login(c.Request.Context(), email, req.Password)
+	result, err := h.auth.Login(c.Request.Context(), email, req.Password)
 	if err != nil {
-		platformHTTP.Error(c, http.StatusUnauthorized, "login failed", err.Error())
+		if errors.Is(err, application.ErrInvalidCredentials) {
+			platformHTTP.Error(c, http.StatusUnauthorized, "invalid credentials", nil)
+			return
+		}
+		platformHTTP.Error(c, http.StatusInternalServerError, "login failed", nil)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"token": token, "user": application.UserResponse(u)})
+	c.JSON(http.StatusOK, result)
 }
 
 // Me godoc
@@ -99,7 +104,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        body  body      CreateUserRequest  true  "User"
-// @Success      201   {object}  RegisterResponse
+// @Success      201   {object}  MeResponse
 // @Failure      403   {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/users [post]
 func (h *AuthHandler) CreateUser(c *gin.Context) {

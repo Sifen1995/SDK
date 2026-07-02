@@ -9,10 +9,12 @@ import (
 	audienceApp "skykin-platform/internal/audience/application"
 	billingApp "skykin-platform/internal/billing/application"
 	campaignApp "skykin-platform/internal/campaigns/application"
+	"skykin-platform/configs"
 	"skykin-platform/internal/platform/bootstrap"
 	"skykin-platform/internal/platform/messaging"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // Module wires admin operator dependencies for the ad portal.
@@ -21,10 +23,13 @@ type Module struct {
 	Catalog           *adminHTTP.CatalogHandler
 	AnalyticsOps      *adminHTTP.AnalyticsHandler
 	SegmentCandidates *adminHTTP.SegmentCandidateHandler
+	Users             *adminHTTP.UsersHandler
 }
 
 // Wire constructs the admin module from application services owned by each bounded context.
 func Wire(
+	db *gorm.DB,
+	cfg *configs.Config,
 	jobs *bootstrap.IntentConsistencyJobs,
 	bus *messaging.Bus,
 	plans *billingApp.PlanService,
@@ -34,18 +39,21 @@ func Wire(
 ) *Module {
 	approveCandidate := adminApp.NewApproveCandidateUseCase(bus, slog.Default())
 	rejectCandidate := adminApp.NewRejectCandidateUseCase(bus, slog.Default())
+	getUsers := bootstrap.NewGetUsersWithIntentsUseCase(db, cfg, slog.Default())
 
 	return &Module{
 		Campaigns:         adminHTTP.NewCampaignHandler(moderation),
 		Catalog:           adminHTTP.NewCatalogHandler(segments, billingAdmin, plans),
 		AnalyticsOps:      adminHTTP.NewAnalyticsHandler(jobs.AnalyzeUC),
 		SegmentCandidates: adminHTTP.NewSegmentCandidateHandler(approveCandidate, rejectCandidate),
+		Users:             adminHTTP.NewUsersHandler(getUsers),
 	}
 }
 
 // Register mounts operator admin routes on the admin group.
 func (m *Module) Register(g *gin.RouterGroup, auth *adportalHTTP.AuthHandler) {
 	g.POST("/users", auth.CreateUser)
+	g.GET("/sdk-users", m.Users.ListUsers)
 	g.GET("/plans", m.Catalog.ListPlans)
 	g.POST("/plans", m.Catalog.CreatePlan)
 	g.GET("/plans/:plan_id", m.Catalog.GetPlan)

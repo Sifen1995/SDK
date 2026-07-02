@@ -24,17 +24,19 @@ import (
 // Register wires ad portal modules and mounts routes under /api/v1/ad-portal.
 func Register(r *gin.Engine, db *gorm.DB, cfg *configs.Config, bus *messaging.Bus) *bootstrap.IntentConsistencyJobs {
 	adRepo := advertiserInfra.NewRepository(db)
-	authHandler := adportalHTTP.NewAuthHandler(advertiserApp.NewAuthService(adRepo, cfg))
+	authService := advertiserApp.NewAuthService(adRepo, cfg)
+	authHandler := adportalHTTP.NewAuthHandler(authService)
 
 	billingMod := billingRoutes.Wire(db, bus)
 	audienceMod := audienceRoutes.Wire(db, billingMod.SubRepo)
 
 	bootstrap.RegisterAdminEventConsumers(db, bus, slog.Default())
-	jobs := bootstrap.SetupIntentConsistency(db, cfg, bus, slog.Default())
+	jobs := bootstrap.SetupIntentConsistency(db, cfg, slog.Default())
 	audienceMod.AttachCandidates(audienceApp.NewListSegmentCandidatesUseCase(jobs.CandidateRepo))
 
 	campaignMod := campaignRoutes.Wire(db, billingMod.SubEnforcer, audienceMod.Purchases, billingMod.ChannelRepo, bus)
 	adminMod := adminRoutes.Wire(
+		db, cfg,
 		jobs, bus,
 		billingMod.PlanService,
 		billingMod.BillingAdmin,
@@ -49,7 +51,7 @@ func Register(r *gin.Engine, db *gorm.DB, cfg *configs.Config, bus *messaging.Bu
 		g.POST("/login", authHandler.Login)
 
 		protected := g.Group("/")
-		protected.Use(platformMiddleware.AdPortalAuthMiddleware(cfg))
+		protected.Use(platformMiddleware.AdPortalAuthMiddleware(cfg, authService))
 		{
 			protected.GET("/me", platformMiddleware.RequirePortalRead(), authHandler.Me)
 

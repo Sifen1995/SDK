@@ -2,11 +2,11 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
 	"skykin-platform/internal/analytics/domain"
-	"skykin-platform/internal/platform/messaging"
 
 	"github.com/google/uuid"
 )
@@ -19,55 +19,103 @@ type IntentConsistencyReader interface {
 type AnalyzeIntentConsistencyUseCase struct {
 	intentRepo IntentConsistencyReader
 	config     domain.ClassificationConfig
-	bus        *messaging.Bus
+	processor  IntentFindingProcessor
 	logger     *slog.Logger
 }
 
 func NewAnalyzeIntentConsistencyUseCase(
 	intentRepo IntentConsistencyReader,
 	config domain.ClassificationConfig,
-	bus *messaging.Bus,
+	processor IntentFindingProcessor,
 	logger *slog.Logger,
 ) *AnalyzeIntentConsistencyUseCase {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &AnalyzeIntentConsistencyUseCase{
-		intentRepo: intentRepo, config: config, bus: bus, logger: logger,
+		intentRepo: intentRepo, config: config, processor: processor, logger: logger,
 	}
 }
 
-func (uc *AnalyzeIntentConsistencyUseCase) Run(ctx context.Context) error {
+func (uc *AnalyzeIntentConsistencyUseCase) Run(ctx context.Context) (*RunReport, error) {
+	report := &RunReport{}
 	for _, intentClass := range uc.config.IntentClasses {
-		users, err := uc.intentRepo.FindConsistentUsers(ctx, intentClass,
-			uc.config.MinConfidence, uc.config.LookbackDays,
-			uc.config.MinDaysActive, uc.config.MaxAgeDays)
+		outcome, err := uc.scanIntent(ctx, intentClass)
 		if err != nil {
-			uc.logger.Error("consistent users query failed", "intent", intentClass, "error", err)
+			uc.logger.Error("intent scan failed", "intent", intentClass, "error", err)
 			continue
 		}
-		if len(users) == 0 {
-			uc.logger.Info("no consistent users", "intent", intentClass)
+		if outcome == nil {
 			continue
 		}
-		var sumConf, sumDays float64
-		for _, u := range users {
-			sumConf += u.Confidence
-			sumDays += float64(u.DaysActive)
-		}
-		n := float64(len(users))
-		finding := domain.IntentConsistencyFinding{
-			FindingID: uuid.New(), IntentName: intentClass, Users: users,
-			UserCount: len(users), AvgConfidence: sumConf / n, AvgDaysActive: sumDays / n,
-			MinDaysActive: uc.config.MinDaysActive, LookbackDays: uc.config.LookbackDays,
-			ScannedAt: time.Now().UTC(),
-		}
-		uc.bus.Publish(messaging.Event{
-			Name: domain.TopicIntentConsistencyFinding, Payload: finding, Ctx: ctx,
-		})
-		uc.logger.Info("intent consistency finding published", "intent", intentClass,
-			"user_count", finding.UserCount, "avg_confidence", finding.AvgConfidence,
-			"avg_days_active", finding.AvgDaysActive)
+		aggregateReport(report, *outcome)
 	}
-	return nil
+	report.Message = buildRunMessage(report)
+	return report, nil
+}
+
+func (uc *AnalyzeIntentConsistencyUseCase) scanIntent(
+	ctx context.Context,
+	intentClass string,
+) (*FindingProcessResult, error) {
+	users, err := uc.intentRepo.FindConsistentUsers(ctx, intentClass,
+		uc.config.MinConfidence, uc.config.LookbackDays,
+		uc.config.MinDaysActive, uc.config.MaxAgeDays)
+	if err != nil {
+		return nil, err
+	}
+	if len(users) == 0 {
+		uc.logger.Info("no consistent users", "intent", intentClass)
+		return nil, nil
+	}
+
+	finding := buildFinding(intentClass, users, uc.config)
+	if uc.processor == nil {
+		uc.logger.Warn("no finding processor wired", "intent", intentClass)
+		return nil, nil
+	}
+	result, err := uc.processor.Process(ctx, finding)
+	if err != nil {
+		return nil, err
+	}
+	uc.logger.Info("intent finding processed",
+		"intent", intentClass, "action", result.Action, "users_added", result.UsersAdded)
+	return &result, nil
+}
+
+func buildFinding(intentClass string, users []*domain.ConsistentUser, cfg domain.ClassificationConfig) domain.IntentConsistencyFinding {
+	var sumConf, sumDays float64
+	for _, u := range users {
+		sumConf += u.Confidence
+		sumDays += float64(u.DaysActive)
+	}
+	n := float64(len(users))
+	return domain.IntentConsistencyFinding{
+		FindingID: uuid.New(), IntentName: intentClass, Users: users,
+		UserCount: len(users), AvgConfidence: sumConf / n, AvgDaysActive: sumDays / n,
+		MinDaysActive: cfg.MinDaysActive, LookbackDays: cfg.LookbackDays,
+		ScannedAt: time.Now().UTC(),
+	}
+}
+
+func aggregateReport(report *RunReport, outcome FindingProcessResult) {
+	switch outcome.Action {
+	case "created_candidate":
+		report.CandidatesCreated++
+	case "updated_candidate":
+		report.CandidatesUpdated++
+	case "merged_segment":
+		report.SegmentsEnriched++
+		report.UsersAdded += outcome.UsersAdded
+	case "skipped_no_new_users":
+		report.IntentsSkipped = append(report.IntentsSkipped, outcome.IntentName)
+	}
+}
+
+func buildRunMessage(report *RunReport) string {
+	if report.CandidatesCreated == 0 && report.CandidatesUpdated == 0 {
+		return "Scan complete. No new segment candidates."
+	}
+	return fmt.Sprintf("Scan complete. %d new candidate(s), %d updated.",
+		report.CandidatesCreated, report.CandidatesUpdated)
 }
