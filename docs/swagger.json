@@ -709,6 +709,39 @@
                 }
             }
         },
+        "/ad-portal/admin/permissions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Permissions"
+                ],
+                "summary": "List all permissions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_permissions_interfaces_http.PermissionResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/admin/plans": {
             "get": {
                 "security": [
@@ -959,6 +992,172 @@
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/roles": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Permissions"
+                ],
+                "summary": "List all roles with permissions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_permissions_interfaces_http.RoleResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Permissions"
+                ],
+                "summary": "Create a custom role",
+                "parameters": [
+                    {
+                        "description": "Role",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_permissions_interfaces_http.CreateRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_permissions_interfaces_http.RoleResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/roles/{role_id}/permissions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Permissions"
+                ],
+                "summary": "Assign permission to role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Role ID",
+                        "name": "role_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Permission",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_permissions_interfaces_http.AssignPermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_permissions_interfaces_http.MessageResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/roles/{role_id}/permissions/{permission_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin Permissions"
+                ],
+                "summary": "Revoke permission from role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Role ID",
+                        "name": "role_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Permission ID",
+                        "name": "permission_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_permissions_interfaces_http.MessageResponse"
                         }
                     }
                 }
@@ -2544,6 +2743,84 @@
                 "user_id": {
                     "type": "string",
                     "example": "user_test_batch_001"
+                }
+            }
+        },
+        "internal_permissions_interfaces_http.AssignPermissionRequest": {
+            "type": "object",
+            "required": [
+                "permission_id"
+            ],
+            "properties": {
+                "permission_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_permissions_interfaces_http.CreateRoleRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 2
+                }
+            }
+        },
+        "internal_permissions_interfaces_http.MessageResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_permissions_interfaces_http.PermissionResponse": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "resource": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_permissions_interfaces_http.RoleResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_system": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_permissions_interfaces_http.PermissionResponse"
+                    }
                 }
             }
         },

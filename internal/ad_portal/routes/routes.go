@@ -12,6 +12,8 @@ import (
 	audienceRoutes "skykin-platform/internal/audience/routes"
 	billingRoutes "skykin-platform/internal/billing/routes"
 	campaignRoutes "skykin-platform/internal/campaigns/routes"
+	permApp "skykin-platform/internal/permissions/application"
+	permHTTP "skykin-platform/internal/permissions/interfaces/http"
 	"skykin-platform/configs"
 	"skykin-platform/internal/platform/bootstrap"
 	"skykin-platform/internal/platform/messaging"
@@ -22,7 +24,14 @@ import (
 )
 
 // Register wires ad portal modules and mounts routes under /api/v1/ad-portal.
-func Register(r *gin.Engine, db *gorm.DB, cfg *configs.Config, bus *messaging.Bus) *bootstrap.IntentConsistencyJobs {
+func Register(
+	r *gin.Engine,
+	db *gorm.DB,
+	cfg *configs.Config,
+	bus *messaging.Bus,
+	checker *permApp.PermissionChecker,
+	permHandler *permHTTP.Handler,
+) *bootstrap.IntentConsistencyJobs {
 	adRepo := advertiserInfra.NewRepository(db)
 	authService := advertiserApp.NewAuthService(adRepo, cfg)
 	authHandler := adportalHTTP.NewAuthHandler(authService)
@@ -60,22 +69,23 @@ func Register(r *gin.Engine, db *gorm.DB, cfg *configs.Config, bus *messaging.Bu
 			{
 				billingMod.RegisterRead(read)
 				audienceMod.RegisterRead(read)
-				campaignMod.RegisterRead(read)
+				campaignMod.RegisterRead(read, checker)
 			}
 
 			write := protected.Group("/")
 			write.Use(platformMiddleware.RequirePortalWrite())
 			{
 				billingMod.RegisterWrite(write)
-				campaignMod.RegisterWrite(write)
+				campaignMod.RegisterWrite(write, checker)
 			}
 
 			admin := protected.Group("/admin")
 			admin.Use(platformMiddleware.RequirePortalRoles("operator_admin"))
 			{
 				adminMod.Register(admin, authHandler)
-				analyticsMod.RegisterAdmin(admin)
+				analyticsMod.RegisterAdmin(admin, checker)
 				audienceMod.RegisterAdmin(admin)
+				permHTTP.RegisterRoutes(admin, permHandler)
 			}
 		}
 	}

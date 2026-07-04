@@ -1,6 +1,7 @@
 package database
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
 	"time"
@@ -21,6 +22,9 @@ import (
 	gormpg "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+//go:embed migrations/20260703120000_permissions.sql
+var permissionsMigrationSQL string
 
 func ConnectDB(cfg *configs.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
@@ -86,6 +90,9 @@ func Migrate(db *gorm.DB) error {
 
 	alignAdPortalSchema(db)
 	alignSegmentClassificationSchema(db)
+	if err := applyPermissionsMigration(db); err != nil {
+		return fmt.Errorf("permissions migration: %w", err)
+	}
 	seedPortalRoles(db)
 	seedRewardRules(db)
 	seedBillingCatalog(db)
@@ -187,4 +194,22 @@ func seedAudienceSegments(db *gorm.DB) {
 		db.Where("name = ?", seg.name).FirstOrCreate(&row)
 	}
 	log.Println("audience segments seeded")
+}
+
+func applyPermissionsMigration(db *gorm.DB) error {
+	var count int64
+	if err := db.Raw(`
+		SELECT COUNT(*) FROM information_schema.tables
+		WHERE table_schema = 'public' AND table_name = 'rbac_permissions'
+	`).Scan(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	if err := db.Exec(permissionsMigrationSQL).Error; err != nil {
+		return err
+	}
+	log.Println("permissions schema migrated and seeded")
+	return nil
 }

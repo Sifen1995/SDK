@@ -4,6 +4,8 @@ import (
 	analyticsApp "skykin-platform/internal/analytics/application"
 	analyticsHTTP "skykin-platform/internal/analytics/interfaces/http"
 	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
+	permApp "skykin-platform/internal/permissions/application"
+	platformMiddleware "skykin-platform/internal/platform/middleware"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -21,11 +23,12 @@ func Wire(db *gorm.DB) *Module {
 }
 
 // RegisterAdmin mounts operator analytics dashboard routes.
-func (m *Module) RegisterAdmin(g *gin.RouterGroup) {
-	g.GET("/analytics/overview", m.Handler.Overview)
-	g.GET("/analytics/campaigns", m.Handler.Campaigns)
-	g.GET("/analytics/campaigns/:id", m.Handler.CampaignDetail)
-	g.GET("/analytics/delivery", m.Handler.Delivery)
-	g.GET("/analytics/revenue", m.Handler.Revenue)
-	g.GET("/analytics/advertisers", m.Handler.Advertisers)
+func (m *Module) RegisterAdmin(g *gin.RouterGroup, checker *permApp.PermissionChecker) {
+	readPerm := platformMiddleware.RequirePermission(checker, "analytics:read")
+	g.GET("/analytics/overview", readPerm, m.Handler.Overview)
+	g.GET("/analytics/campaigns", readPerm, m.Handler.Campaigns)
+	g.GET("/analytics/campaigns/:id", readPerm, m.Handler.CampaignDetail)
+	g.GET("/analytics/delivery", readPerm, m.Handler.Delivery)
+	g.GET("/analytics/revenue", readPerm, m.Handler.Revenue)
+	g.GET("/analytics/advertisers", readPerm, m.Handler.Advertisers)
 }

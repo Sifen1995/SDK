@@ -19,6 +19,7 @@ import (
 	"skykin-platform/internal/platform/websocket"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -75,13 +76,24 @@ func main() {
 	hub := websocket.NewHub()
 	bus := messaging.NewBus()
 
+	var rdb *redis.Client
+	if addr := cfg.RedisAddr; addr != "" {
+		client := redis.NewClient(&redis.Options{Addr: addr})
+		if err := client.Ping(context.Background()).Err(); err != nil {
+			slog.Warn("redis unavailable for permissions cache", "error", err)
+		} else {
+			rdb = client
+		}
+	}
+	checker, permHandler := bootstrap.NewPermissionSystem(db, rdb, bus, slog.Default())
+
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Ready to build!"})
 	})
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	classJobs := route.InitRouter(r, db, cfg, hub, bus)
+	classJobs := route.InitRouter(r, db, cfg, hub, bus, checker, permHandler)
 	bootstrap.StartTargetingJob(db, bus, slog.Default(), 5*time.Minute)
 	bootstrap.StartIntentConsistencyJobs(classJobs, slog.Default())
 
