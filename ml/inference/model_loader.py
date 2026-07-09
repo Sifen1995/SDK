@@ -1,34 +1,50 @@
-"""Load trained behavioral intent model artifact."""
-
 from __future__ import annotations
 
-import os
+import json
 from pathlib import Path
+from dataclasses import dataclass
+from typing import Any
 
-import joblib
+import numpy as np
+import tensorflow as tf
 
-DEFAULT_MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "intent_model.pkl"
+ML_ROOT = Path(__file__).resolve().parent.parent
+MODELS_DIR = ML_ROOT / "models"
 
 
+@dataclass
 class ModelArtifact:
-    def __init__(self, data: dict):
-        self.model = data["model"]
-        self.feature_columns: list[str] = data["feature_columns"]
-        self.threshold: float = float(data.get("threshold", 0.7))
-        self.intents: list[str] = data.get("intents", [])
-        self.model_version: str = data.get("model_version", "unknown")
+    model_version: str
+    intents: list[str]
+    threshold: float
+    feature_columns: list[str]
+    model: Any
 
 
-def load_model(path: str | Path | None = None) -> ModelArtifact:
-    model_path = Path(path or os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH))
+def load_model() -> ModelArtifact:
+    label_map_path = MODELS_DIR / "label_map.json"
+    model_path = MODELS_DIR / "best_model.keras"
+
+    if not label_map_path.exists():
+        raise FileNotFoundError(
+            f"Missing label map at {label_map_path}. Run training first."
+        )
     if not model_path.exists():
         raise FileNotFoundError(
-            f"Model not found at '{model_path}'. Run: python -m training.train"
+            f"Missing model at {model_path}. Run training first."
         )
-    data = joblib.load(model_path)
-    # Backward compat with TF-IDF pipeline artifact
-    if "pipeline" in data and "model" not in data:
-        raise RuntimeError(
-            "Legacy text-based model detected. Retrain with: python -m training.train"
-        )
-    return ModelArtifact(data)
+
+    with label_map_path.open() as f:
+        label_map = json.load(f)
+
+    model = tf.keras.models.load_model(model_path)
+    feature_columns = [f"f_{i}" for i in range(47)]
+    intents = [label_map[str(i)] for i in range(len(label_map))]
+
+    return ModelArtifact(
+        model_version="1.0.0",
+        intents=intents,
+        threshold=0.70,
+        feature_columns=feature_columns,
+        model=model,
+    )

@@ -15,5 +15,6 @@ coverage/
 .env.development
 .env.test
 .env.production
+.venv
 .vscode/
 *.sublime-project

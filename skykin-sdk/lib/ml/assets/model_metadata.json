@@ -1,0 +1,21 @@
+{
+  "model_version": "1.0.0",
+  "feature_size": 47,
+  "num_classes": 10,
+  "intent_classes": [
+    "fashion_interest",
+    "crypto_interest",
+    "coffee_interest",
+    "fintech_interest",
+    "travel_intent",
+    "fitness_interest",
+    "shopping_interest",
+    "food_interest",
+    "abandoned_cart",
+    "no_clear_intent"
+  ],
+  "quantized": true,
+  "accuracy": 1.0,
+  "model_size_kb": 26.4,
+  "confidence_threshold": 0.7
+}

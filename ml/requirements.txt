@@ -1,6 +1,8 @@
 uvicorn
 fastapi
+pydantic>=2.0.0
 scikit-learn
 pandas
 joblib
 numpy
+tensorflow
