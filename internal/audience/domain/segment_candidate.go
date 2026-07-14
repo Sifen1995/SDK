@@ -32,7 +32,7 @@ type SegmentCandidate struct {
 }
 
 type UserInCandidate struct {
-	UserID     uuid.UUID
+	UserID     string
 	Confidence float64
 	DaysActive int
 	LastSeenAt time.Time
@@ -51,6 +51,6 @@ type CandidateRepository interface {
 
 type MembershipRepository interface {
 	BulkInsert(ctx context.Context, segmentID uuid.UUID, users []*UserInCandidate) error
-	FindUsersInSegment(ctx context.Context, segmentID uuid.UUID) ([]uuid.UUID, error)
+	FindUsersInSegment(ctx context.Context, segmentID uuid.UUID) ([]string, error)
 	CountMembers(ctx context.Context, segmentID uuid.UUID) (int, error)
 }

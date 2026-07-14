@@ -25,8 +25,7 @@ func NewHandler(ingest *application.IngestEventsUseCase) *Handler {
 // @Tags         SDK - Events
 // @Accept       json
 // @Produce      json
-// @Security     APIKeyAuth
-// @Param        X-Signature  header    string                false  "HMAC-SHA256 signature of the request body"
+// @Security     APIKeyAuth && SDKSecretAuth
 // @Param        body         body      IngestEventsRequest   true   "Batched events"
 // @Success      202          {object}  IngestEventsResponse
 // @Failure      400          {object}  platformHTTP.APIError

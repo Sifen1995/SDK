@@ -93,12 +93,13 @@ func (s *authService) RegisterApplication(ctx context.Context, devID string, req
 	secretKey := fmt.Sprintf("sk_secret_%s", hex.EncodeToString(sBytes))
 
 	hashedPubKey := hashKey(pubKey)
-	hashedSecretKey := hashKey(secretKey)
 
+	// Secret key is stored in recoverable form for HMAC request verification.
+	// Publishable key is hashed so DB lookup never stores the raw pk_live_ value.
 	apiKeyRecord := &domain.APIKey{
 		ApplicationID:  app.ID,
 		KeyValue:       hashedPubKey,
-		SecretKeyValue: hashedSecretKey,
+		SecretKeyValue: secretKey,
 		IsActive:       true,
 		RateLimit:      120,
 	}

@@ -73,7 +73,7 @@ func (j *TargetingJob) matchCampaign(ctx context.Context, campaign *campaigndoma
 		return
 	}
 
-	var userIDs []uuid.UUID
+	var userIDs []string
 	var err error
 
 	if campaign.SegmentID != nil && strings.TrimSpace(*campaign.SegmentID) != "" {
@@ -127,7 +127,7 @@ func (j *TargetingJob) resolveChannelCode(ctx context.Context, channelID string)
 	return channelCodeForBus(ch.Code)
 }
 
-func (j *TargetingJob) tryMatchUser(ctx context.Context, userID, campaignID uuid.UUID, campaign *campaigndomain.Campaign, cap int, channel string) {
+func (j *TargetingJob) tryMatchUser(ctx context.Context, userID string, campaignID uuid.UUID, campaign *campaigndomain.Campaign, cap int, channel string) {
 	delivered, err := j.deliveryRepo.WasDelivered(ctx, userID, campaignID)
 	if err != nil || delivered {
 		return

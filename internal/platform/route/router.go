@@ -1,9 +1,12 @@
 package route
 
 import (
+	"log/slog"
+
 	"skykin-platform/configs"
 	adportalRoutes "skykin-platform/internal/ad_portal/routes"
 	authRoutes "skykin-platform/internal/auth/routes"
+	consentHTTP "skykin-platform/internal/consent/interfaces/http"
 	eventHTTP "skykin-platform/internal/events/interfaces/http"
 	intentRoutes "skykin-platform/internal/intents/routes"
 	permApp "skykin-platform/internal/permissions/application"
@@ -37,12 +40,14 @@ func InitRouter(
 	eventsModule := eventHTTP.NewModule(db, cfg, bus)
 	downstream := bootstrap.RegisterDownstreamConsumers(db, cfg, eventsModule.Bus, hub)
 	intentModule := intentRoutes.Wire(downstream.Predict)
+	consentHandler := bootstrap.NewConsentSystem(db, bus, slog.Default())
 
 	sdkGroup := r.Group("/api/v1")
 	sdkGroup.Use(sdkAuthMiddleware)
 	{
 		eventHTTP.RegisterRoutes(sdkGroup, eventsModule)
 		intentModule.Register(sdkGroup)
+		consentHTTP.RegisterRoutes(sdkGroup, consentHandler)
 		wsRoutes.RegisterRoutes(sdkGroup, hub)
 	}
 

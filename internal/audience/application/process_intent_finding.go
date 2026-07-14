@@ -88,7 +88,7 @@ func (uc *ProcessIntentFindingUseCase) mergeIntoSegment(
 	if err != nil {
 		return FindingOutcome{}, err
 	}
-	memberSet := uuidSet(existing)
+	memberSet := stringSet(existing)
 	newUsers := filterNewUsers(users, memberSet)
 	if len(newUsers) == 0 {
 		uc.logger.Info("no new users for existing segment", "intent", intentName, "segment_id", seg.ID)
@@ -169,15 +169,15 @@ func candidateFromFinding(finding analyticsdomain.IntentConsistencyFinding) *dom
 	}
 }
 
-func uuidSet(ids []uuid.UUID) map[uuid.UUID]struct{} {
-	set := make(map[uuid.UUID]struct{}, len(ids))
+func stringSet(ids []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
 		set[id] = struct{}{}
 	}
 	return set
 }
 
-func filterNewUsers(users []*domain.UserInCandidate, existing map[uuid.UUID]struct{}) []*domain.UserInCandidate {
+func filterNewUsers(users []*domain.UserInCandidate, existing map[string]struct{}) []*domain.UserInCandidate {
 	out := make([]*domain.UserInCandidate, 0, len(users))
 	for _, u := range users {
 		if _, ok := existing[u.UserID]; !ok {

@@ -1,0 +1,4 @@
+-- Design reference — runtime apply uses 20260712153000_users_consent_identity.sql
+-- users: bigint random PK, no phone / external_user_id
+--pseudonymous_mappings: user_id BIGINT ↔pseudonymous_id UUID
+-- consents: user_id BIGINT

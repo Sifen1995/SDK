@@ -66,8 +66,8 @@ func (r *MembershipRepository) CountMembers(ctx context.Context, segmentID uuid.
 	return int(count), nil
 }
 
-func (r *MembershipRepository) FindUsersInSegment(ctx context.Context, segmentID uuid.UUID) ([]uuid.UUID, error) {
-	var ids []uuid.UUID
+func (r *MembershipRepository) FindUsersInSegment(ctx context.Context, segmentID uuid.UUID) ([]string, error) {
+	var ids []string
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT user_id FROM segment_memberships
 		WHERE segment_id = ?

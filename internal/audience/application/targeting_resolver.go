@@ -6,14 +6,12 @@ import (
 
 	audiencedomain "skykin-platform/internal/audience/domain"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
-
-	"github.com/google/uuid"
 )
 
 // IntentUserFinder resolves user IDs from stored intent predictions.
 type IntentUserFinder interface {
-	FindUsersWithIntent(ctx context.Context, intentName string, minConfidence float64, since time.Time) ([]uuid.UUID, error)
-	FindUsersWithAnyIntent(ctx context.Context, intentNames []string, minConfidence float64, since time.Time) ([]uuid.UUID, error)
+	FindUsersWithIntent(ctx context.Context, intentName string, minConfidence float64, since time.Time) ([]string, error)
+	FindUsersWithAnyIntent(ctx context.Context, intentNames []string, minConfidence float64, since time.Time) ([]string, error)
 }
 
 // TargetingResolver applies segment purchase rules when matching users to campaigns.
@@ -33,7 +31,7 @@ func (r *TargetingResolver) ResolveUserIDs(
 	intents IntentUserFinder,
 	minConfidence float64,
 	since time.Time,
-) ([]uuid.UUID, error) {
+) ([]string, error) {
 	if campaign.SegmentID == nil || *campaign.SegmentID == "" {
 		return intents.FindUsersWithIntent(ctx, campaign.TargetIntent, minConfidence, since)
 	}

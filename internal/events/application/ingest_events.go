@@ -94,6 +94,7 @@ func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (
 	if err != nil {
 		return nil, fmt.Errorf("resolve user: %w", err)
 	}
+	_ = user
 
 	results := make([]EventIngestResult, 0, len(cmd.Events))
 	toStore := make([]domain.Event, 0, len(cmd.Events))
@@ -141,7 +142,7 @@ func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (
 
 		event := domain.Event{
 			EventID:       input.EventID,
-			UserID:        user.ID,
+			UserID:        cmd.ExternalUserID,
 			ApplicationID: cmd.ApplicationID,
 			EventType:     domain.EventType(input.EventType),
 			Domain:        input.Domain,

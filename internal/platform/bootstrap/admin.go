@@ -3,16 +3,16 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"skykin-platform/configs"
 	adminApp "skykin-platform/internal/admin/application"
 	intentdomain "skykin-platform/internal/intents/domain"
-	usersdomain "skykin-platform/internal/users/domain"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
+	usersdomain "skykin-platform/internal/users/domain"
 	usersInfra "skykin-platform/internal/users/infrastructure"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -22,16 +22,25 @@ type intentBatchFetcherAdapter struct {
 
 func (a *intentBatchFetcherAdapter) FindLatestByUserIDs(
 	ctx context.Context,
-	userIDs []uuid.UUID,
-) (map[uuid.UUID]*adminApp.IntentSummary, error) {
-	raw, err := a.repo.FindLatestByUserIDs(ctx, userIDs)
+	userIDs []int64,
+) (map[int64]*adminApp.IntentSummary, error) {
+	ids := make([]string, len(userIDs))
+	for i, id := range userIDs {
+		ids[i] = strconv.FormatInt(id, 10)
+	}
+
+	raw, err := a.repo.FindLatestByUserIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[uuid.UUID]*adminApp.IntentSummary, len(raw))
-	for userID, intent := range raw {
-		result[userID] = &adminApp.IntentSummary{
+	result := make(map[int64]*adminApp.IntentSummary, len(raw))
+	for sid, intent := range raw {
+		uid, err := strconv.ParseInt(sid, 10, 64)
+		if err != nil {
+			continue
+		}
+		result[uid] = &adminApp.IntentSummary{
 			IntentName:  intent.IntentName,
 			Confidence:  intent.Confidence,
 			PredictedAt: intent.CreatedAt.Format(time.RFC3339),
@@ -56,14 +65,9 @@ func (a *userListerAdapter) FindAll(
 
 	result := make([]*adminApp.UserSummary, len(users))
 	for i, u := range users {
-		id, err := uuid.Parse(u.ID)
-		if err != nil {
-			return nil, 0, err
-		}
 		result[i] = &adminApp.UserSummary{
-			ID:             id,
-			ExternalUserID: u.ExternalUserID,
-			CreatedAt:      u.CreatedAt,
+			ID:        u.ID,
+			CreatedAt: u.CreatedAt,
 		}
 	}
 	return result, total, nil

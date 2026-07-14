@@ -71,7 +71,7 @@ func seedPendingCandidate(t *testing.T, repo *audienceInfra.CandidateRepository)
 		Status: audiencedomain.CandidateStatusPending, ScannedAt: time.Now().UTC(),
 	}
 	users := []*audiencedomain.UserInCandidate{
-		{UserID: uuid.New(), Confidence: 0.82, DaysActive: 6, LastSeenAt: time.Now().UTC()},
+		{UserID: uuid.New().String(), Confidence: 0.82, DaysActive: 6, LastSeenAt: time.Now().UTC()},
 	}
 	require.NoError(t, repo.Save(context.Background(), candidate, users))
 	return candidateID

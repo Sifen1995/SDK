@@ -18,7 +18,6 @@ import (
 	platformWS "skykin-platform/internal/platform/websocket"
 	rewardsConsumers "skykin-platform/internal/rewards/consumers"
 	rewardsInfra "skykin-platform/internal/rewards/infrastructure"
-	usersInfra "skykin-platform/internal/users/infrastructure"
 	wsConsumers "skykin-platform/internal/websocket/consumers"
 
 	"gorm.io/gorm"
@@ -32,7 +31,7 @@ type Downstream struct {
 // RegisterDownstreamConsumers wires intent prediction worker and websocket consumers.
 func RegisterDownstreamConsumers(db *gorm.DB, cfg *configs.Config, bus *messaging.Bus, hub *platformWS.Hub) *Downstream {
 	eventRepo := eventsInfra.NewPostgresRepository(db)
-	userRepo := usersInfra.NewUserRepository(db)
+	userResolver := NewPseudonymousUserResolver(db)
 	intentRepo := intentsInfra.NewIntentRepository(db, cfg)
 	rewardRepo := rewardsInfra.NewRewardRepository(db)
 	campaignRepo := campaignInfra.NewRepository(db)
@@ -55,7 +54,7 @@ func RegisterDownstreamConsumers(db *gorm.DB, cfg *configs.Config, bus *messagin
 
 	predictUC := intentsApp.NewPredictIntentUseCase(
 		eventRepo,
-		userRepo,
+		userResolver,
 		mlClient,
 		intentRepo,
 		adDelivery,

@@ -3,13 +3,10 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE users (
-    id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    external_user_id  VARCHAR(255) NOT NULL UNIQUE,
-    phone_number      VARCHAR(20)  NULL, -- 👈 Added optional (nullable) field
-    created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    pseudonymous_id  VARCHAR(64) PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_users_external_user_id ON users (external_user_id);
-CREATE INDEX idx_users_phone_number ON users (phone_number); -- 👈 Added index for fast lookups
+CREATE INDEX idx_users_pseudonymous_id ON users (pseudonymous_id);
 
 -- migrate:down
 DROP TABLE IF EXISTS users;

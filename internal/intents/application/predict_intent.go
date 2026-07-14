@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -139,7 +140,7 @@ func (uc *PredictIntentUseCase) Execute(ctx context.Context, externalUserID stri
 	}
 
 	intent, err := uc.intentRepo.Create(ctx, &intentdomain.Intent{
-		UserID:     user.ID,
+		UserID:     strconv.FormatInt(user.ID, 10),
 		IntentName: mlResult.Intent,
 		Confidence: mlResult.Confidence,
 		CreatedAt:  time.Now().UTC(),
@@ -157,8 +158,9 @@ func (uc *PredictIntentUseCase) Execute(ctx context.Context, externalUserID stri
 		TopSignals:      mlResult.TopSignals,
 	}
 
+	internalID := strconv.FormatInt(user.ID, 10)
 	uc.notifyIntentPredicted(ctx, externalUserID, result)
-	uc.deliverCampaignAd(ctx, externalUserID, user.ID, intent.IntentName, intent.Confidence, history)
+	uc.deliverCampaignAd(ctx, externalUserID, internalID, intent.IntentName, intent.Confidence, history)
 
 	if mlResult.RewardTriggered && uc.bus != nil {
 		uc.bus.Publish(messaging.Event{
@@ -166,7 +168,7 @@ func (uc *PredictIntentUseCase) Execute(ctx context.Context, externalUserID stri
 			Ctx:  ctx,
 			Payload: intentEvents.IntentRewardEligible{
 				ExternalUserID: externalUserID,
-				InternalUserID: user.ID,
+				InternalUserID: internalID,
 				IntentID:       intent.ID,
 				IntentName:     intent.IntentName,
 			},

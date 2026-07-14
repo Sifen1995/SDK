@@ -16,7 +16,7 @@ type EventPublisher interface {
 	Publish(ctx context.Context, topic string, payload any)
 }
 
-// UserResolver resolves SDK external user IDs to internal UUIDs.
+// UserResolver resolves Flutter pseudonymous IDs to internal users (via consent mapping).
 type UserResolver interface {
-	FindOrCreate(ctx context.Context, externalUserID string) (*domain.User, error)
+	FindOrCreate(ctx context.Context, pseudonymousID string) (*domain.User, error)
 }

@@ -9,7 +9,7 @@ import (
 // IntentRow is the GORM persistence model for intents.
 type IntentRow struct {
 	ID         string    `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID     string    `gorm:"type:uuid;not null;index"`
+	UserID     string    `gorm:"type:varchar(64);not null;index"`
 	IntentName string    `gorm:"type:varchar(100);not null;index"`
 	Confidence float64   `gorm:"type:numeric(4,3);not null"`
 	CreatedAt  time.Time `gorm:"not null;default:now()"`

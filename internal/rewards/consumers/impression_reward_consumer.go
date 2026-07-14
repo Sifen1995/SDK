@@ -1,11 +1,12 @@
 package consumers
 
 import (
+	"strconv"
 	"time"
 
+	"skykin-platform/internal/platform/messaging"
 	rewardsdomain "skykin-platform/internal/rewards/domain"
 	usersdomain "skykin-platform/internal/users/domain"
-	"skykin-platform/internal/platform/messaging"
 	wsConsumers "skykin-platform/internal/websocket/consumers"
 )
 
@@ -19,6 +20,8 @@ type RewardEvaluationPayload struct {
 	Triggered      bool
 }
 
+// RewardConsumer handles legacy impression-based reward evaluation.
+// Prefer IntentRewardConsumer for the consent-based pipeline.
 type RewardConsumer struct {
 	rewardRepo rewardsdomain.RewardRepository
 	userRepo   usersdomain.UserRepository
@@ -44,13 +47,17 @@ func (c *RewardConsumer) handle(e messaging.Event) {
 		return
 	}
 
-	user, err := c.userRepo.FindOrCreate(e.Ctx, p.ExternalUserID)
+	userID, err := strconv.ParseInt(p.ExternalUserID, 10, 64)
+	if err != nil {
+		return
+	}
+	user, err := c.userRepo.FindByID(e.Ctx, userID)
 	if err != nil {
 		return
 	}
 
 	reward := &rewardsdomain.Reward{
-		UserID:     user.ID,
+		UserID:     strconv.FormatInt(user.ID, 10),
 		IntentID:   p.IntentID,
 		RuleID:     rule.ID,
 		RewardType: rule.RewardType,

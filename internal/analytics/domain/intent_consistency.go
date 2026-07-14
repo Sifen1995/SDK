@@ -11,7 +11,7 @@ const TopicIntentConsistencyFinding = "IntentConsistencyFinding"
 
 // ConsistentUser is a user exhibiting sustained interest in an intent class.
 type ConsistentUser struct {
-	UserID     uuid.UUID
+	UserID     string
 	Confidence float64
 	DaysActive int
 	LastSeenAt time.Time

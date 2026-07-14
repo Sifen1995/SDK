@@ -8,6 +8,6 @@ import (
 
 // DeliveryRepository tracks per-user campaign delivery jobs.
 type DeliveryRepository interface {
-	WasDelivered(ctx context.Context, userID, campaignID uuid.UUID) (bool, error)
-	CountToday(ctx context.Context, userID, campaignID uuid.UUID) (int, error)
+	WasDelivered(ctx context.Context, userID string, campaignID uuid.UUID) (bool, error)
+	CountToday(ctx context.Context, userID string, campaignID uuid.UUID) (int, error)
 }

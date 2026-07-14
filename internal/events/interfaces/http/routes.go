@@ -7,9 +7,9 @@ import (
 	"skykin-platform/configs"
 	"skykin-platform/internal/events/application"
 	eventsInfra "skykin-platform/internal/events/infrastructure"
+	"skykin-platform/internal/platform/bootstrap"
 	"skykin-platform/internal/platform/messaging"
 	platformredis "skykin-platform/internal/platform/redis"
-	usersInfra "skykin-platform/internal/users/infrastructure"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -28,7 +28,7 @@ func NewModule(db *gorm.DB, cfg *configs.Config, bus *messaging.Bus) *Module {
 	}
 
 	repo := eventsInfra.NewPostgresRepository(db)
-	userRepo := usersInfra.NewUserRepository(db)
+	userResolver := bootstrap.NewPseudonymousUserResolver(db)
 	redisClient := eventsInfra.NewRedisClientFromAddr(cfg.RedisAddr)
 	dedup := eventsInfra.NewRedisDedupStore(redisClient)
 	publisher := eventsInfra.NewBusEventPublisher(bus)
@@ -39,7 +39,7 @@ func NewModule(db *gorm.DB, cfg *configs.Config, bus *messaging.Bus) *Module {
 		}
 	}
 
-	ingest := application.NewIngestEventsUseCase(repo, userRepo, dedup, redisQueueClient, publisher, slog.Default())
+	ingest := application.NewIngestEventsUseCase(repo, userResolver, dedup, redisQueueClient, publisher, slog.Default())
 	handler := NewHandler(ingest)
 
 	return &Module{Handler: handler, Bus: bus}

@@ -114,12 +114,12 @@ func (m *mockCandidateRepo) LinkToSegment(_ context.Context, candidateID, segmen
 }
 
 type mockMembershipRepo struct {
-	inserted map[uuid.UUID]struct{}
+	inserted map[string]struct{}
 	segment  uuid.UUID
 }
 
 func newMockMembershipRepo() *mockMembershipRepo {
-	return &mockMembershipRepo{inserted: make(map[uuid.UUID]struct{})}
+	return &mockMembershipRepo{inserted: make(map[string]struct{})}
 }
 
 func (m *mockMembershipRepo) BulkInsert(_ context.Context, segmentID uuid.UUID, users []*audiencedomain.UserInCandidate) error {
@@ -130,8 +130,8 @@ func (m *mockMembershipRepo) BulkInsert(_ context.Context, segmentID uuid.UUID, 
 	return nil
 }
 
-func (m *mockMembershipRepo) FindUsersInSegment(_ context.Context, _ uuid.UUID) ([]uuid.UUID, error) {
-	out := make([]uuid.UUID, 0, len(m.inserted))
+func (m *mockMembershipRepo) FindUsersInSegment(_ context.Context, _ uuid.UUID) ([]string, error) {
+	out := make([]string, 0, len(m.inserted))
 	for id := range m.inserted {
 		out = append(out, id)
 	}
@@ -203,8 +203,8 @@ func (m *mockProcessor) Process(_ context.Context, finding analyticsdomain.Inten
 
 func TestAnalyzeIntentConsistency_ProcessesFindings(t *testing.T) {
 	users := []*analyticsdomain.ConsistentUser{
-		{UserID: uuid.New(), Confidence: 0.80, DaysActive: 6, LastSeenAt: time.Now()},
-		{UserID: uuid.New(), Confidence: 0.90, DaysActive: 8, LastSeenAt: time.Now()},
+		{UserID: uuid.New().String(), Confidence: 0.80, DaysActive: 6, LastSeenAt: time.Now()},
+		{UserID: uuid.New().String(), Confidence: 0.90, DaysActive: 8, LastSeenAt: time.Now()},
 	}
 	processor := &mockProcessor{}
 	cfg := analyticsdomain.ClassificationConfig{IntentClasses: []string{"coffee_interest"}}
@@ -227,7 +227,7 @@ func TestProcessIntentFinding_CreatesCandidateWhenNoMatch(t *testing.T) {
 		FindingID: uuid.New(), IntentName: "crypto_interest", UserCount: 1,
 		AvgConfidence: 0.9, AvgDaysActive: 6, MinDaysActive: 5, LookbackDays: 30,
 		ScannedAt: time.Now().UTC(),
-		Users: []*analyticsdomain.ConsistentUser{{UserID: uuid.New(), Confidence: 0.9, DaysActive: 6}},
+		Users: []*analyticsdomain.ConsistentUser{{UserID: uuid.New().String(), Confidence: 0.9, DaysActive: 6}},
 	}
 	outcome, err := uc.Execute(context.Background(), finding)
 	require.NoError(t, err)
@@ -240,8 +240,8 @@ func TestProcessIntentFinding_MergesIntoExistingSegment(t *testing.T) {
 	segRepo := newMockSegmentRepo()
 	memRepo := newMockMembershipRepo()
 	segID := uuid.New()
-	existingUser := uuid.New()
-	newUser := uuid.New()
+	existingUser := uuid.New().String()
+	newUser := uuid.New().String()
 	memRepo.inserted[existingUser] = struct{}{}
 	segRepo.segments["crypto_interest"] = &audiencedomain.AudienceSegment{
 		ID: segID.String(), TopIntentSignals: []string{"crypto_interest"}, IsActive: true,
@@ -266,7 +266,7 @@ func TestProcessIntentFinding_SkipsWhenNoNewUsers(t *testing.T) {
 	segRepo := newMockSegmentRepo()
 	memRepo := newMockMembershipRepo()
 	segID := uuid.New()
-	existingUser := uuid.New()
+	existingUser := uuid.New().String()
 	memRepo.inserted[existingUser] = struct{}{}
 	segRepo.segments["crypto_interest"] = &audiencedomain.AudienceSegment{
 		ID: segID.String(), TopIntentSignals: []string{"crypto_interest"}, IsActive: true,
@@ -296,8 +296,8 @@ func TestProcessIntentFinding_UpdatesPendingCandidate(t *testing.T) {
 		FindingID: uuid.New(), IntentName: "fashion_interest", UserCount: 2,
 		AvgConfidence: 0.85, ScannedAt: time.Now().UTC(),
 		Users: []*analyticsdomain.ConsistentUser{
-			{UserID: uuid.New(), Confidence: 0.85, DaysActive: 6},
-			{UserID: uuid.New(), Confidence: 0.85, DaysActive: 6},
+			{UserID: uuid.New().String(), Confidence: 0.85, DaysActive: 6},
+			{UserID: uuid.New().String(), Confidence: 0.85, DaysActive: 6},
 		},
 	}
 	outcome, err := uc.Execute(context.Background(), finding)

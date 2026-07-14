@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Skykin Platform API</title>
+  <link rel="stylesheet" type="text/css" href="./swagger-ui.css">
+  <style>
+    html { box-sizing: border-box; overflow-y: scroll; }
+    *, *:before, *:after { box-sizing: inherit; }
+    body { margin: 0; background: #fafafa; }
+    .skykin-hmac-banner {
+      background: #1b1b1b;
+      color: #e8e8e8;
+      font: 13px/1.45 system-ui, sans-serif;
+      padding: 10px 20px;
+    }
+    .skykin-hmac-banner code { background: #333; padding: 1px 6px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div class="skykin-hmac-banner">
+    <strong>SDK auth:</strong>
+    Authorize with <code>X-API-Key</code> = publishable key (<code>pk_live_...</code>)
+    and <code>X-SDK-Secret</code> = secret key (<code>sk_secret_...</code>).
+    Swagger UI computes <code>X-Signature</code> = HMAC-SHA256(secret, raw JSON body) automatically for POST requests.
+    The secret is <em>not</em> sent to the API.
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="./swagger-ui-bundle.js"></script>
+  <script src="./swagger-ui-standalone-preset.js"></script>
+  <script>
+    async function hmacSha256Hex(secret, message) {
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        "raw",
+        enc.encode(secret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+      );
+      const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+      return Array.from(new Uint8Array(sig))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
+    function normalizeHeaders(headers) {
+      if (!headers) return {};
+      if (headers instanceof Headers) {
+        const out = {};
+        headers.forEach((v, k) => { out[k] = v; });
+        return out;
+      }
+      return Object.assign({}, headers);
+    }
+
+    function headerGet(headers, name) {
+      const lower = name.toLowerCase();
+      for (const k of Object.keys(headers)) {
+        if (k.toLowerCase() === lower) return headers[k];
+      }
+      return "";
+    }
+
+    function headerDelete(headers, name) {
+      const lower = name.toLowerCase();
+      for (const k of Object.keys(headers)) {
+        if (k.toLowerCase() === lower) delete headers[k];
+      }
+    }
+
+    function bodyAsString(body) {
+      if (body == null || body === "") return "";
+      if (typeof body === "string") return body;
+      try { return JSON.stringify(body); } catch (_) { return String(body); }
+    }
+
+    window.onload = function () {
+      window.ui = SwaggerUIBundle({
+        url: "./doc.json",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        persistAuthorization: true,
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: "StandaloneLayout",
+        requestInterceptor: async function (req) {
+          const headers = normalizeHeaders(req.headers);
+          const secret = headerGet(headers, "X-SDK-Secret");
+          const method = (req.method || "GET").toUpperCase();
+          const body = bodyAsString(req.body);
+
+          if (secret && (method === "POST" || method === "PUT" || method === "PATCH")) {
+            headers["X-Signature"] = await hmacSha256Hex(secret, body);
+          }
+          headerDelete(headers, "X-SDK-Secret");
+          req.headers = headers;
+          return req;
+        },
+      });
+    };
+  </script>
+</body>
+</html>

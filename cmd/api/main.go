@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log"
 	"log/slog"
@@ -24,9 +25,12 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+//go:embed swagger_index.html
+var swaggerIndexHTML []byte
+
 // @title           Skykin Platform API
 // @version         1.0
-// @description     Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK event ingestion, intent prediction, campaign ad delivery via WebSocket, and reward notifications.
+// @description     Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK consent registration, event ingestion, intent prediction, campaign ad delivery via WebSocket, and reward notifications.
 
 // @host            localhost:8081
 // @BasePath        /api/v1
@@ -39,7 +43,12 @@ import (
 // @securityDefinitions.apikey APIKeyAuth
 // @in header
 // @name X-API-Key
-// @description SDK publishable key (pk_live_...)
+// @description SDK publishable key (pk_live_...). Required for /api/v1 SDK routes.
+
+// @securityDefinitions.apikey SDKSecretAuth
+// @in header
+// @name X-SDK-Secret
+// @description SDK secret key (sk_secret_...). Swagger UI uses this ONLY to auto-compute X-Signature (HMAC-SHA256 of the request body). The secret is stripped before the request is sent.
 
 func main() {
 	// Initialize clean, bare engine instance
@@ -91,7 +100,17 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Ready to build!"})
 	})
 
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Custom Swagger index: Authorize with pk + sk; UI computes X-Signature via HMAC.
+	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
+	r.GET("/swagger", func(c *gin.Context) { c.Redirect(http.StatusFound, "/swagger/index.html") })
+	r.GET("/swagger/*any", func(c *gin.Context) {
+		path := c.Param("any")
+		if path == "/" || path == "/index.html" || path == "" {
+			c.Data(http.StatusOK, "text/html; charset=utf-8", swaggerIndexHTML)
+			return
+		}
+		swaggerHandler(c)
+	})
 
 	classJobs := route.InitRouter(r, db, cfg, hub, bus, checker, permHandler)
 	bootstrap.StartTargetingJob(db, bus, slog.Default(), 5*time.Minute)

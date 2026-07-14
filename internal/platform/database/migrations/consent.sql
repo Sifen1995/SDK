@@ -1,0 +1,2 @@
+-- Superseded by 20260712120000_consent_and_mappings.sql.
+-- Consent no longer FK's users(pseudonymous_id); mapping lives in pseudonymous_mappings.

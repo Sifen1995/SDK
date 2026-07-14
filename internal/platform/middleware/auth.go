@@ -16,6 +16,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// SDKAuthMiddleware authenticates Flutter/SDK traffic the same way for all
+// /api/v1 routes (events, consent, intents, …):
+//
+//  1. X-API-Key  = publishable key (pk_live_...)
+//  2. X-Signature = lowercase hex HMAC-SHA256(secret_key, raw request body)
+//     Required for every POST (and whenever X-Signature is sent).
 func SDKAuthMiddleware(authRepo repository.AuthRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		pubKeyPlain := c.GetHeader("X-API-Key")
@@ -33,8 +39,24 @@ func SDKAuthMiddleware(authRepo repository.AuthRepository) gin.HandlerFunc {
 			return
 		}
 
-		signature := c.GetHeader("X-Signature")
-		if signature != "" || c.Request.Method == http.MethodPost {
+		needsSignature := c.GetHeader("X-Signature") != "" || c.Request.Method == http.MethodPost
+		if needsSignature {
+			signature := c.GetHeader("X-Signature")
+			if signature == "" {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "missing X-Signature header — compute HMAC-SHA256(secret_key, raw JSON body) as lowercase hex; do not put the secret_key value in X-Signature",
+				})
+				c.Abort()
+				return
+			}
+			if len(signature) >= 10 && (signature[:10] == "sk_secret_" || signature[:3] == "sk_") {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "X-Signature must be HMAC-SHA256(secret_key, raw body) hex — not the secret_key itself. Example: echo -n '{\"consent_level\":\"individual\",\"sdk_version\":\"1.0.0\"}' | openssl dgst -sha256 -hmac 'YOUR_SECRET_KEY'",
+				})
+				c.Abort()
+				return
+			}
+
 			bodyBytes, err := io.ReadAll(c.Request.Body)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "unable to read payload body"})
@@ -47,7 +69,9 @@ func SDKAuthMiddleware(authRepo repository.AuthRepository) gin.HandlerFunc {
 			mac.Write(bodyBytes)
 			expectedSignature := hex.EncodeToString(mac.Sum(nil))
 			if !hmac.Equal([]byte(signature), []byte(expectedSignature)) {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "cryptographic payload signature mismatch"})
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "cryptographic payload signature mismatch — X-Signature must be lowercase hex HMAC-SHA256(secret_key, exact raw request body). Recreate the application if the secret was issued before the HMAC secret-storage fix.",
+				})
 				c.Abort()
 				return
 			}
@@ -110,4 +134,3 @@ func sha256Hash(input string) string {
 	h.Write([]byte(input))
 	return hex.EncodeToString(h.Sum(nil))
 }
-

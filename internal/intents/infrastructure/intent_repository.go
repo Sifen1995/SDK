@@ -9,7 +9,6 @@ import (
 	intentdomain "skykin-platform/internal/intents/domain"
 	"skykin-platform/internal/intents/infrastructure/persistence"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -35,7 +34,7 @@ func (r *intentRepository) FindUsersWithIntent(
 	intentName string,
 	minConfidence float64,
 	since time.Time,
-) ([]uuid.UUID, error) {
+) ([]string, error) {
 	return r.findDistinctUsersWithFilter(ctx, func(q *gorm.DB) *gorm.DB {
 		return q.Where("intent_name = ? AND confidence >= ? AND created_at >= ?", intentName, minConfidence, since)
 	})
@@ -46,7 +45,7 @@ func (r *intentRepository) FindUsersWithAnyIntent(
 	intentNames []string,
 	minConfidence float64,
 	since time.Time,
-) ([]uuid.UUID, error) {
+) ([]string, error) {
 	if len(intentNames) == 0 {
 		return nil, nil
 	}
@@ -58,7 +57,7 @@ func (r *intentRepository) FindUsersWithAnyIntent(
 func (r *intentRepository) findDistinctUsersWithFilter(
 	ctx context.Context,
 	apply func(*gorm.DB) *gorm.DB,
-) ([]uuid.UUID, error) {
+) ([]string, error) {
 	filtered := apply(r.db.WithContext(ctx).Model(&persistence.IntentRow{}))
 	sub := filtered.
 		Select("user_id, MAX(created_at) AS created_at").
@@ -76,34 +75,27 @@ func (r *intentRepository) findDistinctUsersWithFilter(
 		return nil, err
 	}
 
-	out := make([]uuid.UUID, 0, len(rows))
+	out := make([]string, 0, len(rows))
 	for _, row := range rows {
-		parsed, err := uuid.Parse(row.UserID)
-		if err != nil {
-			continue
+		if row.UserID != "" {
+			out = append(out, row.UserID)
 		}
-		out = append(out, parsed)
 	}
 	return out, nil
 }
 
 func (r *intentRepository) FindLatestByUserIDs(
 	ctx context.Context,
-	userIDs []uuid.UUID,
-) (map[uuid.UUID]*intentdomain.Intent, error) {
+	userIDs []string,
+) (map[string]*intentdomain.Intent, error) {
 	if len(userIDs) == 0 {
-		return map[uuid.UUID]*intentdomain.Intent{}, nil
-	}
-
-	ids := make([]string, len(userIDs))
-	for i, id := range userIDs {
-		ids[i] = id.String()
+		return map[string]*intentdomain.Intent{}, nil
 	}
 
 	sub := r.db.WithContext(ctx).
 		Model(&persistence.IntentRow{}).
 		Select("user_id, MAX(created_at) AS created_at").
-		Where("user_id IN ?", ids).
+		Where("user_id IN ?", userIDs).
 		Group("user_id")
 
 	var rows []persistence.IntentRow
@@ -115,14 +107,10 @@ func (r *intentRepository) FindLatestByUserIDs(
 		return nil, err
 	}
 
-	result := make(map[uuid.UUID]*intentdomain.Intent, len(rows))
+	result := make(map[string]*intentdomain.Intent, len(rows))
 	for i := range rows {
 		d := rows[i].ToDomain()
-		uid, err := uuid.Parse(d.UserID)
-		if err != nil {
-			continue
-		}
-		result[uid] = d
+		result[d.UserID] = d
 	}
 	return result, nil
 }
@@ -159,7 +147,7 @@ func (r *intentRepository) findConsistentUsers(
 	maxAgeSince := time.Now().AddDate(0, 0, -maxAgeDays)
 
 	type row struct {
-		UserID        uuid.UUID
+		UserID        string
 		DaysActive    int
 		AvgConfidence float64
 		LastSeenAt    time.Time

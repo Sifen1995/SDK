@@ -21,7 +21,7 @@ func NewUsersHandler(getUsers *adminApp.GetUsersWithIntentsUseCase) *UsersHandle
 
 // ListUsers godoc
 // @Summary      List SDK users with latest intent
-// @Description  Returns paginated SDK users enriched with each user's most recent intent prediction when available.
+// @Description  Returns paginated SDK users (bigint user_id, no phone/external_user_id) enriched with each user's most recent intent prediction when available.
 // @Tags         Ad Portal - Admin
 // @Produce      json
 // @Security     BearerAuth

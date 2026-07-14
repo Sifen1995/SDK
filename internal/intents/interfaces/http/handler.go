@@ -23,7 +23,7 @@ func NewHandler(predict *application.PredictIntentUseCase) *Handler {
 // @Tags         SDK - Intents
 // @Accept       json
 // @Produce      json
-// @Security     APIKeyAuth
+// @Security     APIKeyAuth && SDKSecretAuth
 // @Param        body  body      PredictIntentRequest  true  "User id to evaluate"
 // @Success      200   {object}  application.PredictIntentResult
 // @Failure      400   {object}  platformHTTP.APIError

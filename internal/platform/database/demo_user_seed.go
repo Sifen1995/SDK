@@ -1,53 +1,66 @@
 package database
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"time"
 
+	consentpersistence "skykin-platform/internal/consent/infrastructure/persistence"
 	intentpersistence "skykin-platform/internal/intents/infrastructure/persistence"
 	userpersistence "skykin-platform/internal/users/infrastructure/persistence"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-const (
-	demoFashionExternalID = "demo-fashion-user"
-	demoFashionPhone      = "+251911000001"
-	demoFashionCohortSize = 12 // users that qualify for fashion_interest classification
-)
+const demoFashionCohortSize = 12
 
-// seedDemoFashionUser inserts demo SDK users with phone numbers and sustained
-// fashion_interest rows so intent-consistency analysis produces a segment candidate.
+// seedDemoFashionUser inserts demo SDK users (random bigint ids) with mappings
+// and sustained fashion_interest rows so intent-consistency analysis works.
 func seedDemoFashionUser(db *gorm.DB) {
 	seedFashionCohort(db)
 }
 
 func seedFashionCohort(db *gorm.DB) {
-	now := time.Now().UTC()
-	phones := []string{
-		"+251911000001", "+251911000002", "+251911000003", "+251911000004",
-		"+251911000005", "+251911000006", "+251911000007", "+251911000008",
-		"+251911000009", "+251911000010", "+251911000011", "+251911000012",
+	var existing int64
+	if err := db.Model(&userpersistence.UserRow{}).Count(&existing).Error; err == nil && existing > 0 {
+		return
 	}
 
+	now := time.Now().UTC()
 	for i := 0; i < demoFashionCohortSize; i++ {
-		extID := demoFashionExternalID
-		if i > 0 {
-			extID = fmt.Sprintf("demo-fashion-user-%02d", i+1)
-		}
-		phone := phones[i]
-		user := userpersistence.UserRow{ExternalUserID: extID, PhoneNumber: &phone}
-		if err := db.Where("external_user_id = ?", extID).
-			Attrs(userpersistence.UserRow{PhoneNumber: &phone}).
-			FirstOrCreate(&user).Error; err != nil {
+		id, err := randomDemoUserID()
+		if err != nil {
 			log.Printf("demo fashion user seed (non-fatal): %v", err)
 			continue
 		}
-		seedFashionIntentsForUser(db, user.ID, now, i)
+		user := userpersistence.UserRow{ID: id}
+		if err := db.Create(&user).Error; err != nil {
+			log.Printf("demo fashion user seed (non-fatal): %v", err)
+			continue
+		}
+		mapping := consentpersistence.PseudonymousMappingRow{
+			UserID:         user.ID,
+			PseudonymousID: uuid.New(),
+		}
+		if err := db.Create(&mapping).Error; err != nil {
+			log.Printf("demo fashion mapping seed (non-fatal): %v", err)
+		}
+		consent := consentpersistence.ConsentRow{
+			UserID:       user.ID,
+			ConsentLevel: "individual",
+			IsActive:     true,
+			GrantedAt:    &now,
+			SDKVersion:   "demo",
+		}
+		if err := db.Create(&consent).Error; err != nil {
+			log.Printf("demo fashion consent seed (non-fatal): %v", err)
+		}
+		seedFashionIntentsForUser(db, fmt.Sprintf("%d", user.ID), now, i)
 	}
-	log.Printf("demo fashion cohort seeded: %d users (external ids demo-fashion-user … demo-fashion-user-%02d)",
-		demoFashionCohortSize, demoFashionCohortSize)
+	log.Printf("demo fashion cohort seeded: %d users (bigint ids + pseudonymous mappings)", demoFashionCohortSize)
 }
 
 func seedFashionIntentsForUser(db *gorm.DB, userID string, now time.Time, offset int) {
@@ -69,4 +82,16 @@ func seedFashionIntentsForUser(db *gorm.DB, userID string, now time.Time, offset
 			log.Printf("demo fashion intent seed (non-fatal): %v", err)
 		}
 	}
+}
+
+func randomDemoUserID() (int64, error) {
+	var buf [8]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return 0, err
+	}
+	n := int64(binary.BigEndian.Uint64(buf[:]) & 0x7fffffffffffffff)
+	if n == 0 {
+		n = 1
+	}
+	return n, nil
 }

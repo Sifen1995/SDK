@@ -19,19 +19,19 @@ func NewDeliveryRepository(db *gorm.DB) deliverydomain.DeliveryRepository {
 	return &DeliveryRepository{db: db}
 }
 
-func (r *DeliveryRepository) WasDelivered(ctx context.Context, userID, campaignID uuid.UUID) (bool, error) {
+func (r *DeliveryRepository) WasDelivered(ctx context.Context, userID string, campaignID uuid.UUID) (bool, error) {
 	var n int64
 	err := r.db.WithContext(ctx).Model(&persistence.DeliveryJobRow{}).
-		Where("user_id = ? AND campaign_id = ?", userID.String(), campaignID.String()).
+		Where("user_id = ? AND campaign_id = ?", userID, campaignID.String()).
 		Count(&n).Error
 	return n > 0, err
 }
 
-func (r *DeliveryRepository) CountToday(ctx context.Context, userID, campaignID uuid.UUID) (int, error) {
+func (r *DeliveryRepository) CountToday(ctx context.Context, userID string, campaignID uuid.UUID) (int, error) {
 	start := time.Now().UTC().Truncate(24 * time.Hour)
 	var n int64
 	err := r.db.WithContext(ctx).Model(&persistence.DeliveryJobRow{}).
-		Where("user_id = ? AND campaign_id = ? AND created_at >= ?", userID.String(), campaignID.String(), start).
+		Where("user_id = ? AND campaign_id = ? AND created_at >= ?", userID, campaignID.String(), start).
 		Count(&n).Error
 	return int(n), err
 }

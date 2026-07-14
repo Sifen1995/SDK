@@ -4,15 +4,12 @@ import (
 	"context"
 	"log/slog"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type UserWithIntent struct {
-	UserID         uuid.UUID      `json:"user_id"`
-	ExternalUserID string         `json:"external_user_id"`
-	CreatedAt      string         `json:"created_at"`
-	LatestIntent   *IntentSummary `json:"latest_intent,omitempty"`
+	UserID       int64          `json:"user_id"`
+	CreatedAt    string         `json:"created_at"`
+	LatestIntent *IntentSummary `json:"latest_intent,omitempty"`
 }
 
 type IntentSummary struct {
@@ -23,7 +20,7 @@ type IntentSummary struct {
 
 // IntentBatchFetcher returns admin-owned intent summaries keyed by user id.
 type IntentBatchFetcher interface {
-	FindLatestByUserIDs(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]*IntentSummary, error)
+	FindLatestByUserIDs(ctx context.Context, userIDs []int64) (map[int64]*IntentSummary, error)
 }
 
 // UserLister returns paginated admin-owned user summaries.
@@ -32,9 +29,8 @@ type UserLister interface {
 }
 
 type UserSummary struct {
-	ID             uuid.UUID
-	ExternalUserID string
-	CreatedAt      time.Time
+	ID        int64
+	CreatedAt time.Time
 }
 
 type GetUsersRequest struct {
@@ -91,7 +87,7 @@ func (uc *GetUsersWithIntentsUseCase) Execute(
 		return nil, err
 	}
 
-	userIDs := make([]uuid.UUID, len(users))
+	userIDs := make([]int64, len(users))
 	for i, u := range users {
 		userIDs[i] = u.ID
 	}
@@ -99,15 +95,14 @@ func (uc *GetUsersWithIntentsUseCase) Execute(
 	intentMap, err := uc.intentRepo.FindLatestByUserIDs(ctx, userIDs)
 	if err != nil {
 		uc.logger.Warn("intent fetch failed, returning users only", "error", err)
-		intentMap = map[uuid.UUID]*IntentSummary{}
+		intentMap = map[int64]*IntentSummary{}
 	}
 
 	result := make([]*UserWithIntent, len(users))
 	for i, u := range users {
 		uwi := &UserWithIntent{
-			UserID:         u.ID,
-			ExternalUserID: u.ExternalUserID,
-			CreatedAt:      u.CreatedAt.Format(time.RFC3339),
+			UserID:    u.ID,
+			CreatedAt: u.CreatedAt.Format(time.RFC3339),
 		}
 		if intent, ok := intentMap[u.ID]; ok {
 			uwi.LatestIntent = intent

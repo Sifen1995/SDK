@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK event ingestion, intent prediction, campaign ad delivery via WebSocket, and reward notifications.",
+        "description": "Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK consent registration, event ingestion, intent prediction, campaign ad delivery via WebSocket, and reward notifications.",
         "title": "Skykin Platform API",
         "contact": {},
         "version": "1.0"
@@ -1170,7 +1170,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns paginated SDK users enriched with each user's most recent intent prediction when available.",
+                "description": "Returns paginated SDK users (bigint user_id, no phone/external_user_id) enriched with each user's most recent intent prediction when available.",
                 "produces": [
                     "application/json"
                 ],
@@ -1737,11 +1737,70 @@
                 }
             }
         },
+        "/consent": {
+            "post": {
+                "security": [
+                    {
+                        "APIKeyAuth": [],
+                        "SDKSecretAuth": []
+                    }
+                ],
+                "description": "Flutter sends only consent_level and sdk_version. In Swagger Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); the UI auto-computes X-Signature. Backend generates pseudonymous_id and event-drives user + mapping + consent.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Consent"
+                ],
+                "summary": "Register SDK user consent",
+                "parameters": [
+                    {
+                        "description": "Consent registration",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_consent_interfaces_http.CreateConsentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_consent_interfaces_http.CreateConsentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/events": {
             "post": {
                 "security": [
                     {
-                        "APIKeyAuth": []
+                        "APIKeyAuth": [],
+                        "SDKSecretAuth": []
                     }
                 ],
                 "description": "Accepts domain-agnostic SDK events (screen views, content views, searches, etc.). Stores events and caches history. Call POST /intents/predict to run prediction and receive intent + campaign on WebSocket.",
@@ -1756,12 +1815,6 @@
                 ],
                 "summary": "Ingest batched behavioral events",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "HMAC-SHA256 signature of the request body",
-                        "name": "X-Signature",
-                        "in": "header"
-                    },
                     {
                         "description": "Batched events",
                         "name": "body",
@@ -1804,7 +1857,8 @@
             "post": {
                 "security": [
                     {
-                        "APIKeyAuth": []
+                        "APIKeyAuth": [],
+                        "SDKSecretAuth": []
                     }
                 ],
                 "description": "Loads stored/cached events for a user, calls ML, persists intent, and pushes intent_predicted + campaign_ad (when matched) on WebSocket.",
@@ -2621,6 +2675,50 @@
                 }
             }
         },
+        "internal_consent_interfaces_http.CreateConsentRequest": {
+            "type": "object",
+            "required": [
+                "consent_level",
+                "sdk_version"
+            ],
+            "properties": {
+                "consent_level": {
+                    "description": "ConsentLevel controls identity reversibility: individual | aggregate | none",
+                    "type": "string",
+                    "enum": [
+                        "individual",
+                        "aggregate",
+                        "none"
+                    ],
+                    "example": "individual"
+                },
+                "sdk_version": {
+                    "description": "SDKVersion is the Flutter SDK version string",
+                    "type": "string",
+                    "example": "1.0.0"
+                }
+            }
+        },
+        "internal_consent_interfaces_http.CreateConsentResponse": {
+            "type": "object",
+            "properties": {
+                "consent_level": {
+                    "description": "ConsentLevel echoes the granted level",
+                    "type": "string",
+                    "example": "individual"
+                },
+                "pseudonymous_id": {
+                    "description": "PseudonymousID is a backend-generated UUID for Flutter to attach to intents",
+                    "type": "string",
+                    "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                },
+                "status": {
+                    "description": "Status is always \"success\" on HTTP 201",
+                    "type": "string",
+                    "example": "success"
+                }
+            }
+        },
         "internal_events_interfaces_http.EventIngestResultDTO": {
             "type": "object",
             "properties": {
@@ -2878,14 +2976,11 @@
                 "created_at": {
                     "type": "string"
                 },
-                "external_user_id": {
-                    "type": "string"
-                },
                 "latest_intent": {
                     "$ref": "#/definitions/skykin-platform_internal_admin_application.IntentSummary"
                 },
                 "user_id": {
-                    "type": "string"
+                    "type": "integer"
                 }
             }
         },
@@ -3611,7 +3706,7 @@
     },
     "securityDefinitions": {
         "APIKeyAuth": {
-            "description": "SDK publishable key (pk_live_...)",
+            "description": "SDK publishable key (pk_live_...). Required for /api/v1 SDK routes.",
             "type": "apiKey",
             "name": "X-API-Key",
             "in": "header"
@@ -3620,6 +3715,12 @@
             "description": "Paste the JWT from POST /ad-portal/login (token field only, no \"Bearer \" prefix needed)",
             "type": "apiKey",
             "name": "Authorization",
+            "in": "header"
+        },
+        "SDKSecretAuth": {
+            "description": "SDK secret key (sk_secret_...). Swagger UI uses this ONLY to auto-compute X-Signature (HMAC-SHA256 of the request body). The secret is stripped before the request is sent.",
+            "type": "apiKey",
+            "name": "X-SDK-Secret",
             "in": "header"
         }
     }

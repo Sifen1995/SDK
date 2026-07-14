@@ -26,6 +26,9 @@ import (
 //go:embed migrations/20260703120000_permissions.sql
 var permissionsMigrationSQL string
 
+//go:embed migrations/20260712153000_users_consent_identity.sql
+var usersConsentIdentitySQL string
+
 func ConnectDB(cfg *configs.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
@@ -61,6 +64,10 @@ func Migrate(db *gorm.DB) error {
 
 	alignPersistenceTimestamps(db)
 
+	if err := applyUsersConsentIdentityMigration(db); err != nil {
+		return fmt.Errorf("users/consent identity migration: %w", err)
+	}
+
 	if err := db.AutoMigrate(
 		&userpersistence.UserRow{},
 		&eventpersistence.EventRecord{},
@@ -84,12 +91,16 @@ func Migrate(db *gorm.DB) error {
 		&billingpersistence.InvoiceRow{},
 		&audiencepersistence.AudienceSegmentRow{},
 		&audiencepersistence.SegmentPurchaseRow{},
+		// consents + pseudonymous_mappings are created by applyUsersConsentIdentityMigration
+		// (explicit unique constraint names). Do not AutoMigrate them — GORM would try to
+		// DROP uni_pseudonymous_mappings_* constraints that do not exist.
 	); err != nil {
 		return err
 	}
 
 	alignAdPortalSchema(db)
 	alignSegmentClassificationSchema(db)
+	alignIntentsUserIDColumn(db)
 	if err := applyPermissionsMigration(db); err != nil {
 		return fmt.Errorf("permissions migration: %w", err)
 	}
@@ -196,6 +207,24 @@ func seedAudienceSegments(db *gorm.DB) {
 	log.Println("audience segments seeded")
 }
 
+// alignIntentsUserIDColumn widens intents.user_id from uuid to varchar so it can
+// store bigint user ids as decimal strings.
+func alignIntentsUserIDColumn(db *gorm.DB) {
+	var dataType string
+	_ = db.Raw(`
+		SELECT data_type FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = 'intents' AND column_name = 'user_id'
+	`).Scan(&dataType).Error
+	if dataType == "" || dataType == "character varying" || dataType == "text" {
+		return
+	}
+	if err := db.Exec(`ALTER TABLE intents ALTER COLUMN user_id TYPE VARCHAR(64) USING user_id::text`).Error; err != nil {
+		log.Printf("align intents.user_id (non-fatal): %v", err)
+		return
+	}
+	log.Println("intents.user_id aligned to varchar")
+}
+
 func applyPermissionsMigration(db *gorm.DB) error {
 	var count int64
 	if err := db.Raw(`
@@ -211,5 +240,84 @@ func applyPermissionsMigration(db *gorm.DB) error {
 		return err
 	}
 	log.Println("permissions schema migrated and seeded")
+	return nil
+}
+
+// applyUsersConsentIdentityMigration rebuilds users without phone/external_user_id
+// (bigint random ids) and consent/mapping tables. Runs once when legacy schema is detected.
+func applyUsersConsentIdentityMigration(db *gorm.DB) error {
+	var externalCols int64
+	_ = db.Raw(`
+		SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'external_user_id'
+	`).Scan(&externalCols).Error
+
+	var idType string
+	_ = db.Raw(`
+		SELECT data_type FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'id'
+	`).Scan(&idType).Error
+
+	var usersExists int64
+	_ = db.Raw(`
+		SELECT COUNT(*) FROM information_schema.tables
+		WHERE table_schema = 'public' AND table_name = 'users'
+	`).Scan(&usersExists).Error
+
+	alreadyMigrated := usersExists > 0 && externalCols == 0 && idType == "bigint"
+	if alreadyMigrated {
+		return ensureConsentTables(db)
+	}
+
+	// Clear intent rows that referenced legacy uuid user ids before rebuild.
+	_ = db.Exec(`TRUNCATE TABLE intents RESTART IDENTITY CASCADE`).Error
+
+	if err := db.Exec(usersConsentIdentitySQL).Error; err != nil {
+		return err
+	}
+	log.Println("users/consent identity schema rebuilt (legacy columns and data removed)")
+	return nil
+}
+
+// ensureConsentTables creates consents /pseudonymous_mappings if missing without
+// touching an already-migrated users table.
+func ensureConsentTables(db *gorm.DB) error {
+	var mappings int64
+	_ = db.Raw(`
+		SELECT COUNT(*) FROM information_schema.tables
+		WHERE table_schema = 'public' AND table_name = 'pseudonymous_mappings'
+	`).Scan(&mappings).Error
+	if mappings > 0 {
+		return nil
+	}
+	stmts := []string{
+		`CREATE TABLE IF NOT EXISTS consents (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			consent_level VARCHAR(20) NOT NULL,
+			is_active BOOLEAN NOT NULL DEFAULT TRUE,
+			granted_at TIMESTAMPTZ,
+			revoked_at TIMESTAMPTZ,
+			sdk_version VARCHAR(20) NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE TABLE IF NOT EXISTS pseudonymous_mappings (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			pseudonymous_id UUID NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			CONSTRAINT uq_pseudonymous_mappings_user UNIQUE (user_id),
+			CONSTRAINT uq_pseudonymous_mappings_pseudo UNIQUE (pseudonymous_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_consents_user_id ON consents (user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_pseudonymous_mappings_user ON pseudonymous_mappings (user_id)`,
+	}
+	for _, stmt := range stmts {
+		if err := db.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
+	log.Println("consent tables ensured")
 	return nil
 }
