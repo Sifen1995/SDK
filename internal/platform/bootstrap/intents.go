@@ -16,28 +16,53 @@ import (
 )
 
 // NewIntentSystem wires the intents ingest + ad fetch flow (composition root).
-// Campaign selection stays behind intents/application.AdSelector; no cross-repo access here.
 func NewIntentSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *intentHTTP.Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
 	intentRepo := intentsInfra.NewIntentRepository(db, cfg)
-	profileRepo := intentsInfra.NewProfileRepository(intentRepo)
 
+	var platformRDB *platformredis.RedisClient
 	var cache intentApp.ActiveIntentCache
+	var logQueue *intentsInfra.IntentLogQueue
+	var redisCampaign *campaignInfra.RedisCampaignRepository
+
 	if addr := strings.TrimSpace(cfg.RedisAddr); addr != "" {
 		if rdb, err := platformredis.NewRedisClient(addr); err == nil {
+			platformRDB = rdb
 			cache = intentsInfra.NewIntentCacheAdapter(intentsInfra.NewRedisIntentRepository(rdb))
-			logger.Info("intent cache: redis", "addr", addr)
+			logQueue = intentsInfra.NewIntentLogQueue(rdb)
+			redisCampaign = campaignInfra.NewRedisCampaignRepository(rdb)
+			logger.Info("intent system: redis enabled", "addr", addr)
 		} else {
-			logger.Warn("intent cache unavailable", "error", err)
+			logger.Warn("intent system: redis unavailable", "error", err)
 		}
 	}
 
+	profileRepo := intentsInfra.NewProfileRepository(intentRepo, logQueue)
+
 	campaignRepo := campaignInfra.NewRepository(db)
-	adSelector := campaignApp.NewIntentAdSelector(campaignRepo)
+	cachedCampaigns := campaignInfra.NewCachedCampaignRepository(campaignRepo, redisCampaign, platformRDB)
+	adSelector := campaignApp.NewIntentAdSelector(cachedCampaigns)
 
 	svc := intentApp.NewIntentService(profileRepo, cache, adSelector)
 	return intentHTTP.NewHandler(svc)
+}
+
+// StartIntentLogWorker launches the background BRPop → Postgres batch flusher.
+func StartIntentLogWorker(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	addr := strings.TrimSpace(cfg.RedisAddr)
+	if addr == "" {
+		return
+	}
+	rdb, err := platformredis.NewRedisClient(addr)
+	if err != nil {
+		logger.Warn("intent log worker: redis unavailable", "error", err)
+		return
+	}
+	intentsInfra.StartIntentLogWorker(db, rdb, logger)
 }

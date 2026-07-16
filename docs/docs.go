@@ -1809,7 +1809,7 @@ const docTemplate = `{
                         "SDKSecretAuth": []
                     }
                 ],
-                "description": "Flutter sends an on-device ML intent (from accessibility + app usage). Backend caches the active intent, persists the profile, and returns a campaign creative for the requested channel. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.",
+                "description": "Flutter sends an on-device ML intent (from accessibility + app usage). Backend caches the active intent, enqueues the profile for async Postgres persistence (Redis queue:intent_logs), ranks eligible campaigns by subscription plan tier in memory (after budget/frequency filters), and returns the winning campaign creative. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3501,6 +3501,17 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "planID": {
+                    "description": "Delivery ranking fields (populated when loading eligible campaigns via active subscription join).",
+                    "type": "string"
+                },
+                "planMonthlyFeeETB": {
+                    "type": "number",
+                    "format": "float64"
+                },
+                "planName": {
+                    "type": "string"
+                },
                 "scheduledEndAt": {
                     "type": "string"
                 },
@@ -3588,7 +3599,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Skykin Platform API",
-	Description:      "Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK consent registration, intent ingest + ad delivery, campaign ad delivery via WebSocket, and reward notifications.",
+	Description:      "Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK consent registration, intent ingest + ad delivery, and reward notifications.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

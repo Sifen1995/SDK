@@ -6,17 +6,24 @@ import (
 	intentdomain "skykin-platform/internal/intents/domain"
 )
 
-// ProfileRepository persists IntentProfile rows via the intents Postgres repository.
+// ProfileRepository persists intent profiles via async queue or direct Postgres fallback.
 type ProfileRepository struct {
 	intents intentdomain.IntentRepository
+	queue   *IntentLogQueue
 }
 
-func NewProfileRepository(intents intentdomain.IntentRepository) *ProfileRepository {
-	return &ProfileRepository{intents: intents}
+func NewProfileRepository(intents intentdomain.IntentRepository, queue *IntentLogQueue) *ProfileRepository {
+	return &ProfileRepository{intents: intents, queue: queue}
 }
 
 func (r *ProfileRepository) Save(ctx context.Context, profile *intentdomain.IntentProfile) error {
-	if r == nil || r.intents == nil {
+	if r == nil {
+		return nil
+	}
+	if r.queue != nil {
+		return r.queue.Enqueue(ctx, profile)
+	}
+	if r.intents == nil {
 		return nil
 	}
 	intent := &intentdomain.Intent{

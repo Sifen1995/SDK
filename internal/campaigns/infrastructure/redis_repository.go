@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -13,13 +14,12 @@ import (
 
 const eligibleCampaignsTTL = 5 * time.Minute
 
-// EligibleCampaignReader is the Postgres (or other) source behind the Redis cache.
+// EligibleCampaignReader is the Postgres source behind the Redis eligible-campaign cache.
 type EligibleCampaignReader interface {
-	ListActiveByIntent(ctx context.Context, intentName string) ([]campaigndomain.Campaign, error)
+	ListEligibleForDelivery(ctx context.Context, intentName, channelCode string) ([]campaigndomain.Campaign, error)
 }
 
-// RedisCampaignRepository handles Redis-backed campaign delivery helpers
-// (frequency capping + eligible-campaign cache) via the platform Redis wrapper.
+// RedisCampaignRepository handles Redis-backed campaign delivery helpers via the platform wrapper.
 type RedisCampaignRepository struct {
 	rdb *redis.RedisClient
 }
@@ -29,7 +29,31 @@ func NewRedisCampaignRepository(rdb *redis.RedisClient) *RedisCampaignRepository
 }
 
 // ============================================================================
-// JOB 2 — Frequency capping
+// Budget exhaustion flags (set by billing background jobs)
+// ============================================================================
+
+func budgetExhaustedKey(campaignID string) string {
+	return "budget_exhausted:" + campaignID
+}
+
+// IsBudgetExhausted returns true when billing flagged the campaign as out of budget.
+func (r *RedisCampaignRepository) IsBudgetExhausted(ctx context.Context, campaignID string) (bool, error) {
+	if r == nil || r.rdb == nil {
+		return false, nil
+	}
+	return r.rdb.Exists(ctx, budgetExhaustedKey(campaignID))
+}
+
+// SetBudgetExhausted marks a campaign as budget-exhausted until TTL expires.
+func (r *RedisCampaignRepository) SetBudgetExhausted(ctx context.Context, campaignID string, ttl time.Duration) error {
+	if r == nil || r.rdb == nil {
+		return nil
+	}
+	return r.rdb.Set(ctx, budgetExhaustedKey(campaignID), "1", ttl)
+}
+
+// ============================================================================
+// Frequency capping
 // ============================================================================
 
 func (r *RedisCampaignRepository) IncrementDeliveryCount(
@@ -77,32 +101,102 @@ func (r *RedisCampaignRepository) IsFrequencyCapped(
 }
 
 // ============================================================================
-// JOB 1 — Eligible campaigns cache (Redis + Postgres fallback)
+// Eligible campaigns cache + in-memory plan-tier ranker
 // ============================================================================
 
-// CachedCampaignRepository wraps Postgres campaign reads with a Redis cache.
+// CachedCampaignRepository wraps Postgres reads with Redis cache-aside and delivery filters.
 type CachedCampaignRepository struct {
 	postgres EligibleCampaignReader
+	redis    *RedisCampaignRepository
 	rdb      *redis.RedisClient
 }
 
-func NewCachedCampaignRepository(postgres EligibleCampaignReader, rdb *redis.RedisClient) *CachedCampaignRepository {
+func NewCachedCampaignRepository(
+	postgres EligibleCampaignReader,
+	redisRepo *RedisCampaignRepository,
+	rdb *redis.RedisClient,
+) *CachedCampaignRepository {
 	return &CachedCampaignRepository{
 		postgres: postgres,
+		redis:    redisRepo,
 		rdb:      rdb,
 	}
 }
 
-// GetEligibleCampaigns returns active campaigns for an intent (cache-aside).
+func eligibleCampaignsCacheKey(intentName, channelCode string) string {
+	if channelCode == "" {
+		return "eligible_campaigns:" + intentName + ":all"
+	}
+	return "eligible_campaigns:" + intentName + ":" + channelCode
+}
+
+// GetEligibleCampaigns returns cached active campaigns for an intent/channel (no delivery filters).
 func (r *CachedCampaignRepository) GetEligibleCampaigns(
 	ctx context.Context,
-	intentName string,
+	intentName, channelCode string,
 ) ([]campaigndomain.Campaign, error) {
+	return r.loadEligibleCampaigns(ctx, intentName, channelCode)
+}
+
+// SelectBestCampaign applies budget + frequency filters and ranks by subscription plan tier in Go memory.
+func (r *CachedCampaignRepository) SelectBestCampaign(
+	ctx context.Context,
+	intentName, channelCode, pseudonymousID string,
+) (*campaigndomain.Campaign, error) {
 	if r == nil || r.postgres == nil {
 		return nil, fmt.Errorf("cached campaign repository is not configured")
 	}
 
-	key := "eligible_campaigns:" + intentName
+	campaigns, err := r.loadEligibleCampaigns(ctx, intentName, channelCode)
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := make([]campaigndomain.Campaign, 0, len(campaigns))
+	for _, campaign := range campaigns {
+		if r.redis != nil {
+			exhausted, err := r.redis.IsBudgetExhausted(ctx, campaign.ID)
+			if err != nil {
+				return nil, err
+			}
+			if exhausted {
+				continue
+			}
+
+			capLimit := campaign.FrequencyCapPerDay
+			if capLimit <= 0 {
+				capLimit = 3
+			}
+			capped, err := r.redis.IsFrequencyCapped(ctx, pseudonymousID, campaign.ID, capLimit)
+			if err != nil {
+				return nil, err
+			}
+			if capped {
+				continue
+			}
+		}
+		filtered = append(filtered, campaign)
+	}
+
+	if len(filtered) == 0 {
+		return nil, fmt.Errorf("no eligible campaign for intent %s", intentName)
+	}
+
+	rankCampaignsByPlanSubscription(filtered)
+
+	selected := filtered[0]
+	if r.redis != nil && pseudonymousID != "" {
+		_, _ = r.redis.IncrementDeliveryCount(ctx, pseudonymousID, selected.ID, 24*time.Hour)
+	}
+
+	return &selected, nil
+}
+
+func (r *CachedCampaignRepository) loadEligibleCampaigns(
+	ctx context.Context,
+	intentName, channelCode string,
+) ([]campaigndomain.Campaign, error) {
+	key := eligibleCampaignsCacheKey(intentName, channelCode)
 
 	if r.rdb != nil {
 		raw, err := r.rdb.Get(ctx, key)
@@ -112,11 +206,11 @@ func (r *CachedCampaignRepository) GetEligibleCampaigns(
 				return campaigns, nil
 			}
 		} else if err != redis.ErrNil {
-			// Unexpected Redis error — fall through to Postgres.
+			// fall through to Postgres on unexpected Redis errors
 		}
 	}
 
-	campaigns, err := r.postgres.ListActiveByIntent(ctx, intentName)
+	campaigns, err := r.postgres.ListEligibleForDelivery(ctx, intentName, channelCode)
 	if err != nil {
 		return nil, err
 	}
@@ -128,4 +222,23 @@ func (r *CachedCampaignRepository) GetEligibleCampaigns(
 	}
 
 	return campaigns, nil
+}
+
+// rankCampaignsByPlanSubscription sorts campaigns by active plan monthly fee (tier) descending.
+func rankCampaignsByPlanSubscription(campaigns []campaigndomain.Campaign) {
+	slices.SortFunc(campaigns, func(a, b campaigndomain.Campaign) int {
+		if a.PlanMonthlyFeeETB > b.PlanMonthlyFeeETB {
+			return -1
+		}
+		if a.PlanMonthlyFeeETB < b.PlanMonthlyFeeETB {
+			return 1
+		}
+		if a.CreatedAt.After(b.CreatedAt) {
+			return -1
+		}
+		if a.CreatedAt.Before(b.CreatedAt) {
+			return 1
+		}
+		return 0
+	})
 }

@@ -29,6 +29,21 @@ func (r *intentRepository) Create(ctx context.Context, intent *intentdomain.Inte
 	return row.ToDomain(), nil
 }
 
+func (r *intentRepository) CreateBatch(ctx context.Context, intents []*intentdomain.Intent) error {
+	if len(intents) == 0 {
+		return nil
+	}
+	rows := make([]persistence.IntentRow, len(intents))
+	for i, intent := range intents {
+		row := persistence.IntentRowFromDomain(intent)
+		if row == nil {
+			continue
+		}
+		rows[i] = *row
+	}
+	return r.db.WithContext(ctx).CreateInBatches(rows, 100).Error
+}
+
 func (r *intentRepository) FindUsersWithIntent(
 	ctx context.Context,
 	intentName string,

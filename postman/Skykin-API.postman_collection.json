@@ -2,11 +2,14 @@
   "info": {
     "_postman_id": "skykin-platform-api",
     "name": "Skykin Platform API",
-    "description": "Campaign Ad Portal (frontend), Developer Portal (SDK keys), and SDK (Flutter) endpoints.\n\n**Setup:** Import `Skykin-Local.postman_environment.json`, select environment **Skykin — Local**, run `docker compose up`.\n\n**Docs:** `docs/AD_PORTAL_POSTMAN.md`",
+    "description": "Campaign Ad Portal (frontend), Developer Portal (SDK keys), and SDK (Flutter) endpoints.\n\n**Setup:** Import `Skykin-Local.postman_environment.json`, select environment **Skykin \u2014 Local**, run `docker compose up`.\n\n**Docs:** `docs/AD_PORTAL_POSTMAN.md`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8081" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8081"
+    }
   ],
   "item": [
     {
@@ -25,7 +28,7 @@
       ]
     },
     {
-      "name": "Ad Portal — Auth (Campaign UI)",
+      "name": "Ad Portal \u2014 Auth (Campaign UI)",
       "description": "JWT campaign management portal for React/Next.js. Token variable: `adPortalToken`.",
       "item": [
         {
@@ -43,7 +46,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Acme Ads\",\n  \"email\": \"advertiser@test.com\",\n  \"password\": \"SecurePass1!\",\n  \"company_name\": \"Acme Inc\",\n  \"role\": \"advertiser\"\n}"
@@ -73,7 +81,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"advertiser@test.com\",\n  \"password\": \"SecurePass1!\"\n}"
@@ -98,7 +111,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
@@ -113,7 +131,13 @@
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adPortalToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
@@ -124,10 +148,16 @@
       ]
     },
     {
-      "name": "Ad Portal — Campaigns",
+      "name": "Ad Portal \u2014 Campaigns",
       "auth": {
         "type": "bearer",
-        "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{adPortalToken}}",
+            "type": "string"
+          }
+        ]
       },
       "item": [
         {
@@ -147,7 +177,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Crypto Promo\",\n  \"target_intent\": \"crypto_interest\",\n  \"channel\": \"banner\",\n  \"budget\": 1000\n}"
@@ -160,7 +195,12 @@
           "name": "Create Campaign (sms_plus)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Crypto SMS+\",\n  \"target_intent\": \"crypto_interest\",\n  \"channel\": \"sms_plus\",\n  \"budget\": 500\n}"
@@ -173,7 +213,12 @@
           "name": "Create Campaign (push)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Crypto Push\",\n  \"target_intent\": \"crypto_interest\",\n  \"channel\": \"push\",\n  \"budget\": 500\n}"
@@ -213,14 +258,20 @@
       ]
     },
     {
-      "name": "Ad Portal — Creatives",
+      "name": "Ad Portal \u2014 Creatives",
       "auth": {
         "type": "bearer",
-        "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{adPortalToken}}",
+            "type": "string"
+          }
+        ]
       },
       "item": [
         {
-          "name": "Create Creative — Banner",
+          "name": "Create Creative \u2014 Banner",
           "event": [
             {
               "listen": "test",
@@ -235,7 +286,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"format\": \"banner\",\n  \"payload\": {\n    \"image_url\": \"https://via.placeholder.com/320x50.png\",\n    \"click_url\": \"https://example.com\"\n  }\n}"
@@ -245,10 +301,15 @@
           "response": []
         },
         {
-          "name": "Create Creative — Push",
+          "name": "Create Creative \u2014 Push",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"format\": \"push\",\n  \"payload\": {\n    \"title\": \"Flash sale\",\n    \"body\": \"20% off today only\",\n    \"icon_url\": \"https://via.placeholder.com/64\",\n    \"deep_link\": \"https://example.com/deals\"\n  }\n}"
@@ -258,10 +319,15 @@
           "response": []
         },
         {
-          "name": "Create Creative — SMS+",
+          "name": "Create Creative \u2014 SMS+",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"format\": \"sms_plus\",\n  \"payload\": {\n    \"image_url\": \"https://via.placeholder.com/150\",\n    \"title\": \"Deal\",\n    \"description\": \"Save on crypto fees today\",\n    \"cta_url\": \"https://example.com\"\n  }\n}"
@@ -291,17 +357,28 @@
       ]
     },
     {
-      "name": "Ad Portal — Admin",
+      "name": "Ad Portal \u2014 Admin",
       "auth": {
         "type": "bearer",
-        "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{adPortalToken}}",
+            "type": "string"
+          }
+        ]
       },
       "item": [
         {
           "name": "Create Portal User",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Analyst Jane\",\n  \"email\": \"analyst@acme.com\",\n  \"password\": \"SecurePass1!\",\n  \"role\": \"read_only_analyst\"\n}"
@@ -334,9 +411,23 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/ad-portal/admin/audience/segment-candidates?status=pending",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "ad-portal", "admin", "audience", "segment-candidates"],
-              "query": [{ "key": "status", "value": "pending" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ad-portal",
+                "admin",
+                "audience",
+                "segment-candidates"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                }
+              ]
             },
             "description": "Requires operator_admin JWT. Lists candidates from the nightly intent classification scan."
           },
@@ -369,7 +460,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Coffee Enthusiasts\",\n  \"description\": \"Users with sustained coffee purchase intent\",\n  \"estimated_cpm\": 4.5\n}"
@@ -383,7 +479,12 @@
           "name": "Reject Segment Candidate",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"notes\": \"Insufficient user volume\"\n}"
@@ -403,7 +504,12 @@
           "name": "Register Developer",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Mobile Team\",\n  \"email\": \"dev@company.com\",\n  \"password\": \"securepass123\"\n}"
@@ -429,7 +535,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"dev@company.com\",\n  \"password\": \"securepass123\"\n}"
@@ -458,16 +569,27 @@
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{portalToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{portalToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"app_name\": \"My Flutter App\",\n  \"platform\": \"flutter\",\n  \"bundle_id\": \"com.company.myapp\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/portal/applications",
-            "description": "secret_key shown once — saved to `secretKey` env by test script."
+            "description": "secret_key shown once \u2014 saved to `secretKey` env by test script."
           },
           "response": []
         },
@@ -476,7 +598,13 @@
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{portalToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{portalToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
@@ -487,7 +615,7 @@
       ]
     },
     {
-      "name": "SDK — Events & Intents (Flutter)",
+      "name": "SDK \u2014 Events & Intents (Flutter)",
       "description": "Requires publishableKey + secretKey. HMAC auto-signed by folder pre-request script.",
       "event": [
         {
@@ -515,13 +643,18 @@
           "name": "Ingest Events (crypto batch)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"events\": [\n    {\n      \"event_id\": \"{{$guid}}\",\n      \"event_type\": \"content_viewed\",\n      \"domain\": \"crypto\",\n      \"session_id\": \"{{$guid}}\",\n      \"screen_name\": \"asset_details\",\n      \"metadata\": { \"asset\": \"BTC\", \"duration_ms\": 4200 },\n      \"device_type\": \"mobile\",\n      \"platform\": \"flutter\",\n      \"app_version\": \"1.0.0\",\n      \"created_at\": \"2026-06-02T12:00:00Z\"\n    },\n    {\n      \"event_id\": \"{{$guid}}\",\n      \"event_type\": \"search_performed\",\n      \"domain\": \"crypto\",\n      \"session_id\": \"{{$guid}}\",\n      \"screen_name\": \"search\",\n      \"metadata\": { \"query\": \"bitcoin price\" },\n      \"device_type\": \"mobile\",\n      \"platform\": \"flutter\",\n      \"app_version\": \"1.0.0\",\n      \"created_at\": \"2026-06-02T12:01:00Z\"\n    },\n    {\n      \"event_id\": \"{{$guid}}\",\n      \"event_type\": \"screen_viewed\",\n      \"domain\": \"crypto\",\n      \"session_id\": \"{{$guid}}\",\n      \"screen_name\": \"wallet\",\n      \"metadata\": { \"tab\": \"portfolio\" },\n      \"device_type\": \"mobile\",\n      \"platform\": \"flutter\",\n      \"app_version\": \"1.0.0\",\n      \"created_at\": \"2026-06-02T12:02:00Z\"\n    }\n  ]\n}"
             },
             "url": "{{baseUrl}}/api/v1/events",
-            "description": "Returns 202. Use new UUIDs each run ({{$guid}}). Run 2–3 times before predict."
+            "description": "Returns 202. Use new UUIDs each run ({{$guid}}). Run 2\u20133 times before predict."
           },
           "response": []
         },
@@ -529,42 +662,25 @@
           "name": "Predict Intent",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"user_id\": \"{{userId}}\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/intents/predict",
-            "description": "Connect WebSocket first. Triggers campaign_ad + optional reward_earned."
+            "description": "Returns the matched campaign ad in the HTTP response."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "SDK — WebSocket",
-      "description": "In Postman: **New → WebSocket Request** (not REST).\n\nURL: `ws://localhost:8081/api/v1/ws/rewards/{{userId}}`\n\nConnect **before** Predict Intent. Listen for `type: campaign_ad` and `type: reward_earned`.",
-      "item": [
-        {
-          "name": "WebSocket URL (copy to WS client)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "ws://localhost:8081/api/v1/ws/rewards/{{userId}}",
-              "protocol": "ws",
-              "host": ["localhost"],
-              "port": "8081",
-              "path": ["api", "v1", "ws", "rewards", "{{userId}}"]
-            },
-            "description": "Open as WebSocket in Postman or use wscat:\n`wscat -c ws://localhost:8081/api/v1/ws/rewards/user-demo-001`"
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "E2E — Full ad delivery flow",
+      "name": "E2E \u2014 Full ad delivery flow",
       "description": "Run requests in order (Collection Runner compatible).",
       "item": [
         {
@@ -583,7 +699,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"advertiser@test.com\",\n  \"password\": \"SecurePass1!\"\n}"
@@ -609,10 +730,21 @@
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adPortalToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"E2E Crypto Banner\",\n  \"target_intent\": \"crypto_interest\",\n  \"channel\": \"banner\",\n  \"budget\": 100\n}"
@@ -638,10 +770,21 @@
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adPortalToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"format\": \"banner\",\n  \"payload\": {\n    \"image_url\": \"https://via.placeholder.com/320x50.png\",\n    \"click_url\": \"https://example.com\"\n  }\n}"
@@ -655,7 +798,13 @@
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{adPortalToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adPortalToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "POST",
             "header": [],
@@ -680,7 +829,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"dev@company.com\",\n  \"password\": \"securepass123\"\n}"
@@ -708,10 +862,21 @@
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{portalToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{portalToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"app_name\": \"E2E Flutter\",\n  \"platform\": \"flutter\",\n  \"bundle_id\": \"com.skykin.e2e\"\n}"
@@ -740,7 +905,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"events\": [\n    {\n      \"event_id\": \"{{$guid}}\",\n      \"event_type\": \"content_viewed\",\n      \"domain\": \"crypto\",\n      \"session_id\": \"{{$guid}}\",\n      \"screen_name\": \"btc\",\n      \"metadata\": { \"asset\": \"BTC\" },\n      \"device_type\": \"mobile\",\n      \"platform\": \"flutter\",\n      \"app_version\": \"1.0.0\"\n    }\n  ]\n}"
@@ -769,13 +939,18 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"user_id\": \"{{userId}}\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/intents/predict",
-            "description": "Manually connect WebSocket to ws://localhost:8081/api/v1/ws/rewards/{{userId}} before this step."
+            "description": "Returns the matched campaign ad in the HTTP response."
           },
           "response": []
         }

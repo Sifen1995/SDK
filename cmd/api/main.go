@@ -16,9 +16,8 @@ import (
 	"skykin-platform/internal/platform/bootstrap"
 	"skykin-platform/internal/platform/database"
 	"skykin-platform/internal/platform/messaging"
-	"skykin-platform/internal/platform/route"
-	"skykin-platform/internal/platform/websocket"
 	platformredis "skykin-platform/internal/platform/redis"
+	"skykin-platform/internal/platform/route"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -31,7 +30,7 @@ var swaggerIndexHTML []byte
 
 // @title           Skykin Platform API
 // @version         1.0
-// @description     Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK consent registration, intent ingest + ad delivery, campaign ad delivery via WebSocket, and reward notifications.
+// @description     Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK consent registration, intent ingest + ad delivery, and reward notifications.
 
 // @host            localhost:8081
 // @BasePath        /api/v1
@@ -83,7 +82,6 @@ func main() {
 		log.Printf("operator admin ready: %s", cfg.AdminEmail)
 	}
 
-	hub := websocket.NewHub()
 	bus := messaging.NewBus()
 
 	var rdb *redis.Client
@@ -116,7 +114,8 @@ func main() {
 		swaggerHandler(c)
 	})
 
-	classJobs := route.InitRouter(r, db, cfg, hub, bus, checker, permHandler)
+	classJobs := route.InitRouter(r, db, cfg, bus, checker, permHandler)
+	bootstrap.StartIntentLogWorker(db, cfg, slog.Default())
 	bootstrap.StartTargetingJob(db, bus, slog.Default(), 5*time.Minute)
 	bootstrap.StartIntentConsistencyJobs(classJobs, slog.Default())
 

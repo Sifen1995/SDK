@@ -27,5 +27,5 @@ type AdSelection struct {
 
 // AdSelector selects a campaign ad for an intent without exposing campaign repositories here.
 type AdSelector interface {
-	SelectAd(ctx context.Context, targetIntent, channelCode string) (*AdSelection, error)
+	SelectAd(ctx context.Context, pseudonymousID, targetIntent, channelCode string) (*AdSelection, error)
 }

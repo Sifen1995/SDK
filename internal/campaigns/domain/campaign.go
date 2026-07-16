@@ -19,8 +19,13 @@ type Campaign struct {
 	DestinationURL string
 	CanvasJSON     map[string]any
 
-	BillingModel       string
-	DailyBudgetCap     float64
+	BillingModel   string
+	DailyBudgetCap float64
+
+	// Delivery ranking fields (populated when loading eligible campaigns via active subscription join).
+	PlanID            string
+	PlanName          string
+	PlanMonthlyFeeETB float64
 	TotalBudgetCap     float64
 	BudgetSpent        float64
 	FrequencyCapPerDay int

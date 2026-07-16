@@ -8,23 +8,23 @@ import (
 	"skykin-platform/internal/campaigns/infrastructure"
 )
 
-// IntentAdSelector implements intents/application.AdSelector using campaigns infrastructure.
+// IntentAdSelector implements intents/application.AdSelector using the cached plan-tier ranker.
 type IntentAdSelector struct {
-	repo *infrastructure.Repository
+	campaigns *infrastructure.CachedCampaignRepository
 }
 
 var _ intentsApp.AdSelector = (*IntentAdSelector)(nil)
 
-func NewIntentAdSelector(repo *infrastructure.Repository) *IntentAdSelector {
-	return &IntentAdSelector{repo: repo}
+func NewIntentAdSelector(campaigns *infrastructure.CachedCampaignRepository) *IntentAdSelector {
+	return &IntentAdSelector{campaigns: campaigns}
 }
 
-// SelectAd finds the best active campaign for an intent and channel (campaigns module only).
+// SelectAd finds the highest-plan-tier eligible campaign for an intent and channel.
 func (s *IntentAdSelector) SelectAd(
 	ctx context.Context,
-	targetIntent, channelCode string,
+	pseudonymousID, targetIntent, channelCode string,
 ) (*intentsApp.AdSelection, error) {
-	if s == nil || s.repo == nil {
+	if s == nil || s.campaigns == nil {
 		return nil, fmt.Errorf("ad selector is not configured")
 	}
 
@@ -33,11 +33,13 @@ func (s *IntentAdSelector) SelectAd(
 		codes = []string{"IN_APP_BANNER", "SMS_PLUS", "PUSH", "NATIVE_FEED"}
 	}
 
+	var best *intentsApp.AdSelection
+	var bestPlanFee float64
 	for _, code := range codes {
 		if code == "" {
 			continue
 		}
-		campaign, err := s.repo.FindActiveForIntent(ctx, targetIntent, code)
+		campaign, err := s.campaigns.SelectBestCampaign(ctx, targetIntent, code, pseudonymousID)
 		if err != nil {
 			continue
 		}
@@ -45,13 +47,19 @@ func (s *IntentAdSelector) SelectAd(
 		if err != nil {
 			continue
 		}
-		return &intentsApp.AdSelection{
-			CampaignID:   campaign.ID,
-			CampaignName: campaign.Name,
-			ChannelCode:  code,
-			Content:      content,
-		}, nil
+		if best == nil || campaign.PlanMonthlyFeeETB > bestPlanFee {
+			bestPlanFee = campaign.PlanMonthlyFeeETB
+			best = &intentsApp.AdSelection{
+				CampaignID:   campaign.ID,
+				CampaignName: campaign.Name,
+				ChannelCode:  code,
+				Content:      content,
+			}
+		}
 	}
 
-	return nil, fmt.Errorf("no active campaign for intent %s", targetIntent)
+	if best == nil {
+		return nil, fmt.Errorf("no active campaign for intent %s", targetIntent)
+	}
+	return best, nil
 }

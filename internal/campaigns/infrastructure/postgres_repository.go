@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"time"
 
 	billingdomain "skykin-platform/internal/billing/domain"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
@@ -10,6 +11,13 @@ import (
 
 	"gorm.io/gorm"
 )
+
+type eligibleCampaignScan struct {
+	persistence.CampaignRow
+	PlanID         string  `gorm:"column:plan_id"`
+	PlanName       string  `gorm:"column:plan_name"`
+	PlanMonthlyFee float64 `gorm:"column:plan_monthly_fee_etb"`
+}
 
 type Repository struct {
 	db *gorm.DB
@@ -21,7 +29,7 @@ func NewRepository(db *gorm.DB) *Repository {
 
 var (
 	_ campaigndomain.CampaignRepository = (*Repository)(nil)
-	_ billingdomain.CampaignQuotaReader  = (*Repository)(nil)
+	_ billingdomain.CampaignQuotaReader = (*Repository)(nil)
 )
 
 func (r *Repository) ListActive(ctx context.Context) ([]campaigndomain.Campaign, error) {
@@ -145,18 +153,38 @@ func (r *Repository) FindActiveForIntent(ctx context.Context, targetIntent, chan
 	return row.ToDomain()
 }
 
-// ListActiveByIntent returns approved active campaigns matching a target intent.
-func (r *Repository) ListActiveByIntent(ctx context.Context, intentName string) ([]campaigndomain.Campaign, error) {
-	var rows []persistence.CampaignRow
-	err := r.db.WithContext(ctx).
-		Where("target_intent = ? AND is_active = ? AND validation_status = ? AND moderation_status = ?",
-			intentName, true, "passed", campaigndomain.ModerationApproved).
-		Order("created_at desc").
-		Find(&rows).Error
-	if err != nil {
+// ListEligibleForDelivery returns active campaigns for an intent/channel without SQL ordering.
+// Plan-tier ranking happens in Go memory inside CachedCampaignRepository.
+func (r *Repository) ListEligibleForDelivery(
+	ctx context.Context,
+	intentName, channelCode string,
+) ([]campaigndomain.Campaign, error) {
+	now := time.Now().UTC()
+	var rows []eligibleCampaignScan
+	q := r.db.WithContext(ctx).
+		Table("campaigns").
+		Select(`campaigns.*,
+			sp.id AS plan_id,
+			sp.name AS plan_name,
+			sp.monthly_fee_etb AS plan_monthly_fee_etb`).
+		Joins("JOIN channels ON channels.id = campaigns.channel_id").
+		Joins(`JOIN advertiser_subscriptions sub ON sub.advertiser_id = campaigns.advertiser_id AND sub.status = 'active'`).
+		Joins(`JOIN subscription_plans sp ON sp.id = sub.plan_id AND sp.is_active = true`).
+		Where(`campaigns.target_intent = ? AND campaigns.is_active = ? AND campaigns.validation_status = ? AND campaigns.moderation_status = ?
+			AND sub.current_period_start <= ? AND sub.current_period_end >= ?`,
+			intentName, true, "passed", campaigndomain.ModerationApproved, now, now)
+	if channelCode != "" {
+		q = q.Where("channels.code = ?", channelCode)
+	}
+	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	return toDomainCampaigns(rows)
+	return toEligibleDomainCampaigns(rows)
+}
+
+// ListActiveByIntent returns approved active campaigns matching a target intent.
+func (r *Repository) ListActiveByIntent(ctx context.Context, intentName string) ([]campaigndomain.Campaign, error) {
+	return r.ListEligibleForDelivery(ctx, intentName, "")
 }
 
 func (r *Repository) LogDelivery(ctx context.Context, log *campaigndomain.DeliveryLog) error {
@@ -164,7 +192,7 @@ func (r *Repository) LogDelivery(ctx context.Context, log *campaigndomain.Delive
 	return r.db.WithContext(ctx).Create(row).Error
 }
 
-// CampaignAdContent builds SDK/WebSocket payload from a campaign.
+// CampaignAdContent builds the SDK ad payload from a campaign.
 func CampaignAdContent(c *campaigndomain.Campaign, channelCode string) (map[string]any, error) {
 	canvas := c.CanvasJSON
 	if canvas == nil {
@@ -179,6 +207,21 @@ func CampaignAdContent(c *campaigndomain.Campaign, channelCode string) (map[stri
 		"canvas_json":     canvas,
 	}
 	return content, nil
+}
+
+func toEligibleDomainCampaigns(rows []eligibleCampaignScan) ([]campaigndomain.Campaign, error) {
+	out := make([]campaigndomain.Campaign, len(rows))
+	for i := range rows {
+		c, err := rows[i].CampaignRow.ToDomain()
+		if err != nil {
+			return nil, err
+		}
+		c.PlanID = rows[i].PlanID
+		c.PlanName = rows[i].PlanName
+		c.PlanMonthlyFeeETB = rows[i].PlanMonthlyFee
+		out[i] = *c
+	}
+	return out, nil
 }
 
 func toDomainCampaigns(rows []persistence.CampaignRow) ([]campaigndomain.Campaign, error) {

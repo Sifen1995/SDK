@@ -8,7 +8,7 @@ import (
 	"skykin-platform/internal/campaigns/infrastructure"
 )
 
-// AdDeliveryService builds WebSocket ad payloads for matched intents.
+// AdDeliveryService builds campaign ad payloads and logs dispatches.
 type AdDeliveryService struct {
 	repo *infrastructure.Repository
 }

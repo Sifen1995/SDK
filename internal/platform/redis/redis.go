@@ -92,3 +92,12 @@ func (c *RedisClient) Get(ctx context.Context, key string) (string, error) {
 func (c *RedisClient) Incr(ctx context.Context, key string) (int64, error) {
 	return c.Client.Incr(ctx, key).Result()
 }
+
+// Exists reports whether a key is present.
+func (c *RedisClient) Exists(ctx context.Context, key string) (bool, error) {
+	n, err := c.Client.Exists(ctx, key).Result()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}

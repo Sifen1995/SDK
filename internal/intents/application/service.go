@@ -49,7 +49,7 @@ func (s *IntentService) IngestAndFetchAd(
 		return nil, fmt.Errorf("save intent profile: %w", err)
 	}
 
-	ad, err := s.ads.SelectAd(ctx, profile.IntentName, channelCode)
+	ad, err := s.ads.SelectAd(ctx, profile.PseudonymousID, profile.IntentName, channelCode)
 	if err != nil {
 		return nil, err
 	}

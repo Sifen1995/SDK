@@ -17,7 +17,7 @@ import (
 )
 
 // SDKAuthMiddleware authenticates Flutter/SDK traffic the same way for all
-// /api/v1 routes (consent, websocket, …):
+// /api/v1 routes (consent, intents, …):
 //
 //  1. X-API-Key  = publishable key (pk_live_...)
 //  2. X-Signature = lowercase hex HMAC-SHA256(secret_key, raw request body)

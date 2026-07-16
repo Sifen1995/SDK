@@ -1009,6 +1009,15 @@ definitions:
         type: string
       name:
         type: string
+      planID:
+        description: Delivery ranking fields (populated when loading eligible campaigns
+          via active subscription join).
+        type: string
+      planMonthlyFeeETB:
+        format: float64
+        type: number
+      planName:
+        type: string
       scheduledEndAt:
         type: string
       scheduledStartAt:
@@ -1052,7 +1061,7 @@ info:
   contact: {}
   description: Skykin platform API — developer portal (SDK keys), ad campaign portal
     (advertisers/operators), SDK consent registration, intent ingest + ad delivery,
-    campaign ad delivery via WebSocket, and reward notifications.
+    and reward notifications.
   title: Skykin Platform API
   version: "1.0"
 paths:
@@ -2194,9 +2203,11 @@ paths:
       consumes:
       - application/json
       description: Flutter sends an on-device ML intent (from accessibility + app
-        usage). Backend caches the active intent, persists the profile, and returns
-        a campaign creative for the requested channel. Authorize with X-API-Key (pk_live_...)
-        and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.
+        usage). Backend caches the active intent, enqueues the profile for async Postgres
+        persistence (Redis queue:intent_logs), ranks eligible campaigns by subscription
+        plan tier in memory (after budget/frequency filters), and returns the winning
+        campaign creative. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret
+        (sk_secret_...); Swagger UI auto-computes X-Signature.
       parameters:
       - description: Intent profile + optional channel
         in: body

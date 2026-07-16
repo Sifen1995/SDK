@@ -7,7 +7,6 @@ import (
 	"skykin-platform/internal/platform/messaging"
 	rewardsdomain "skykin-platform/internal/rewards/domain"
 	usersdomain "skykin-platform/internal/users/domain"
-	wsConsumers "skykin-platform/internal/websocket/consumers"
 )
 
 const RewardEvaluationRequested = "rewards.evaluation.requested"
@@ -72,14 +71,4 @@ func (c *RewardConsumer) handle(e messaging.Event) {
 		return
 	}
 
-	c.bus.Publish(messaging.Event{
-		Name: wsConsumers.RewardCreatedEvent,
-		Ctx:  e.Ctx,
-		Payload: wsConsumers.RewardCreatedPayload{
-			ExternalUserID: p.ExternalUserID,
-			IntentName:     p.IntentName,
-			Confidence:     p.Confidence,
-			Reward:         reward,
-		},
-	})
 }

@@ -27,7 +27,7 @@ func NewHandler(svc *intentApp.IntentService) *Handler {
 
 // IngestIntentAd godoc
 // @Summary      Ingest intent profile and fetch matching ad
-// @Description  Flutter sends an on-device ML intent (from accessibility + app usage). Backend caches the active intent, persists the profile, and returns a campaign creative for the requested channel. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.
+// @Description  Flutter sends an on-device ML intent (from accessibility + app usage). Backend caches the active intent, enqueues the profile for async Postgres persistence (Redis queue:intent_logs), ranks eligible campaigns by subscription plan tier in memory (after budget/frequency filters), and returns the winning campaign creative. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.
 // @Tags         SDK - Intents
 // @Accept       json
 // @Produce      json
