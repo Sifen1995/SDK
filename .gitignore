@@ -18,3 +18,4 @@ coverage/
 .venv
 .vscode/
 *.sublime-project
+/api
