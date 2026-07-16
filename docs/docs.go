@@ -1801,7 +1801,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/events": {
+        "/intents/ingest-ad": {
             "post": {
                 "security": [
                     {
@@ -1809,7 +1809,7 @@ const docTemplate = `{
                         "SDKSecretAuth": []
                     }
                 ],
-                "description": "Accepts domain-agnostic SDK events (screen views, content views, searches, etc.). Stores events and caches history. Call POST /intents/predict to run prediction and receive intent + campaign on WebSocket.",
+                "description": "Flutter sends an on-device ML intent (from accessibility + app usage). Backend caches the active intent, persists the profile, and returns a campaign creative for the requested channel. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1817,25 +1817,25 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "SDK - Events"
+                    "SDK - Intents"
                 ],
-                "summary": "Ingest batched behavioral events",
+                "summary": "Ingest intent profile and fetch matching ad",
                 "parameters": [
                     {
-                        "description": "Batched events",
+                        "description": "Intent profile + optional channel",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_events_interfaces_http.IngestEventsRequest"
+                            "$ref": "#/definitions/internal_intents_interfaces_http.IngestIntentAdRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "202": {
-                        "description": "Accepted",
+                    "200": {
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_events_interfaces_http.IngestEventsResponse"
+                            "$ref": "#/definitions/internal_intents_interfaces_http.IngestIntentAdResponse"
                         }
                     },
                     "400": {
@@ -1850,54 +1850,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
-                        }
-                    }
-                }
-            }
-        },
-        "/intents/predict": {
-            "post": {
-                "security": [
-                    {
-                        "APIKeyAuth": [],
-                        "SDKSecretAuth": []
-                    }
-                ],
-                "description": "Loads stored/cached events for a user, calls ML, persists intent, and pushes intent_predicted + campaign_ad (when matched) on WebSocket.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "SDK - Intents"
-                ],
-                "summary": "Predict user intent (sync)",
-                "parameters": [
-                    {
-                        "description": "User id to evaluate",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/internal_intents_interfaces_http.PredictIntentRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/skykin-platform_internal_intents_application.PredictIntentResult"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -2725,128 +2679,75 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_events_interfaces_http.EventIngestResultDTO": {
+        "internal_intents_interfaces_http.IngestIntentAdRequest": {
             "type": "object",
+            "required": [
+                "confidence",
+                "intent_name",
+                "pseudonymous_id"
+            ],
             "properties": {
-                "event_id": {
-                    "type": "string"
+                "channel_code": {
+                    "description": "ChannelCode delivery channel; empty tries IN_APP_BANNER, SMS_PLUS, PUSH, NATIVE_FEED",
+                    "type": "string",
+                    "example": "IN_APP_BANNER"
                 },
-                "status": {
-                    "type": "string"
+                "confidence": {
+                    "description": "Confidence is the model score between 0 and 1",
+                    "type": "number",
+                    "example": 0.87
+                },
+                "intent_name": {
+                    "description": "IntentName is the predicted intent class (e.g. fashion_interest)",
+                    "type": "string",
+                    "example": "fashion_interest"
+                },
+                "model_version": {
+                    "description": "ModelVersion identifies the on-device / ML model version",
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "pseudonymous_id": {
+                    "description": "PseudonymousID from POST /consent (UUID)",
+                    "type": "string",
+                    "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
                 }
             }
         },
-        "internal_events_interfaces_http.EventInput": {
+        "internal_intents_interfaces_http.IngestIntentAdResponse": {
             "type": "object",
-            "required": [
-                "domain",
-                "event_id",
-                "event_type",
-                "metadata"
-            ],
             "properties": {
-                "app_version": {
-                    "type": "string",
-                    "example": "1.2.0"
-                },
-                "created_at": {
-                    "type": "string",
-                    "example": "2026-06-01T12:00:00Z"
-                },
-                "device_type": {
-                    "type": "string",
-                    "example": "mobile"
-                },
-                "domain": {
-                    "type": "string",
-                    "example": "crypto"
-                },
-                "event_id": {
-                    "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440001"
-                },
-                "event_type": {
-                    "type": "string",
-                    "enum": [
-                        "session_started",
-                        "screen_viewed",
-                        "content_viewed",
-                        "search_performed",
-                        "interaction_received",
-                        "scroll_activity",
-                        "notification_opened",
-                        "campaign_impression",
-                        "campaign_clicked",
-                        "conversion_completed",
-                        "transaction_completed",
-                        "reward_claimed"
-                    ],
-                    "example": "content_viewed"
-                },
-                "metadata": {
+                "ad_content": {
                     "type": "object",
-                    "additionalProperties": true
+                    "additionalProperties": {}
                 },
-                "platform": {
+                "campaign_id": {
                     "type": "string",
-                    "example": "android"
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
                 },
-                "screen_name": {
+                "campaign_name": {
                     "type": "string",
-                    "example": "asset_details"
+                    "example": "Summer Fashion Drop"
                 },
-                "session_id": {
+                "channel_code": {
                     "type": "string",
-                    "example": "660e8400-e29b-41d4-a716-446655440002"
-                }
-            }
-        },
-        "internal_events_interfaces_http.IngestEventsRequest": {
-            "type": "object",
-            "required": [
-                "events",
-                "user_id"
-            ],
-            "properties": {
-                "events": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "$ref": "#/definitions/internal_events_interfaces_http.EventInput"
-                    }
+                    "example": "IN_APP_BANNER"
                 },
-                "user_id": {
+                "confidence": {
+                    "type": "number",
+                    "example": 0.87
+                },
+                "intent_name": {
                     "type": "string",
-                    "example": "user_abc_123"
-                }
-            }
-        },
-        "internal_events_interfaces_http.IngestEventsResponse": {
-            "type": "object",
-            "properties": {
-                "accepted": {
-                    "type": "boolean"
+                    "example": "fashion_interest"
                 },
-                "prediction_queued": {
-                    "type": "boolean"
-                },
-                "results": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/internal_events_interfaces_http.EventIngestResultDTO"
-                    }
-                }
-            }
-        },
-        "internal_intents_interfaces_http.PredictIntentRequest": {
-            "type": "object",
-            "required": [
-                "user_id"
-            ],
-            "properties": {
-                "user_id": {
+                "model_version": {
                     "type": "string",
-                    "example": "user_test_batch_001"
+                    "example": "1.0.0"
+                },
+                "pseudonymous_id": {
+                    "type": "string",
+                    "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
                 }
             }
         },
@@ -3630,58 +3531,6 @@ const docTemplate = `{
                 }
             }
         },
-        "skykin-platform_internal_intents_application.PredictIntentResult": {
-            "type": "object",
-            "properties": {
-                "confidence": {
-                    "type": "number"
-                },
-                "intent": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "reward": {
-                    "$ref": "#/definitions/skykin-platform_internal_intents_application.Reward"
-                },
-                "reward_triggered": {
-                    "type": "boolean"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "top_signals": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "skykin-platform_internal_intents_application.Reward": {
-            "type": "object",
-            "properties": {
-                "amount": {
-                    "type": "number"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "reward_id": {
-                    "type": "string"
-                },
-                "reward_type": {
-                    "type": "string"
-                }
-            }
-        },
         "skykin-platform_internal_platform_http.APIError": {
             "type": "object",
             "properties": {
@@ -3739,7 +3588,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Skykin Platform API",
-	Description:      "Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK consent registration, event ingestion, intent prediction, campaign ad delivery via WebSocket, and reward notifications.",
+	Description:      "Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK consent registration, intent ingest + ad delivery, campaign ad delivery via WebSocket, and reward notifications.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

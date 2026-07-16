@@ -16,12 +16,14 @@ import (
 )
 
 // Module wires dependencies for the events bounded context.
+// Not mounted from InitRouter — kept so event ingestion can be re-enabled later.
 type Module struct {
 	Handler *Handler
 	Bus     *messaging.Bus
 }
 
 // NewModule constructs the events module with dependency injection.
+// Currently unused at process start; call from route wiring to reactivate ingestion.
 func NewModule(db *gorm.DB, cfg *configs.Config, bus *messaging.Bus) *Module {
 	if bus == nil {
 		bus = messaging.NewBus()
@@ -46,6 +48,7 @@ func NewModule(db *gorm.DB, cfg *configs.Config, bus *messaging.Bus) *Module {
 }
 
 // RegisterRoutes mounts events HTTP routes on the SDK API group.
+// Intentionally not called from InitRouter while event ingestion is disabled.
 func RegisterRoutes(r *gin.RouterGroup, module *Module) {
 	r.POST("/events", module.Handler.PostEvents)
 }

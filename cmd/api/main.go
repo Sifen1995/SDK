@@ -18,6 +18,7 @@ import (
 	"skykin-platform/internal/platform/messaging"
 	"skykin-platform/internal/platform/route"
 	"skykin-platform/internal/platform/websocket"
+	platformredis "skykin-platform/internal/platform/redis"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -30,7 +31,7 @@ var swaggerIndexHTML []byte
 
 // @title           Skykin Platform API
 // @version         1.0
-// @description     Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK consent registration, event ingestion, intent prediction, campaign ad delivery via WebSocket, and reward notifications.
+// @description     Skykin platform API — developer portal (SDK keys), ad campaign portal (advertisers/operators), SDK consent registration, intent ingest + ad delivery, campaign ad delivery via WebSocket, and reward notifications.
 
 // @host            localhost:8081
 // @BasePath        /api/v1
@@ -86,13 +87,16 @@ func main() {
 	bus := messaging.NewBus()
 
 	var rdb *redis.Client
-	if addr := cfg.RedisAddr; addr != "" {
-		client := redis.NewClient(&redis.Options{Addr: addr})
-		if err := client.Ping(context.Background()).Err(); err != nil {
-			slog.Warn("redis unavailable for permissions cache", "error", err)
+	if cfg.RedisAddr != "" {
+		client, err := platformredis.NewRedisClient(cfg.RedisAddr)
+		if err != nil {
+			slog.Warn("redis unavailable, falling back to database-only mode", "error", err)
 		} else {
-			rdb = client
+			rdb = client.Client
+			slog.Info("redis client successfully initialized and connected", "addr", cfg.RedisAddr)
 		}
+	} else {
+		slog.Info("redis address not configured, running in database-only mode")
 	}
 	checker, permHandler := bootstrap.NewPermissionSystem(db, rdb, bus, slog.Default())
 

@@ -453,96 +453,60 @@ definitions:
         example: success
         type: string
     type: object
-  internal_events_interfaces_http.EventIngestResultDTO:
+  internal_intents_interfaces_http.IngestIntentAdRequest:
     properties:
-      event_id:
+      channel_code:
+        description: ChannelCode delivery channel; empty tries IN_APP_BANNER, SMS_PLUS,
+          PUSH, NATIVE_FEED
+        example: IN_APP_BANNER
         type: string
-      status:
+      confidence:
+        description: Confidence is the model score between 0 and 1
+        example: 0.87
+        type: number
+      intent_name:
+        description: IntentName is the predicted intent class (e.g. fashion_interest)
+        example: fashion_interest
         type: string
+      model_version:
+        description: ModelVersion identifies the on-device / ML model version
+        example: 1.0.0
+        type: string
+      pseudonymous_id:
+        description: PseudonymousID from POST /consent (UUID)
+        example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+        type: string
+    required:
+    - confidence
+    - intent_name
+    - pseudonymous_id
     type: object
-  internal_events_interfaces_http.EventInput:
+  internal_intents_interfaces_http.IngestIntentAdResponse:
     properties:
-      app_version:
-        example: 1.2.0
-        type: string
-      created_at:
-        example: "2026-06-01T12:00:00Z"
-        type: string
-      device_type:
-        example: mobile
-        type: string
-      domain:
-        example: crypto
-        type: string
-      event_id:
-        example: 550e8400-e29b-41d4-a716-446655440001
-        type: string
-      event_type:
-        enum:
-        - session_started
-        - screen_viewed
-        - content_viewed
-        - search_performed
-        - interaction_received
-        - scroll_activity
-        - notification_opened
-        - campaign_impression
-        - campaign_clicked
-        - conversion_completed
-        - transaction_completed
-        - reward_claimed
-        example: content_viewed
-        type: string
-      metadata:
-        additionalProperties: true
+      ad_content:
+        additionalProperties: {}
         type: object
-      platform:
-        example: android
+      campaign_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
         type: string
-      screen_name:
-        example: asset_details
+      campaign_name:
+        example: Summer Fashion Drop
         type: string
-      session_id:
-        example: 660e8400-e29b-41d4-a716-446655440002
+      channel_code:
+        example: IN_APP_BANNER
         type: string
-    required:
-    - domain
-    - event_id
-    - event_type
-    - metadata
-    type: object
-  internal_events_interfaces_http.IngestEventsRequest:
-    properties:
-      events:
-        items:
-          $ref: '#/definitions/internal_events_interfaces_http.EventInput'
-        minItems: 1
-        type: array
-      user_id:
-        example: user_abc_123
+      confidence:
+        example: 0.87
+        type: number
+      intent_name:
+        example: fashion_interest
         type: string
-    required:
-    - events
-    - user_id
-    type: object
-  internal_events_interfaces_http.IngestEventsResponse:
-    properties:
-      accepted:
-        type: boolean
-      prediction_queued:
-        type: boolean
-      results:
-        items:
-          $ref: '#/definitions/internal_events_interfaces_http.EventIngestResultDTO'
-        type: array
-    type: object
-  internal_intents_interfaces_http.PredictIntentRequest:
-    properties:
-      user_id:
-        example: user_test_batch_001
+      model_version:
+        example: 1.0.0
         type: string
-    required:
-    - user_id
+      pseudonymous_id:
+        example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+        type: string
     type: object
   internal_permissions_interfaces_http.AssignPermissionRequest:
     properties:
@@ -1065,40 +1029,6 @@ definitions:
       validationStatus:
         type: string
     type: object
-  skykin-platform_internal_intents_application.PredictIntentResult:
-    properties:
-      confidence:
-        type: number
-      intent:
-        type: string
-      message:
-        type: string
-      reward:
-        $ref: '#/definitions/skykin-platform_internal_intents_application.Reward'
-      reward_triggered:
-        type: boolean
-      status:
-        type: string
-      top_signals:
-        items:
-          type: string
-        type: array
-      user_id:
-        type: string
-    type: object
-  skykin-platform_internal_intents_application.Reward:
-    properties:
-      amount:
-        type: number
-      currency:
-        type: string
-      message:
-        type: string
-      reward_id:
-        type: string
-      reward_type:
-        type: string
-    type: object
   skykin-platform_internal_platform_http.APIError:
     properties:
       code:
@@ -1121,7 +1051,7 @@ host: localhost:8081
 info:
   contact: {}
   description: Skykin platform API — developer portal (SDK keys), ad campaign portal
-    (advertisers/operators), SDK consent registration, event ingestion, intent prediction,
+    (advertisers/operators), SDK consent registration, intent ingest + ad delivery,
     campaign ad delivery via WebSocket, and reward notifications.
   title: Skykin Platform API
   version: "1.0"
@@ -2259,27 +2189,28 @@ paths:
       summary: Register SDK user consent
       tags:
       - SDK - Consent
-  /events:
+  /intents/ingest-ad:
     post:
       consumes:
       - application/json
-      description: Accepts domain-agnostic SDK events (screen views, content views,
-        searches, etc.). Stores events and caches history. Call POST /intents/predict
-        to run prediction and receive intent + campaign on WebSocket.
+      description: Flutter sends an on-device ML intent (from accessibility + app
+        usage). Backend caches the active intent, persists the profile, and returns
+        a campaign creative for the requested channel. Authorize with X-API-Key (pk_live_...)
+        and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.
       parameters:
-      - description: Batched events
+      - description: Intent profile + optional channel
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_events_interfaces_http.IngestEventsRequest'
+          $ref: '#/definitions/internal_intents_interfaces_http.IngestIntentAdRequest'
       produces:
       - application/json
       responses:
-        "202":
-          description: Accepted
+        "200":
+          description: OK
           schema:
-            $ref: '#/definitions/internal_events_interfaces_http.IngestEventsResponse'
+            $ref: '#/definitions/internal_intents_interfaces_http.IngestIntentAdResponse'
         "400":
           description: Bad Request
           schema:
@@ -2288,38 +2219,8 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
-      security:
-      - APIKeyAuth: []
-        SDKSecretAuth: []
-      summary: Ingest batched behavioral events
-      tags:
-      - SDK - Events
-  /intents/predict:
-    post:
-      consumes:
-      - application/json
-      description: Loads stored/cached events for a user, calls ML, persists intent,
-        and pushes intent_predicted + campaign_ad (when matched) on WebSocket.
-      parameters:
-      - description: User id to evaluate
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/internal_intents_interfaces_http.PredictIntentRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/skykin-platform_internal_intents_application.PredictIntentResult'
-        "400":
-          description: Bad Request
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
         "500":
@@ -2329,7 +2230,7 @@ paths:
       security:
       - APIKeyAuth: []
         SDKSecretAuth: []
-      summary: Predict user intent (sync)
+      summary: Ingest intent profile and fetch matching ad
       tags:
       - SDK - Intents
   /portal/applications:

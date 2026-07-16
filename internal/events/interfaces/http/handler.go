@@ -19,19 +19,8 @@ func NewHandler(ingest *application.IngestEventsUseCase) *Handler {
 	return &Handler{ingest: ingest}
 }
 
-// PostEvents godoc
-// @Summary      Ingest batched behavioral events
-// @Description  Accepts domain-agnostic SDK events (screen views, content views, searches, etc.). Stores events and caches history. Call POST /intents/predict to run prediction and receive intent + campaign on WebSocket.
-// @Tags         SDK - Events
-// @Accept       json
-// @Produce      json
-// @Security     APIKeyAuth && SDKSecretAuth
-// @Param        body         body      IngestEventsRequest   true   "Batched events"
-// @Success      202          {object}  IngestEventsResponse
-// @Failure      400          {object}  platformHTTP.APIError
-// @Failure      401          {object}  platformHTTP.APIError
-// @Failure      500          {object}  platformHTTP.APIError
-// @Router       /events [post]
+// PostEvents handles SDK batch event ingestion.
+// Not mounted while event ingestion is disabled; handler + use case kept for later reuse.
 func (h *Handler) PostEvents(c *gin.Context) {
 	appID, exists := c.Get("application_id")
 	if !exists {

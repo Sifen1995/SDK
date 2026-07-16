@@ -145,6 +145,20 @@ func (r *Repository) FindActiveForIntent(ctx context.Context, targetIntent, chan
 	return row.ToDomain()
 }
 
+// ListActiveByIntent returns approved active campaigns matching a target intent.
+func (r *Repository) ListActiveByIntent(ctx context.Context, intentName string) ([]campaigndomain.Campaign, error) {
+	var rows []persistence.CampaignRow
+	err := r.db.WithContext(ctx).
+		Where("target_intent = ? AND is_active = ? AND validation_status = ? AND moderation_status = ?",
+			intentName, true, "passed", campaigndomain.ModerationApproved).
+		Order("created_at desc").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return toDomainCampaigns(rows)
+}
+
 func (r *Repository) LogDelivery(ctx context.Context, log *campaigndomain.DeliveryLog) error {
 	row := persistence.DeliveryLogRowFromDomain(log)
 	return r.db.WithContext(ctx).Create(row).Error

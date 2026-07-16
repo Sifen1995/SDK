@@ -1,9 +1,8 @@
 package http
 
-import (
-	"github.com/gin-gonic/gin"
-)
+import "github.com/gin-gonic/gin"
 
-func RegisterRoutes(r *gin.RouterGroup, handler *Handler) {
-	r.POST("/intents/predict", handler.PredictIntent)
+// RegisterRoutes mounts intent SDK routes on the API group.
+func RegisterRoutes(r *gin.RouterGroup, h *Handler) {
+	r.POST("/intents/ingest-ad", h.IngestIntentAd)
 }

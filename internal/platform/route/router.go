@@ -7,8 +7,7 @@ import (
 	adportalRoutes "skykin-platform/internal/ad_portal/routes"
 	authRoutes "skykin-platform/internal/auth/routes"
 	consentHTTP "skykin-platform/internal/consent/interfaces/http"
-	eventHTTP "skykin-platform/internal/events/interfaces/http"
-	intentRoutes "skykin-platform/internal/intents/routes"
+	intentHTTP "skykin-platform/internal/intents/interfaces/http"
 	permApp "skykin-platform/internal/permissions/application"
 	permHTTP "skykin-platform/internal/permissions/interfaces/http"
 	"skykin-platform/internal/platform/bootstrap"
@@ -37,17 +36,17 @@ func InitRouter(
 	sdkAuthMiddleware := authRoutes.RegisterRoutes(r, db, cfg)
 	intentJobs := adportalRoutes.Register(r, db, cfg, bus, checker, permHandler)
 
-	eventsModule := eventHTTP.NewModule(db, cfg, bus)
-	downstream := bootstrap.RegisterDownstreamConsumers(db, cfg, eventsModule.Bus, hub)
-	intentModule := intentRoutes.Wire(downstream.Predict)
+	// Event ingestion HTTP + bus publishing intentionally not mounted.
+	// Package internal/events is retained for later reactivation.
+	bootstrap.RegisterDownstreamConsumers(db, cfg, bus, hub)
 	consentHandler := bootstrap.NewConsentSystem(db, bus, slog.Default())
+	intentHandler := bootstrap.NewIntentSystem(db, cfg, slog.Default())
 
 	sdkGroup := r.Group("/api/v1")
 	sdkGroup.Use(sdkAuthMiddleware)
 	{
-		eventHTTP.RegisterRoutes(sdkGroup, eventsModule)
-		intentModule.Register(sdkGroup)
 		consentHTTP.RegisterRoutes(sdkGroup, consentHandler)
+		intentHTTP.RegisterRoutes(sdkGroup, intentHandler)
 		wsRoutes.RegisterRoutes(sdkGroup, hub)
 	}
 

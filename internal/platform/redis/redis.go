@@ -74,3 +74,21 @@ func (c *RedisClient) LTrim(ctx context.Context, key string, start, stop int64) 
 func (c *RedisClient) Expire(ctx context.Context, key string, ttl time.Duration) error {
 	return c.Client.Expire(ctx, key, ttl).Err()
 }
+
+// ErrNil is returned by Get when the key does not exist.
+var ErrNil = redis.Nil
+
+// Set writes a key with an optional TTL (0 = no expiry).
+func (c *RedisClient) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
+	return c.Client.Set(ctx, key, value, ttl).Err()
+}
+
+// Get reads a string key. Returns ErrNil when the key is missing.
+func (c *RedisClient) Get(ctx context.Context, key string) (string, error) {
+	return c.Client.Get(ctx, key).Result()
+}
+
+// Incr atomically increments a key and returns the new value.
+func (c *RedisClient) Incr(ctx context.Context, key string) (int64, error) {
+	return c.Client.Incr(ctx, key).Result()
+}
