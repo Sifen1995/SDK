@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
+	analyticsdomain "skykin-platform/internal/analytics/domain"
 	intentApp "skykin-platform/internal/intents/application"
 	"skykin-platform/internal/intents/domain"
 	platformHTTP "skykin-platform/internal/platform/http"
@@ -16,13 +18,18 @@ type intentAdIngestor interface {
 	IngestAndFetchAd(ctx context.Context, profile *domain.IntentProfile, channelCode string) (*intentApp.IngestAndFetchAdResult, error)
 }
 
-// Handler exposes SDK intent HTTP endpoints.
-type Handler struct {
-	ingest intentAdIngestor
+type intentAggregateReporter interface {
+	EnqueueReport(ctx context.Context, report *analyticsdomain.AggregateReport) error
 }
 
-func NewHandler(svc *intentApp.IntentService) *Handler {
-	return &Handler{ingest: svc}
+// Handler exposes SDK intent HTTP endpoints.
+type Handler struct {
+	ingest     intentAdIngestor
+	aggregates intentAggregateReporter
+}
+
+func NewHandler(svc *intentApp.IntentService, aggregates intentAggregateReporter) *Handler {
+	return &Handler{ingest: svc, aggregates: aggregates}
 }
 
 // IngestIntentAd godoc
@@ -75,4 +82,60 @@ func (h *Handler) IngestIntentAd(c *gin.Context) {
 		ChannelCode:    result.ChannelCode,
 		AdContent:      result.AdContent,
 	})
+}
+
+// IngestIntentAggregate godoc
+// @Summary      Ingest anonymous intent aggregates
+// @Description  Accepts a device batch of anonymized intent counters for non-consented users. Enqueues to Redis (queue:analytics_aggregate) for async upsert into intent_aggregate_counts (signal_count += count, weighted_count += days_consistent). Does not select or return ads. Authorize with X-API-Key and X-SDK-Secret.
+// @Tags         SDK - Intents
+// @Accept       json
+// @Produce      json
+// @Security     APIKeyAuth && SDKSecretAuth
+// @Param        body  body  IngestIntentAggregateRequest  true  "Anonymous aggregate batch"
+// @Success      202  "Accepted — batch queued"
+// @Failure      400  {object}  platformHTTP.APIError
+// @Failure      401  {object}  platformHTTP.APIError
+// @Failure      503  {object}  platformHTTP.APIError
+// @Router       /intents/ingest-aggregate [post]
+func (h *Handler) IngestIntentAggregate(c *gin.Context) {
+	if h == nil || h.aggregates == nil {
+		platformHTTP.Error(c, http.StatusServiceUnavailable, "aggregate ingest unavailable", "")
+		return
+	}
+
+	var req IngestIntentAggregateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		platformHTTP.Error(c, http.StatusBadRequest, "invalid aggregate payload", err.Error())
+		return
+	}
+
+	bucket, err := time.Parse("2006-01-02", strings.TrimSpace(req.DateBucket))
+	if err != nil {
+		platformHTTP.Error(c, http.StatusBadRequest, "invalid date_bucket", "expected YYYY-MM-DD")
+		return
+	}
+
+	report := &analyticsdomain.AggregateReport{
+		DateBucket: bucket.UTC(),
+		Intents:    make([]analyticsdomain.AggregateIntentSignal, len(req.Intents)),
+	}
+	for i, item := range req.Intents {
+		report.Intents[i] = analyticsdomain.AggregateIntentSignal{
+			IntentName:     strings.TrimSpace(item.IntentName),
+			Count:          item.Count,
+			DaysConsistent: item.DaysConsistent,
+		}
+	}
+
+	if err := h.aggregates.EnqueueReport(c.Request.Context(), report); err != nil {
+		msg := err.Error()
+		status := http.StatusServiceUnavailable
+		if strings.Contains(msg, "required") || strings.Contains(msg, "must") || strings.Contains(msg, "empty") {
+			status = http.StatusBadRequest
+		}
+		platformHTTP.Error(c, status, "aggregate ingest failed", msg)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
 }

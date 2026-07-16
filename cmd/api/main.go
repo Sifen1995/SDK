@@ -116,6 +116,7 @@ func main() {
 
 	classJobs := route.InitRouter(r, db, cfg, bus, checker, permHandler)
 	bootstrap.StartIntentLogWorker(db, cfg, slog.Default())
+	bootstrap.StartAnalyticsAggregateWorker(db, cfg, slog.Default())
 	bootstrap.StartTargetingJob(db, bus, slog.Default(), 5*time.Minute)
 	bootstrap.StartIntentConsistencyJobs(classJobs, slog.Default())
 

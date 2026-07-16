@@ -72,6 +72,7 @@ func Migrate(db *gorm.DB) error {
 		&userpersistence.UserRow{},
 		&eventpersistence.EventRecord{},
 		&intentpersistence.IntentRow{},
+		&intentpersistence.IntentAggregateCountRow{},
 		&rewardpersistence.RewardRuleRow{},
 		&rewardpersistence.RewardRow{},
 		&authpersistence.DeveloperRow{},
@@ -101,6 +102,7 @@ func Migrate(db *gorm.DB) error {
 	alignAdPortalSchema(db)
 	alignSegmentClassificationSchema(db)
 	alignIntentsUserIDColumn(db)
+	ensureIntentAggregateCountsTable(db)
 	if err := applyPermissionsMigration(db); err != nil {
 		return fmt.Errorf("permissions migration: %w", err)
 	}
@@ -223,6 +225,24 @@ func alignIntentsUserIDColumn(db *gorm.DB) {
 		return
 	}
 	log.Println("intents.user_id aligned to varchar")
+}
+
+// ensureIntentAggregateCountsTable guarantees the anonymous aggregate rollup table + unique constraint.
+func ensureIntentAggregateCountsTable(db *gorm.DB) {
+	if err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS intent_aggregate_counts (
+			id             UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+			intent_name    VARCHAR(100)  NOT NULL,
+			date_bucket    DATE          NOT NULL DEFAULT CURRENT_DATE,
+			signal_count   INTEGER       NOT NULL DEFAULT 0,
+			weighted_count NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+			CONSTRAINT uq_intent_date UNIQUE (intent_name, date_bucket)
+		)
+	`).Error; err != nil {
+		log.Printf("ensure intent_aggregate_counts (non-fatal): %v", err)
+		return
+	}
+	_ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_agg_intent_date ON intent_aggregate_counts (intent_name, date_bucket DESC)`).Error
 }
 
 func applyPermissionsMigration(db *gorm.DB) error {

@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"skykin-platform/configs"
+	analyticsApp "skykin-platform/internal/analytics/application"
+	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
 	intentApp "skykin-platform/internal/intents/application"
@@ -15,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// NewIntentSystem wires the intents ingest + ad fetch flow (composition root).
+// NewIntentSystem wires the intents ingest + ad fetch + anonymous aggregate flow.
 func NewIntentSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *intentHTTP.Handler {
 	if logger == nil {
 		logger = slog.Default()
@@ -27,6 +29,7 @@ func NewIntentSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *int
 	var cache intentApp.ActiveIntentCache
 	var logQueue *intentsInfra.IntentLogQueue
 	var redisCampaign *campaignInfra.RedisCampaignRepository
+	var aggregateIngest *analyticsApp.AggregateIngestService
 
 	if addr := strings.TrimSpace(cfg.RedisAddr); addr != "" {
 		if rdb, err := platformredis.NewRedisClient(addr); err == nil {
@@ -34,6 +37,7 @@ func NewIntentSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *int
 			cache = intentsInfra.NewIntentCacheAdapter(intentsInfra.NewRedisIntentRepository(rdb))
 			logQueue = intentsInfra.NewIntentLogQueue(rdb)
 			redisCampaign = campaignInfra.NewRedisCampaignRepository(rdb)
+			aggregateIngest = analyticsApp.NewAggregateIngestService(analyticsInfra.NewAnalyticsAggregateQueue(rdb))
 			logger.Info("intent system: redis enabled", "addr", addr)
 		} else {
 			logger.Warn("intent system: redis unavailable", "error", err)
@@ -47,7 +51,7 @@ func NewIntentSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *int
 	adSelector := campaignApp.NewIntentAdSelector(cachedCampaigns)
 
 	svc := intentApp.NewIntentService(profileRepo, cache, adSelector)
-	return intentHTTP.NewHandler(svc)
+	return intentHTTP.NewHandler(svc, aggregateIngest)
 }
 
 // StartIntentLogWorker launches the background BRPop → Postgres batch flusher.

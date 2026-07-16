@@ -508,6 +508,40 @@ definitions:
         example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
         type: string
     type: object
+  internal_intents_interfaces_http.IngestIntentAggregateItem:
+    properties:
+      count:
+        example: 3
+        minimum: 1
+        type: integer
+      days_consistent:
+        example: 7
+        minimum: 1
+        type: number
+      intent_name:
+        example: fashion_interest
+        type: string
+    required:
+    - count
+    - days_consistent
+    - intent_name
+    type: object
+  internal_intents_interfaces_http.IngestIntentAggregateRequest:
+    properties:
+      date_bucket:
+        description: DateBucket is YYYY-MM-DD for the rollup day
+        example: "2026-07-16"
+        type: string
+      intents:
+        description: Intents is the per-intent counters for this device batch
+        items:
+          $ref: '#/definitions/internal_intents_interfaces_http.IngestIntentAggregateItem'
+        minItems: 1
+        type: array
+    required:
+    - date_bucket
+    - intents
+    type: object
   internal_permissions_interfaces_http.AssignPermissionRequest:
     properties:
       permission_id:
@@ -2242,6 +2276,44 @@ paths:
       - APIKeyAuth: []
         SDKSecretAuth: []
       summary: Ingest intent profile and fetch matching ad
+      tags:
+      - SDK - Intents
+  /intents/ingest-aggregate:
+    post:
+      consumes:
+      - application/json
+      description: Accepts a device batch of anonymized intent counters for non-consented
+        users. Enqueues to Redis (queue:analytics_aggregate) for async upsert into
+        intent_aggregate_counts (signal_count += count, weighted_count += days_consistent).
+        Does not select or return ads. Authorize with X-API-Key and X-SDK-Secret.
+      parameters:
+      - description: Anonymous aggregate batch
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_intents_interfaces_http.IngestIntentAggregateRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted — batch queued
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - APIKeyAuth: []
+        SDKSecretAuth: []
+      summary: Ingest anonymous intent aggregates
       tags:
       - SDK - Intents
   /portal/applications:

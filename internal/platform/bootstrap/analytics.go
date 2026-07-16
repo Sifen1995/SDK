@@ -3,14 +3,17 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
+	"skykin-platform/configs"
 	analyticsApp "skykin-platform/internal/analytics/application"
 	analyticsdomain "skykin-platform/internal/analytics/domain"
+	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
 	audienceApp "skykin-platform/internal/audience/application"
 	audienceInfra "skykin-platform/internal/audience/infrastructure"
-	"skykin-platform/configs"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
+	platformredis "skykin-platform/internal/platform/redis"
 
 	"gorm.io/gorm"
 )
@@ -65,4 +68,21 @@ func StartIntentConsistencyJobs(jobs *IntentConsistencyJobs, logger *slog.Logger
 		}
 	}()
 	logger.Info("intent consistency analysis scheduled, interval: 24h")
+}
+
+// StartAnalyticsAggregateWorker drains queue:analytics_aggregate into Postgres upserts.
+func StartAnalyticsAggregateWorker(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	addr := strings.TrimSpace(cfg.RedisAddr)
+	if addr == "" {
+		return
+	}
+	rdb, err := platformredis.NewRedisClient(addr)
+	if err != nil {
+		logger.Warn("analytics aggregate worker: redis unavailable", "error", err)
+		return
+	}
+	analyticsInfra.StartAnalyticsAggregateWorker(db, rdb, logger)
 }

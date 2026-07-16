@@ -1865,6 +1865,61 @@ const docTemplate = `{
                 }
             }
         },
+        "/intents/ingest-aggregate": {
+            "post": {
+                "security": [
+                    {
+                        "APIKeyAuth": [],
+                        "SDKSecretAuth": []
+                    }
+                ],
+                "description": "Accepts a device batch of anonymized intent counters for non-consented users. Enqueues to Redis (queue:analytics_aggregate) for async upsert into intent_aggregate_counts (signal_count += count, weighted_count += days_consistent). Does not select or return ads. Authorize with X-API-Key and X-SDK-Secret.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Intents"
+                ],
+                "summary": "Ingest anonymous intent aggregates",
+                "parameters": [
+                    {
+                        "description": "Anonymous aggregate batch",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_intents_interfaces_http.IngestIntentAggregateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted — batch queued"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/portal/applications": {
             "get": {
                 "security": [
@@ -2748,6 +2803,52 @@ const docTemplate = `{
                 "pseudonymous_id": {
                     "type": "string",
                     "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                }
+            }
+        },
+        "internal_intents_interfaces_http.IngestIntentAggregateItem": {
+            "type": "object",
+            "required": [
+                "count",
+                "days_consistent",
+                "intent_name"
+            ],
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 3
+                },
+                "days_consistent": {
+                    "type": "number",
+                    "minimum": 1,
+                    "example": 7
+                },
+                "intent_name": {
+                    "type": "string",
+                    "example": "fashion_interest"
+                }
+            }
+        },
+        "internal_intents_interfaces_http.IngestIntentAggregateRequest": {
+            "type": "object",
+            "required": [
+                "date_bucket",
+                "intents"
+            ],
+            "properties": {
+                "date_bucket": {
+                    "description": "DateBucket is YYYY-MM-DD for the rollup day",
+                    "type": "string",
+                    "example": "2026-07-16"
+                },
+                "intents": {
+                    "description": "Intents is the per-intent counters for this device batch",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/internal_intents_interfaces_http.IngestIntentAggregateItem"
+                    }
                 }
             }
         },
