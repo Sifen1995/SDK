@@ -1743,6 +1743,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/campaigns/anonymous": {
+            "get": {
+                "security": [
+                    {
+                        "APIKeyAuth": [],
+                        "SDKSecretAuth": []
+                    }
+                ],
+                "description": "Returns the master list of all active, budget-unexhausted campaigns across intents. Stateless — no excluded IDs accepted. Flutter applies on-device frequency capping (e.g. 3 exposures). Authorize with X-API-Key and X-SDK-Secret.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Campaigns"
+                ],
+                "summary": "List active campaigns for anonymous delivery",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_delivery_http.AnonymousCampaignDTO"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/consent": {
             "post": {
                 "security": [
@@ -2734,6 +2775,59 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_delivery_http.AnonymousCampaignDTO": {
+            "type": "object",
+            "properties": {
+                "body_text": {
+                    "type": "string",
+                    "example": "Shop the drop"
+                },
+                "canvas_json": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "channel_code": {
+                    "type": "string",
+                    "example": "IN_APP_BANNER"
+                },
+                "destination_url": {
+                    "type": "string",
+                    "example": "https://shop.example.com"
+                },
+                "frequency_cap_per_day": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://cdn.example.com/ad.png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Summer Fashion Drop"
+                },
+                "plan_monthly_fee_etb": {
+                    "type": "number",
+                    "example": 15000
+                },
+                "plan_name": {
+                    "type": "string",
+                    "example": "Growth"
+                },
+                "target_intent": {
+                    "type": "string",
+                    "example": "fashion_interest"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "New season styles"
+                }
+            }
+        },
         "internal_intents_interfaces_http.IngestIntentAdRequest": {
             "type": "object",
             "required": [
@@ -3561,6 +3655,10 @@ const docTemplate = `{
                 "canvasJSON": {
                     "type": "object",
                     "additionalProperties": {}
+                },
+                "channelCode": {
+                    "description": "populated on delivery/master list reads via channels join",
+                    "type": "string"
                 },
                 "channelID": {
                     "type": "string"

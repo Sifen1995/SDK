@@ -13,10 +13,13 @@ import (
 )
 
 const eligibleCampaignsTTL = 5 * time.Minute
+const activeCampaignsMasterTTL = 5 * time.Minute
+const activeCampaignsMasterKey = "cache:active_campaigns_master"
 
 // EligibleCampaignReader is the Postgres source behind the Redis eligible-campaign cache.
 type EligibleCampaignReader interface {
 	ListEligibleForDelivery(ctx context.Context, intentName, channelCode string) ([]campaigndomain.Campaign, error)
+	ListActiveMaster(ctx context.Context) ([]campaigndomain.Campaign, error)
 }
 
 // RedisCampaignRepository handles Redis-backed campaign delivery helpers via the platform wrapper.
@@ -136,6 +139,68 @@ func (r *CachedCampaignRepository) GetEligibleCampaigns(
 	intentName, channelCode string,
 ) ([]campaigndomain.Campaign, error) {
 	return r.loadEligibleCampaigns(ctx, intentName, channelCode)
+}
+
+// ListActiveMasterCampaigns returns the anonymous delivery master list:
+// active campaigns from Redis cache:active_campaigns_master (Postgres fallback),
+// excluding any campaign with budget_exhausted:{id}. Frequency capping is on-device.
+func (r *CachedCampaignRepository) ListActiveMasterCampaigns(
+	ctx context.Context,
+) ([]campaigndomain.Campaign, error) {
+	if r == nil || r.postgres == nil {
+		return nil, fmt.Errorf("cached campaign repository is not configured")
+	}
+
+	campaigns, err := r.loadActiveMasterCampaigns(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.redis == nil {
+		return campaigns, nil
+	}
+
+	out := make([]campaigndomain.Campaign, 0, len(campaigns))
+	for _, campaign := range campaigns {
+		exhausted, err := r.redis.IsBudgetExhausted(ctx, campaign.ID)
+		if err != nil {
+			return nil, err
+		}
+		if exhausted {
+			continue
+		}
+		out = append(out, campaign)
+	}
+	return out, nil
+}
+
+func (r *CachedCampaignRepository) loadActiveMasterCampaigns(
+	ctx context.Context,
+) ([]campaigndomain.Campaign, error) {
+	if r.rdb != nil {
+		raw, err := r.rdb.Get(ctx, activeCampaignsMasterKey)
+		if err == nil {
+			var campaigns []campaigndomain.Campaign
+			if err := json.Unmarshal([]byte(raw), &campaigns); err == nil {
+				return campaigns, nil
+			}
+		} else if err != redis.ErrNil {
+			// fall through to Postgres on unexpected Redis errors
+		}
+	}
+
+	campaigns, err := r.postgres.ListActiveMaster(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.rdb != nil {
+		if payload, err := json.Marshal(campaigns); err == nil {
+			_ = r.rdb.Set(ctx, activeCampaignsMasterKey, string(payload), activeCampaignsMasterTTL)
+		}
+	}
+
+	return campaigns, nil
 }
 
 // SelectBestCampaign applies budget + frequency filters and ranks by subscription plan tier in Go memory.

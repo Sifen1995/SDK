@@ -17,6 +17,7 @@ type eligibleCampaignScan struct {
 	PlanID         string  `gorm:"column:plan_id"`
 	PlanName       string  `gorm:"column:plan_name"`
 	PlanMonthlyFee float64 `gorm:"column:plan_monthly_fee_etb"`
+	ChannelCode    string  `gorm:"column:channel_code"`
 }
 
 type Repository struct {
@@ -166,7 +167,8 @@ func (r *Repository) ListEligibleForDelivery(
 		Select(`campaigns.*,
 			sp.id AS plan_id,
 			sp.name AS plan_name,
-			sp.monthly_fee_etb AS plan_monthly_fee_etb`).
+			sp.monthly_fee_etb AS plan_monthly_fee_etb,
+			channels.code AS channel_code`).
 		Joins("JOIN channels ON channels.id = campaigns.channel_id").
 		Joins(`JOIN advertiser_subscriptions sub ON sub.advertiser_id = campaigns.advertiser_id AND sub.status = 'active'`).
 		Joins(`JOIN subscription_plans sp ON sp.id = sub.plan_id AND sp.is_active = true`).
@@ -177,6 +179,30 @@ func (r *Repository) ListEligibleForDelivery(
 		q = q.Where("channels.code = ?", channelCode)
 	}
 	if err := q.Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return toEligibleDomainCampaigns(rows)
+}
+
+// ListActiveMaster returns all active, approved campaigns with live subscriptions (all intents).
+func (r *Repository) ListActiveMaster(ctx context.Context) ([]campaigndomain.Campaign, error) {
+	now := time.Now().UTC()
+	var rows []eligibleCampaignScan
+	err := r.db.WithContext(ctx).
+		Table("campaigns").
+		Select(`campaigns.*,
+			sp.id AS plan_id,
+			sp.name AS plan_name,
+			sp.monthly_fee_etb AS plan_monthly_fee_etb,
+			channels.code AS channel_code`).
+		Joins("JOIN channels ON channels.id = campaigns.channel_id").
+		Joins(`JOIN advertiser_subscriptions sub ON sub.advertiser_id = campaigns.advertiser_id AND sub.status = 'active'`).
+		Joins(`JOIN subscription_plans sp ON sp.id = sub.plan_id AND sp.is_active = true`).
+		Where(`campaigns.is_active = ? AND campaigns.validation_status = ? AND campaigns.moderation_status = ?
+			AND sub.current_period_start <= ? AND sub.current_period_end >= ?`,
+			true, "passed", campaigndomain.ModerationApproved, now, now).
+		Find(&rows).Error
+	if err != nil {
 		return nil, err
 	}
 	return toEligibleDomainCampaigns(rows)
@@ -219,6 +245,7 @@ func toEligibleDomainCampaigns(rows []eligibleCampaignScan) ([]campaigndomain.Ca
 		c.PlanID = rows[i].PlanID
 		c.PlanName = rows[i].PlanName
 		c.PlanMonthlyFeeETB = rows[i].PlanMonthlyFee
+		c.ChannelCode = rows[i].ChannelCode
 		out[i] = *c
 	}
 	return out, nil

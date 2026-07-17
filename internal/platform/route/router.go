@@ -7,6 +7,7 @@ import (
 	adportalRoutes "skykin-platform/internal/ad_portal/routes"
 	authRoutes "skykin-platform/internal/auth/routes"
 	consentHTTP "skykin-platform/internal/consent/interfaces/http"
+	deliveryHTTP "skykin-platform/internal/delivery/http"
 	intentHTTP "skykin-platform/internal/intents/interfaces/http"
 	permApp "skykin-platform/internal/permissions/application"
 	permHTTP "skykin-platform/internal/permissions/interfaces/http"
@@ -38,12 +39,14 @@ func InitRouter(
 	bootstrap.RegisterDownstreamConsumers(db, cfg, bus)
 	consentHandler := bootstrap.NewConsentSystem(db, bus, slog.Default())
 	intentHandler := bootstrap.NewIntentSystem(db, cfg, slog.Default())
+	anonymousCampaigns := bootstrap.NewAnonymousCampaignSystem(db, cfg, slog.Default())
 
 	sdkGroup := r.Group("/api/v1")
 	sdkGroup.Use(sdkAuthMiddleware)
 	{
 		consentHTTP.RegisterRoutes(sdkGroup, consentHandler)
 		intentHTTP.RegisterRoutes(sdkGroup, intentHandler)
+		deliveryHTTP.RegisterSDKRoutes(sdkGroup, anonymousCampaigns)
 	}
 
 	return intentJobs

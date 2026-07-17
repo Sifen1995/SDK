@@ -26,8 +26,9 @@ type Campaign struct {
 	PlanID            string
 	PlanName          string
 	PlanMonthlyFeeETB float64
-	TotalBudgetCap     float64
-	BudgetSpent        float64
+	ChannelCode       string // populated on delivery/master list reads via channels join
+	TotalBudgetCap    float64
+	BudgetSpent       float64
 	FrequencyCapPerDay int
 
 	ScheduledStartAt *time.Time

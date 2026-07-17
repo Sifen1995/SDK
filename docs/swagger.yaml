@@ -453,6 +453,45 @@ definitions:
         example: success
         type: string
     type: object
+  internal_delivery_http.AnonymousCampaignDTO:
+    properties:
+      body_text:
+        example: Shop the drop
+        type: string
+      canvas_json:
+        additionalProperties: {}
+        type: object
+      channel_code:
+        example: IN_APP_BANNER
+        type: string
+      destination_url:
+        example: https://shop.example.com
+        type: string
+      frequency_cap_per_day:
+        example: 3
+        type: integer
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      image_url:
+        example: https://cdn.example.com/ad.png
+        type: string
+      name:
+        example: Summer Fashion Drop
+        type: string
+      plan_monthly_fee_etb:
+        example: 15000
+        type: number
+      plan_name:
+        example: Growth
+        type: string
+      target_intent:
+        example: fashion_interest
+        type: string
+      title:
+        example: New season styles
+        type: string
+    type: object
   internal_intents_interfaces_http.IngestIntentAdRequest:
     properties:
       channel_code:
@@ -1016,6 +1055,9 @@ definitions:
       canvasJSON:
         additionalProperties: {}
         type: object
+      channelCode:
+        description: populated on delivery/master list reads via channels join
+        type: string
       channelID:
         type: string
       createdAt:
@@ -2192,6 +2234,34 @@ paths:
       summary: Subscribe to a plan
       tags:
       - Ad Portal - Billing
+  /campaigns/anonymous:
+    get:
+      description: Returns the master list of all active, budget-unexhausted campaigns
+        across intents. Stateless — no excluded IDs accepted. Flutter applies on-device
+        frequency capping (e.g. 3 exposures). Authorize with X-API-Key and X-SDK-Secret.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_delivery_http.AnonymousCampaignDTO'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - APIKeyAuth: []
+        SDKSecretAuth: []
+      summary: List active campaigns for anonymous delivery
+      tags:
+      - SDK - Campaigns
   /consent:
     post:
       consumes:
