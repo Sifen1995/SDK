@@ -1,8 +1,6 @@
-uvicorn
-fastapi
-pydantic>=2.0.0
+# Full local / training install. Docker serve image uses requirements-serve.txt.
+-r requirements-serve.txt
+joblib
+# training extras (local retrain)
 scikit-learn
 pandas
-joblib
-numpy
-tensorflow

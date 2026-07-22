@@ -38,10 +38,10 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - PORT=8081
-      - ML_SERVICE_URL=http://ml-service:8000
+      # Optional: host-run ML (cd ml && uvicorn …); not a compose service
+      - ML_SERVICE_URL=${ML_SERVICE_URL:-http://host.docker.internal:8000}
     depends_on:
       - db
-      - ml-service
     env_file:
       - ../../.env
   redis:
@@ -53,17 +53,6 @@ services:
     volumes:
       - redis_data:/data
     restart: unless-stopped
-
-  # 4. ML Engine (Python)
-  ml-service:
-    build:
-      context: ../../ml
-      dockerfile: ../deployments/docker/ml.Dockerfile
-    container_name: skykin_ml
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
 
 volumes:
   redis_data:

@@ -39,14 +39,14 @@ func InitRouter(
 	bootstrap.RegisterDownstreamConsumers(db, cfg, bus)
 	consentHandler := bootstrap.NewConsentSystem(db, bus, slog.Default())
 	intentHandler := bootstrap.NewIntentSystem(db, cfg, slog.Default())
-	anonymousCampaigns := bootstrap.NewAnonymousCampaignSystem(db, cfg, slog.Default())
+	deliverySDK := bootstrap.NewDeliverySDKSystem(db, cfg, slog.Default())
 
 	sdkGroup := r.Group("/api/v1")
 	sdkGroup.Use(sdkAuthMiddleware)
 	{
 		consentHTTP.RegisterRoutes(sdkGroup, consentHandler)
 		intentHTTP.RegisterRoutes(sdkGroup, intentHandler)
-		deliveryHTTP.RegisterSDKRoutes(sdkGroup, anonymousCampaigns)
+		deliveryHTTP.RegisterSDKRoutes(sdkGroup, deliverySDK.Campaigns, deliverySDK.Telemetry)
 	}
 
 	return intentJobs

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-import numpy as np
 import tensorflow as tf
+
+from training.feature_engineering import FEATURE_SIZE
 
 ML_ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ML_ROOT / "models"
@@ -38,11 +39,11 @@ def load_model() -> ModelArtifact:
         label_map = json.load(f)
 
     model = tf.keras.models.load_model(model_path)
-    feature_columns = [f"f_{i}" for i in range(47)]
+    feature_columns = [f"f_{i}" for i in range(FEATURE_SIZE)]
     intents = [label_map[str(i)] for i in range(len(label_map))]
 
     return ModelArtifact(
-        model_version="1.0.0",
+        model_version="2.0.0",
         intents=intents,
         threshold=0.70,
         feature_columns=feature_columns,

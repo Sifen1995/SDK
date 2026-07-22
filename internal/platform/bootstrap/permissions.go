@@ -7,15 +7,15 @@ import (
 	permInfra "skykin-platform/internal/permissions/infrastructure"
 	permHTTP "skykin-platform/internal/permissions/interfaces/http"
 	"skykin-platform/internal/platform/messaging"
+	"skykin-platform/internal/platform/redis"
 
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
 // NewPermissionSystem wires the permissions module (composition root).
 func NewPermissionSystem(
 	db *gorm.DB,
-	rdb *redis.Client,
+	rdb *redis.RedisClient,
 	bus *messaging.Bus,
 	logger *slog.Logger,
 ) (*permApp.PermissionChecker, *permHTTP.Handler) {
@@ -28,8 +28,8 @@ func NewPermissionSystem(
 
 	var cache *permInfra.RedisPermissionCache
 	var memCache *permInfra.InMemoryPermissionCache
-	if rdb != nil {
-		cache = permInfra.NewRedisPermissionCache(rdb, logger)
+	if rdb != nil && rdb.Client != nil {
+		cache = permInfra.NewRedisPermissionCache(rdb.Client, logger)
 		logger.Info("permissions cache: redis")
 	} else {
 		memCache = permInfra.NewInMemoryPermissionCache()

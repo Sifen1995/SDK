@@ -41,12 +41,12 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-password}
       - DB_NAME=${DB_NAME:-skykin_db}
       - PORT=8081
-      - ML_SERVICE_URL=http://ml-service:8000
+      # Optional: point at a host-run uvicorn (cd ml && uvicorn app:app --port 8000)
+      - ML_SERVICE_URL=${ML_SERVICE_URL:-http://host.docker.internal:8000}
       - REDIS_ADDR=redis:6379
       - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-me}
     depends_on:
       - db
-      - ml-service
       - redis
     env_file:
       - .env
@@ -59,19 +59,6 @@ services:
     volumes:
       - redis_data:/data
     restart: unless-stopped
-
-  # 4. ML Engine (Python) — stateless; talks to backend only via HTTP
-  ml-service:
-    build:
-      context: ./ml
-      dockerfile: ../deployments/docker/ml.Dockerfile
-    container_name: skykin_ml
-    ports:
-      - "8000:8000"
-    environment:
-      - MODEL_PATH=/app/models/intent_model.pkl
-    depends_on:
-      - db
 
 volumes:
   redis_data:

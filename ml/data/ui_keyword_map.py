@@ -5,7 +5,6 @@ UI_KEYWORDS = {
         "dress", "shoes", "jacket", "outfit", "style",
         "fashion", "clothing", "wear", "collection",
         
-        
     ],
     "crypto": [
         "bitcoin", "ethereum", "crypto", "wallet", "blockchain",
@@ -13,7 +12,7 @@ UI_KEYWORDS = {
     ],
     "coffee": [
         "coffee", "espresso", "latte", "café", "cappuccino",
-        "arabica", "brew",
+        "arabica", "brew", 
     ],
     "fintech": [
         "transfer", "payment", "deposit", "withdraw", "balance",
@@ -21,7 +20,7 @@ UI_KEYWORDS = {
     ],
     "travel": [
         "flight", "hotel", "booking", "trip", "destination",
-        "ticket", "travel", "journey",
+        "ticket", "travel", "journey", 
     ],
     "fitness": [
         "workout", "gym", "run", "exercise", "training",
@@ -29,6 +28,6 @@ UI_KEYWORDS = {
     ],
     "shopping": [
         "buy", "cart", "price", "discount", "offer", "deal",
-        "order", "checkout",
+        "order", "checkout", 
     ],
 }

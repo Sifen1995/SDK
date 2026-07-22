@@ -27,6 +27,7 @@ type AudienceSegmentRow struct {
 
 func (AudienceSegmentRow) TableName() string { return "audience_segments" }
 
+// converts database row to Go domain object
 func (row *AudienceSegmentRow) ToDomain() (*domain.AudienceSegment, error) {
 	if row == nil {
 		return nil, nil
