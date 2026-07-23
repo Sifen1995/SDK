@@ -9,6 +9,7 @@ import (
 	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	deliveryInfra "skykin-platform/internal/delivery/infrastructure"
 	intentApp "skykin-platform/internal/intents/application"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
 	intentHTTP "skykin-platform/internal/intents/interfaces/http"
@@ -48,7 +49,8 @@ func NewIntentSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *int
 
 	campaignRepo := campaignInfra.NewRepository(db)
 	cachedCampaigns := campaignInfra.NewCachedCampaignRepository(campaignRepo, redisCampaign, platformRDB)
-	adSelector := campaignApp.NewIntentAdSelector(cachedCampaigns)
+	deliveryJobs := deliveryInfra.NewDeliveryRepository(db)
+	adSelector := campaignApp.NewIntentAdSelector(cachedCampaigns, campaignRepo, deliveryJobs, logger)
 
 	svc := intentApp.NewIntentService(profileRepo, cache, adSelector)
 	return intentHTTP.NewHandler(svc, aggregateIngest)

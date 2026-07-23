@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DeliveryRepository struct {
@@ -34,4 +35,22 @@ func (r *DeliveryRepository) CountToday(ctx context.Context, userID string, camp
 		Where("user_id = ? AND campaign_id = ? AND created_at >= ?", userID, campaignID.String(), start).
 		Count(&n).Error
 	return int(n), err
+}
+
+// RecordJob upserts a delivery_jobs row for analytics / frequency helpers.
+func (r *DeliveryRepository) RecordJob(ctx context.Context, userID, campaignID string) error {
+	if r == nil || r.db == nil || userID == "" || campaignID == "" {
+		return nil
+	}
+	row := &persistence.DeliveryJobRow{
+		UserID:     userID,
+		CampaignID: campaignID,
+		CreatedAt:  time.Now().UTC(),
+	}
+	return r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_id"}, {Name: "campaign_id"}},
+			DoNothing: true,
+		}).
+		Create(row).Error
 }
