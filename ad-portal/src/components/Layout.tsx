@@ -1,12 +1,27 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
+import {
+  AppShell,
+  SkykinMark,
+  ThemeToggle,
+  Avatar,
+  AvatarFallback,
+  Button,
+  type NavGroup,
+} from '@skykin/ui';
+import { Megaphone, CreditCard, User, Users, PlusCircle, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
-import RoleBadge from './RoleBadge';
-import ThemeToggle from './ThemeToggle';
+import { useTheme } from '../context/ThemeContext';
+
+function initials(name?: string) {
+  if (!name) return 'AD';
+  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || 'AD';
+}
 
 export default function Layout() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, canWrite } = useAuth();
   const { subscribed, subscription } = useSubscription();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   function handleLogout() {
@@ -14,82 +29,68 @@ export default function Layout() {
     navigate('/login');
   }
 
-  const navClass = ({ isActive }: { isActive: boolean }) =>
-    `px-3 py-2 rounded-lg text-sm font-medium transition ${
-      isActive ? 'nav-link-active' : 'nav-link'
-    }`;
+  const workspace = [
+    { label: 'Campaigns', to: '/', end: true, icon: Megaphone },
+    ...(canWrite && subscribed ? [{ label: 'New Campaign', to: '/campaigns/new', icon: PlusCircle }] : []),
+    {
+      label: 'Subscription',
+      to: '/subscription',
+      icon: CreditCard,
+      badge: !subscribed ? <span className="size-2 rounded-full bg-warning" title="Action needed" /> : undefined,
+    },
+  ];
+  const account = [
+    { label: 'Profile', to: '/profile', icon: User },
+    ...(isAdmin ? [{ label: 'Team', to: '/team', icon: Users }] : []),
+  ];
+  const groups: NavGroup[] = [
+    { label: 'Workspace', items: workspace },
+    { label: 'Account', items: account },
+  ];
+
+  const firstName = user?.name?.trim().split(/\s+/)[0] || 'there';
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-20 app-header">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <Link to="/" className="flex items-center gap-2.5 shrink-0">
-            <div className="logo-mark h-9 w-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm">
-              Sk
-            </div>
-            <div>
-              <p className="font-semibold text-primary leading-tight">Skykin</p>
-              <p className="text-[11px] text-muted font-medium uppercase tracking-wider">Ad Portal</p>
-            </div>
-          </Link>
-
-          {user && (
-            <nav className="hidden md:flex items-center gap-1">
-              <NavLink to="/" end className={navClass}>Campaigns</NavLink>
-              <NavLink to="/subscription" className={navClass}>
-                Subscription
-                {user && !subscribed && (
-                  <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" title="Action needed" />
-                )}
-              </NavLink>
-              <NavLink to="/profile" className={navClass}>Profile</NavLink>
-              {isAdmin && <NavLink to="/team" className={navClass}>Team</NavLink>}
-            </nav>
-          )}
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
-
-            {user ? (
-              <>
-                <div className="hidden sm:block text-right">
-                  <p className="text-sm font-medium text-primary truncate max-w-[140px]">{user.name}</p>
-                  <div className="flex items-center justify-end gap-2">
-                    <RoleBadge role={user.role} size="sm" />
-                    {subscribed && subscription && (
-                      <span className="text-[10px] text-brand-600 dark:text-brand-400 font-medium">
-                        {subscription.plan.name}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="text-sm text-muted hover:text-primary transition cursor-pointer"
-                >
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <div className="flex items-center gap-2 text-sm">
-                <Link to="/login" className="text-muted hover:text-primary">Sign in</Link>
-                <Link to="/register" className="btn-primary px-3 py-1.5 text-sm">
-                  Register
-                </Link>
-              </div>
-            )}
-          </div>
+    <AppShell
+      brand={{ name: 'Skykin', sub: 'Ad Portal', mark: <SkykinMark className="size-5 text-identity" /> }}
+      groups={groups}
+      title={
+        <div>
+          <h1 className="font-display text-base font-semibold text-foreground">Hey {firstName}, welcome back</h1>
+          <p className="hidden text-[11px] text-muted-foreground sm:block">
+            {user?.company_name ? `${user.company_name} · ` : ''}Manage your intent-targeted campaigns
+          </p>
         </div>
-      </header>
-
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-8">
-        <Outlet />
-      </main>
-
-      <footer className="app-footer py-6 text-center text-xs">
-        Skykin Advertiser Portal · Campaign management for intent-driven ads
-      </footer>
-    </div>
+      }
+      topbarRight={
+        <>
+          <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
+          <Avatar>
+            <AvatarFallback>{initials(user?.name)}</AvatarFallback>
+          </Avatar>
+        </>
+      }
+      sidebarFooter={
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+            <Avatar className="size-8">
+              <AvatarFallback className="text-[10px]">{initials(user?.name)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-sidebar-foreground">{user?.name}</p>
+              <p className="truncate text-[10px] text-sidebar-muted">
+                {subscribed && subscription ? `${subscription.plan.name} plan` : user?.email}
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sidebar-muted" onClick={handleLogout}>
+            <LogOut className="size-4" />
+            Sign out
+          </Button>
+        </div>
+      }
+    >
+      <Outlet />
+    </AppShell>
   );
 }

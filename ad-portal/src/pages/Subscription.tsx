@@ -1,151 +1,106 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
+import {
+  Card, CardContent, Button, Badge, LoadingState, ErrorState, EmptyState, InlineError,
+} from '@skykin/ui';
+import { Check, ArrowRight, CreditCard } from 'lucide-react';
 import { useSubscription } from '../context/SubscriptionContext';
+import { usePlans, useSubscribe } from '../lib/queries';
 import { formatDate, formatEtb } from '../lib/campaignUtils';
-import type { Plan } from '../types';
 
 export default function SubscriptionPage() {
   const { subscribed, subscription, refresh } = useSubscription();
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [subscribingId, setSubscribingId] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  const { data: plans, isPending, isError, error, refetch } = usePlans();
+  const subscribe = useSubscribe();
   const [success, setSuccess] = useState('');
 
-  useEffect(() => {
-    api.listPlans()
-      .then(setPlans)
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load plans'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  async function handleSubscribe(planId: string) {
-    setSubscribingId(planId);
-    setError('');
+  function handleSubscribe(planId: string) {
     setSuccess('');
-    try {
-      await api.subscribe(planId);
-      await refresh();
-      setSuccess('Subscription activated! You can now create campaigns.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Subscription failed');
-    } finally {
-      setSubscribingId(null);
-    }
-  }
-
-  if (loading) {
-    return <p className="text-muted">Loading plans…</p>;
+    subscribe.mutate(planId, {
+      onSuccess: async () => { await refresh(); setSuccess('Subscription activated — you can now create campaigns.'); },
+    });
   }
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-primary">Subscription</h1>
-        <p className="text-muted mt-1">
-          Choose a plan to unlock campaign creation, delivery channels, and audience targeting.
-        </p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-display text-lg font-semibold">Subscription</h2>
+        <p className="text-sm text-muted-foreground">Choose a plan to unlock campaign creation, delivery channels, and audience targeting.</p>
       </div>
 
-      {error && <div className="alert-error mb-6">{error}</div>}
-      {success && <div className="alert-success mb-6">{success}</div>}
+      {success && <div className="rounded-md border border-success/30 bg-success-surface px-3 py-2 text-sm text-success">{success}</div>}
+      {subscribe.isError && <InlineError message={(subscribe.error as Error).message} />}
 
       {subscribed && subscription && (
-        <div className="subscription-active-banner mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="relative overflow-hidden rounded-xl bg-primary p-6 text-primary-foreground">
+          <div className="pointer-events-none absolute inset-0 opacity-90" style={{ background: 'radial-gradient(circle at 12% 88%, rgb(255 255 255 / 0.12), transparent 45%)' }} />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-brand-300 mb-1">Current plan</p>
-              <h2 className="text-xl font-bold text-white">{subscription.plan.name}</h2>
-              <p className="text-sm text-white/80 mt-1">
-                {formatEtb(subscription.plan.monthly_fee_etb)}/month ·{' '}
-                {subscription.impressions_used.toLocaleString()} / {subscription.plan.included_impressions.toLocaleString()} impressions used
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-white/70">Current plan</p>
+              <h3 className="font-display text-xl font-bold">{subscription.plan.name}</h3>
+              <p className="mt-1 text-sm text-white/85 tabular-nums">
+                {formatEtb(subscription.plan.monthly_fee_etb)}/mo · {subscription.impressions_used.toLocaleString()} / {subscription.plan.included_impressions.toLocaleString()} impressions used
               </p>
-              <p className="text-xs text-white/60 mt-2">
-                Period ends {formatDate(subscription.current_period_end)}
-              </p>
+              <p className="mt-2 text-xs text-white/60">Period ends {formatDate(subscription.current_period_end)}</p>
             </div>
-            <Link to="/campaigns/new" className="btn-primary shrink-0 bg-white text-brand-700 hover:bg-brand-50">
-              Create campaign →
-            </Link>
+            <Button asChild variant="secondary" className="bg-white text-primary hover:bg-white/90">
+              <Link to="/campaigns/new">Create campaign <ArrowRight className="size-4" /></Link>
+            </Button>
           </div>
-          <div className="mt-6 flex flex-wrap gap-2">
-            {subscription.plan.audiencemart_enabled && (
-              <span className="plan-feature-pill">Audiencemart segments</span>
-            )}
-            {subscription.plan.sms_plus_enabled && (
-              <span className="plan-feature-pill">SMS+ channel</span>
-            )}
-            <span className="plan-feature-pill">
-              Up to {subscription.plan.max_active_campaigns} active campaigns
-            </span>
-            <span className="plan-feature-pill">
-              {formatEtb(subscription.plan.max_daily_budget_etb)} daily budget cap
-            </span>
+          <div className="relative mt-5 flex flex-wrap gap-2 text-xs">
+            {subscription.plan.audiencemart_enabled && <span className="rounded-full border border-white/25 bg-white/12 px-3 py-1">AudienceMart segments</span>}
+            {subscription.plan.sms_plus_enabled && <span className="rounded-full border border-white/25 bg-white/12 px-3 py-1">SMS+ channel</span>}
+            <span className="rounded-full border border-white/25 bg-white/12 px-3 py-1">Up to {subscription.plan.max_active_campaigns} active campaigns</span>
+            <span className="rounded-full border border-white/25 bg-white/12 px-3 py-1">{formatEtb(subscription.plan.max_daily_budget_etb)} daily cap</span>
           </div>
         </div>
       )}
 
       {!subscribed && (
-        <div className="mb-6 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
-          Subscribe to a plan before creating campaigns. Campaign creation is blocked until you have an active subscription.
+        <div className="rounded-lg border border-warning/30 bg-warning-surface px-4 py-3 text-sm text-foreground">
+          Subscribe to a plan before creating campaigns — creation stays locked until you have an active subscription.
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {plans.map(plan => {
-          const isCurrent = subscription?.plan.id === plan.id;
-          return (
-            <div
-              key={plan.id}
-              className={`plan-card ${isCurrent ? 'plan-card-current' : ''}`}
-            >
-              {isCurrent && (
-                <span className="plan-card-badge">Your plan</span>
-              )}
-              <h3 className="text-lg font-bold text-primary">{plan.name}</h3>
-              <p className="text-3xl font-bold text-brand-600 dark:text-brand-400 mt-2">
-                {formatEtb(plan.monthly_fee_etb)}
-                <span className="text-sm font-normal text-muted">/mo</span>
-              </p>
-
-              <ul className="mt-6 space-y-2 text-sm text-muted">
-                <li>✓ {plan.included_impressions.toLocaleString()} included impressions</li>
-                <li>✓ Up to {plan.max_active_campaigns} active campaigns</li>
-                <li>✓ {formatEtb(plan.max_daily_budget_etb)} max daily budget</li>
-                {plan.audiencemart_enabled ? (
-                  <li>✓ Audiencemart audience segments</li>
-                ) : (
-                  <li className="text-faint">Intent-only targeting (no segments)</li>
-                )}
-                {plan.sms_plus_enabled && <li>✓ SMS+ premium channel</li>}
-                {plan.cpc_discount_pct > 0 && (
-                  <li>✓ {plan.cpc_discount_pct}% CPC discount</li>
-                )}
-              </ul>
-
-              {!subscribed && (
-                <button
-                  type="button"
-                  className="btn-primary w-full mt-6"
-                  disabled={subscribingId === plan.id}
-                  onClick={() => handleSubscribe(plan.id)}
-                >
-                  {subscribingId === plan.id ? 'Subscribing…' : `Choose ${plan.name}`}
-                </button>
-              )}
-              {isCurrent && (
-                <p className="text-center text-xs text-brand-600 dark:text-brand-400 font-medium mt-6">
-                  Active subscription
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {plans.length === 0 && (
-        <div className="card p-12 text-center text-muted">No plans available right now.</div>
+      {isPending ? (
+        <LoadingState label="Loading plans…" />
+      ) : isError ? (
+        <ErrorState message={(error as Error)?.message} onRetry={() => refetch()} />
+      ) : !plans || plans.length === 0 ? (
+        <EmptyState icon={CreditCard} title="No plans available" description="Subscription plans will appear here once configured." />
+      ) : (
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {plans.map(plan => {
+            const isCurrent = subscription?.plan.id === plan.id;
+            return (
+              <Card key={plan.id} className={isCurrent ? 'ring-1 ring-identity' : undefined}>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-display text-base font-bold">{plan.name}</h3>
+                    {isCurrent && <Badge variant="identity">Your plan</Badge>}
+                  </div>
+                  <p className="mt-2 font-display text-3xl font-bold tabular-nums text-identity">
+                    {formatEtb(plan.monthly_fee_etb)}<span className="text-sm font-normal text-muted-foreground">/mo</span>
+                  </p>
+                  <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
+                    <li className="flex items-center gap-2"><Check className="size-4 text-success" /> {plan.included_impressions.toLocaleString()} impressions</li>
+                    <li className="flex items-center gap-2"><Check className="size-4 text-success" /> Up to {plan.max_active_campaigns} active campaigns</li>
+                    <li className="flex items-center gap-2"><Check className="size-4 text-success" /> {formatEtb(plan.max_daily_budget_etb)} daily budget</li>
+                    <li className="flex items-center gap-2">{plan.audiencemart_enabled ? <><Check className="size-4 text-success" /> AudienceMart segments</> : <span className="pl-6">Intent-only targeting</span>}</li>
+                    {plan.sms_plus_enabled && <li className="flex items-center gap-2"><Check className="size-4 text-success" /> SMS+ premium channel</li>}
+                    {plan.cpc_discount_pct > 0 && <li className="flex items-center gap-2"><Check className="size-4 text-success" /> {plan.cpc_discount_pct}% CPC discount</li>}
+                  </ul>
+                  {!subscribed && (
+                    <Button className="mt-6 w-full" disabled={subscribe.isPending} onClick={() => handleSubscribe(plan.id)}>
+                      {subscribe.isPending && subscribe.variables === plan.id ? 'Subscribing…' : `Choose ${plan.name}`}
+                    </Button>
+                  )}
+                  {isCurrent && <p className="mt-6 text-center text-xs font-medium text-identity">Active subscription</p>}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { AppProviders } from '@skykin/ui';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -50,6 +51,7 @@ export default function App() {
       <BrowserRouter>
         <AuthProvider>
           <SubscriptionProvider>
+            <AppProviders>
             <Routes>
               <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
               <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
@@ -62,6 +64,7 @@ export default function App() {
                 <Route path="/team" element={<AdminRoute><Team /></AdminRoute>} />
               </Route>
             </Routes>
+            </AppProviders>
           </SubscriptionProvider>
         </AuthProvider>
       </BrowserRouter>

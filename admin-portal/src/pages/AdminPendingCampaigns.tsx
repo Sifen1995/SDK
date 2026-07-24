@@ -1,256 +1,164 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api } from '../lib/api';
+import { useState } from 'react';
+import { useQueryState, parseAsStringLiteral } from 'nuqs';
+import {
+  Tabs, TabsList, TabsTrigger, Badge, Button, Input, Label,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  LoadingState, ErrorState, EmptyState, InlineError,
+} from '@skykin/ui';
+import { ShieldCheck } from 'lucide-react';
 import type { Campaign } from '../types';
 import CampaignModerationCard, { type ModerationAction } from '../components/CampaignModerationCard';
-import { ConfirmModal, NotesModal } from '../components/Modal';
-import OffsetPagination, { paginateSlice, PAGE_SIZE } from '../components/Pagination';
+import { usePendingCampaigns, useReadyCampaigns, useModerateCampaign, useActivateCampaign, useApproveAndGoLive } from '../lib/queries';
 
-type Tab = 'pending' | 'ready';
-
-type ModalState =
+type Modal =
   | { type: 'none' }
-  | { type: 'confirm'; action: 'go-live' | 'approve-and-go-live'; campaignId: string; campaignName: string }
-  | { type: 'notes-approve'; campaignId: string }
-  | { type: 'notes-reject'; campaignId: string };
+  | { type: 'confirm'; action: 'go-live' | 'approve-and-go-live'; c: Campaign }
+  | { type: 'approve'; c: Campaign }
+  | { type: 'reject'; c: Campaign };
 
 export default function AdminPendingCampaigns() {
-  const [tab, setTab] = useState<Tab>('pending');
-  const [pending, setPending] = useState<Campaign[]>([]);
-  const [ready, setReady] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [actionError, setActionError] = useState('');
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [pendingPage, setPendingPage] = useState(1);
-  const [readyPage, setReadyPage] = useState(1);
-  const [modal, setModal] = useState<ModalState>({ type: 'none' });
+  const [tab, setTab] = useQueryState('tab', parseAsStringLiteral(['pending', 'ready'] as const).withDefault('pending'));
+  const pending = usePendingCampaigns();
+  const ready = useReadyCampaigns();
+  const moderate = useModerateCampaign();
+  const activate = useActivateCampaign();
+  const approveGoLive = useApproveAndGoLive();
 
-  const loadAll = useCallback(async () => {
-    try {
-      setLoading(true);
-      setActionError('');
-      const [pendingList, allRes] = await Promise.all([
-        api.listPendingCampaigns(),
-        api.listCampaigns(0, 500),
-      ]);
-      setPending(pendingList);
-      setReady(
-        allRes.campaigns.filter(
-          c =>
-            c.moderationStatus === 'approved' &&
-            c.validationStatus === 'passed' &&
-            !c.isActive,
-        ),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load campaigns');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [modal, setModal] = useState<Modal>({ type: 'none' });
+  const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  const busy = moderate.isPending || activate.isPending || approveGoLive.isPending;
+  const list = tab === 'pending' ? pending : ready;
+  const rows = (list.data ?? []) as Campaign[];
 
-  const activeList = tab === 'pending' ? pending : ready;
-  const activePage = tab === 'pending' ? pendingPage : readyPage;
-  const setActivePage = tab === 'pending' ? setPendingPage : setReadyPage;
-  const paginated = useMemo(
-    () => paginateSlice(activeList, activePage, PAGE_SIZE),
-    [activeList, activePage],
-  );
-
-  useEffect(() => {
-    setActivePage(1);
-  }, [tab, setActivePage]);
-
-  function openAction(campaign: Campaign, action: ModerationAction) {
-    setActionError('');
-    switch (action) {
-      case 'approve-and-go-live':
-        setModal({
-          type: 'confirm',
-          action: 'approve-and-go-live',
-          campaignId: campaign.id,
-          campaignName: campaign.name,
-        });
-        break;
-      case 'go-live':
-        setModal({
-          type: 'confirm',
-          action: 'go-live',
-          campaignId: campaign.id,
-          campaignName: campaign.name,
-        });
-        break;
-      case 'approve-only':
-        setModal({ type: 'notes-approve', campaignId: campaign.id });
-        break;
-      case 'reject':
-        setModal({ type: 'notes-reject', campaignId: campaign.id });
-        break;
-    }
+  function openAction(c: Campaign, action: ModerationAction) {
+    setNotes('');
+    if (action === 'approve-and-go-live') setModal({ type: 'confirm', action, c });
+    else if (action === 'go-live') setModal({ type: 'confirm', action: 'go-live', c });
+    else if (action === 'approve-only') setModal({ type: 'approve', c });
+    else setModal({ type: 'reject', c });
   }
 
-  async function runValidate(campaignId: string, action: 'approve' | 'reject', notes?: string) {
-    setProcessingId(campaignId);
-    try {
-      await api.validateCampaign(campaignId, action, notes || undefined);
-      setModal({ type: 'none' });
-      await loadAll();
-      if (action === 'approve') setTab('ready');
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Action failed');
-    } finally {
-      setProcessingId(null);
-    }
-  }
-
-  async function runActivate(campaignId: string) {
-    setProcessingId(campaignId);
-    try {
-      await api.adminActivateCampaign(campaignId);
-      setModal({ type: 'none' });
-      await loadAll();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Activation failed');
-    } finally {
-      setProcessingId(null);
-    }
-  }
-
-  async function handleConfirm() {
+  function confirmAction() {
     if (modal.type !== 'confirm') return;
-    const { campaignId, action } = modal;
-    if (action === 'go-live') {
-      await runActivate(campaignId);
-      return;
-    }
-    setProcessingId(campaignId);
-    try {
-      await api.validateCampaign(campaignId, 'approve');
-      await api.adminActivateCampaign(campaignId);
-      setModal({ type: 'none' });
-      await loadAll();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Approve & go live failed');
-    } finally {
-      setProcessingId(null);
-    }
+    const done = { onSuccess: () => setModal({ type: 'none' }) };
+    if (modal.action === 'go-live') activate.mutate(modal.c.id, done);
+    else approveGoLive.mutate(modal.c.id, { onSuccess: () => { setModal({ type: 'none' }); setTab('ready'); } });
   }
 
-  if (loading) return <div className="text-muted">Loading campaigns…</div>;
-  if (error) return <div className="alert-error">{error}</div>;
+  function submitApprove() {
+    if (modal.type !== 'approve') return;
+    moderate.mutate(
+      { id: modal.c.id, action: 'approve', notes: notes || undefined },
+      { onSuccess: () => { setModal({ type: 'none' }); setTab('ready'); } },
+    );
+  }
+
+  function submitReject() {
+    if (modal.type !== 'reject') return;
+    moderate.mutate(
+      { id: modal.c.id, action: 'reject', notes },
+      { onSuccess: () => setModal({ type: 'none' }) },
+    );
+  }
+
+  const mutationError = (moderate.error || activate.error || approveGoLive.error) as Error | null;
 
   return (
-    <div>
-      <h1 className="text-xl font-bold text-primary mb-1">Campaign Moderation</h1>
-      <p className="text-sm text-muted mb-5">
-        Review pending submissions, approve moderation, and activate approved campaigns.
-      </p>
-
-      <div className="tab-bar mb-6">
-        <button
-          type="button"
-          className={`tab-btn ${tab === 'pending' ? 'tab-btn-active' : ''}`}
-          onClick={() => setTab('pending')}
-        >
-          Awaiting review
-          {pending.length > 0 && <span className="tab-count">{pending.length}</span>}
-        </button>
-        <button
-          type="button"
-          className={`tab-btn ${tab === 'ready' ? 'tab-btn-active' : ''}`}
-          onClick={() => setTab('ready')}
-        >
-          Ready to go live
-          {ready.length > 0 && <span className="tab-count tab-count-ready">{ready.length}</span>}
-        </button>
+    <div className="space-y-5">
+      <div>
+        <h2 className="font-display text-lg font-semibold">Campaign moderation</h2>
+        <p className="text-sm text-muted-foreground">Review pending submissions, approve moderation, and activate approved campaigns.</p>
       </div>
 
-      {actionError && <div className="alert-error mb-6">{actionError}</div>}
+      <Tabs value={tab} onValueChange={v => setTab(v as 'pending' | 'ready')}>
+        <TabsList>
+          <TabsTrigger value="pending">
+            Awaiting review
+            {(pending.data?.length ?? 0) > 0 && <Badge variant="warning" className="ml-1.5">{pending.data!.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="ready">
+            Ready to go live
+            {(ready.data?.length ?? 0) > 0 && <Badge variant="success" className="ml-1.5">{ready.data!.length}</Badge>}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      {activeList.length === 0 ? (
-        <div className="card-static p-12 text-center border-dashed">
-          <p className="text-muted">
-            {tab === 'pending'
-              ? 'No campaigns awaiting moderation.'
-              : 'No approved campaigns waiting for activation. Approve a campaign first, then activate it here.'}
-          </p>
-        </div>
+      {mutationError && <InlineError message={mutationError.message} />}
+
+      {list.isPending ? (
+        <LoadingState label="Loading campaigns…" />
+      ) : list.isError ? (
+        <ErrorState message={(list.error as Error)?.message} onRetry={() => list.refetch()} />
+      ) : rows.length === 0 ? (
+        <EmptyState
+          icon={ShieldCheck}
+          title={tab === 'pending' ? 'Nothing awaiting moderation' : 'Nothing ready to activate'}
+          description={tab === 'pending' ? 'New submissions will appear here for review.' : 'Approve a campaign first, then activate it here.'}
+        />
       ) : (
-        <>
-          <div className="space-y-4">
-            {paginated.map(c => (
-              <CampaignModerationCard
-                key={c.id}
-                campaign={c}
-                processing={processingId === c.id}
-                mode={tab}
-                onAction={action => openAction(c, action)}
-              />
-            ))}
-          </div>
-          <OffsetPagination
-            page={activePage}
-            totalItems={activeList.length}
-            onPageChange={setActivePage}
-          />
-        </>
+        <div className="space-y-4">
+          {rows.map(c => (
+            <CampaignModerationCard key={c.id} campaign={c} processing={busy} mode={tab} onAction={a => openAction(c, a)} />
+          ))}
+        </div>
       )}
 
-      <ConfirmModal
-        open={modal.type === 'confirm'}
-        title={
-          modal.type === 'confirm' && modal.action === 'go-live'
-            ? 'Activate campaign?'
-            : 'Approve & go live?'
-        }
-        description={
-          modal.type === 'confirm'
-            ? modal.action === 'go-live'
-              ? `"${modal.campaignName}" will go live and start delivering to matched users.`
-              : `"${modal.campaignName}" will be approved and activated immediately.`
-            : ''
-        }
-        confirmLabel={modal.type === 'confirm' && modal.action === 'go-live' ? 'Go Live' : 'Approve & Go Live'}
-        variant="success"
-        loading={processingId !== null}
-        onConfirm={handleConfirm}
-        onCancel={() => setModal({ type: 'none' })}
-      />
+      {/* Confirm (go-live / approve+go-live) */}
+      <Dialog open={modal.type === 'confirm'} onOpenChange={o => !o && setModal({ type: 'none' })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{modal.type === 'confirm' && modal.action === 'go-live' ? 'Activate campaign?' : 'Approve & go live?'}</DialogTitle>
+            <DialogDescription>
+              {modal.type === 'confirm' && (modal.action === 'go-live'
+                ? `"${modal.c.name}" will go live and start delivering to matched users.`
+                : `"${modal.c.name}" will be approved and activated immediately.`)}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setModal({ type: 'none' })}>Cancel</Button>
+            <Button onClick={confirmAction} disabled={busy}>
+              {busy ? 'Working…' : modal.type === 'confirm' && modal.action === 'go-live' ? 'Go live' : 'Approve & go live'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <NotesModal
-        open={modal.type === 'notes-approve'}
-        title="Approve campaign"
-        description="Creative validation will run again. The campaign moves to Ready to go live for activation."
-        label="Approval notes (optional)"
-        placeholder="Looks good — brand guidelines met…"
-        confirmLabel="Approve"
-        variant="primary"
-        loading={processingId !== null}
-        onConfirm={notes =>
-          modal.type === 'notes-approve' && runValidate(modal.campaignId, 'approve', notes)
-        }
-        onCancel={() => setModal({ type: 'none' })}
-      />
+      {/* Approve with optional notes */}
+      <Dialog open={modal.type === 'approve'} onOpenChange={o => !o && setModal({ type: 'none' })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve campaign</DialogTitle>
+            <DialogDescription>Creative validation runs again; the campaign moves to “Ready to go live”.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="approve-notes">Approval notes (optional)</Label>
+            <Input id="approve-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Looks good — brand guidelines met…" />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setModal({ type: 'none' })}>Cancel</Button>
+            <Button onClick={submitApprove} disabled={busy}>{busy ? 'Approving…' : 'Approve'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <NotesModal
-        open={modal.type === 'notes-reject'}
-        title="Reject campaign"
-        description="The advertiser will see this campaign as rejected."
-        label="Rejection reason"
-        placeholder="Creative does not meet guidelines…"
-        required
-        confirmLabel="Reject campaign"
-        variant="danger"
-        loading={processingId !== null}
-        onConfirm={notes =>
-          modal.type === 'notes-reject' && runValidate(modal.campaignId, 'reject', notes)
-        }
-        onCancel={() => setModal({ type: 'none' })}
-      />
+      {/* Reject with required reason */}
+      <Dialog open={modal.type === 'reject'} onOpenChange={o => !o && setModal({ type: 'none' })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject campaign</DialogTitle>
+            <DialogDescription>The advertiser will see this campaign as rejected.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="reject-notes">Rejection reason</Label>
+            <Input id="reject-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Creative does not meet guidelines…" />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setModal({ type: 'none' })}>Cancel</Button>
+            <Button variant="destructive" onClick={submitReject} disabled={busy || !notes.trim()}>{busy ? 'Rejecting…' : 'Reject campaign'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

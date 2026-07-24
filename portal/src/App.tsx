@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AppProviders } from '@skykin/ui';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -21,6 +22,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <AppProviders>
         <Routes>
           <Route element={<Layout />}>
             <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
@@ -29,6 +31,7 @@ export default function App() {
             <Route path="/applications/new" element={<ProtectedRoute><NewApplication /></ProtectedRoute>} />
           </Route>
         </Routes>
+        </AppProviders>
       </AuthProvider>
     </BrowserRouter>
   );

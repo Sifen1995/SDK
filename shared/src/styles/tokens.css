@@ -1,0 +1,241 @@
+/* ============================================================================
+   Skykin "Signal" design system — single source of truth
+   Consumed by portal / ad-portal / admin-portal via `@import "@skykin/ui/styles.css"`.
+   Direction: clean-corporate. Core teal action color shared by all apps; each
+   app identified only by a wayfinding accent (--identity). shadcn token contract.
+   ============================================================================ */
+
+/* Fonts (self-hosted via @fontsource — no CDN) */
+@import "@fontsource-variable/schibsted-grotesk/wght.css";
+@import "@fontsource-variable/schibsted-grotesk/wght-italic.css";
+@import "@fontsource-variable/hanken-grotesk/wght.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* scan the shared package's own components for utility classes */
+@source "../**/*.{ts,tsx}";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ tokens */
+:root {
+  --background: #fafdff;
+  --foreground: #131a22;
+  --card: #ffffff;
+  --card-foreground: #131a22;
+  --popover: #ffffff;
+  --popover-foreground: #131a22;
+
+  --primary: #1f4e4a;            /* deep muted teal — shared primary action */
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f4;
+  --secondary-foreground: #131a22;
+  --muted: #eef1f4;
+  --muted-foreground: #5c6773;   /* slate */
+  --accent: #eef1f4;             /* shadcn "accent" = neutral hover surface (NOT identity) */
+  --accent-foreground: #131a22;
+
+  --destructive: #b4232a;
+  --destructive-foreground: #ffffff;
+  --success: #2e7d5b;
+  --success-foreground: #ffffff;
+  --warning: #b7791f;
+  --warning-foreground: #ffffff;
+
+  --border: #e3e7ec;
+  --input: #e3e7ec;
+  --ring: #1f4e4a;
+
+  /* muted status surfaces (pills/tiles) — tinted, low-chroma */
+  --success-surface: #e6f2ec;
+  --warning-surface: #f6eed9;
+  --destructive-surface: #f7e6e6;
+
+  --chart-1: #1f4e4a;
+  --chart-2: #3d6b99;
+  --chart-3: #9c6b3f;
+  --chart-4: #6b5b95;
+  --chart-5: #2e7d5b;
+  --chart-6: #b7791f;
+
+  /* per-app wayfinding accent (overridden by [data-app]) */
+  --identity: #1f4e4a;
+  --identity-foreground: #ffffff;
+
+  /* sidebar shell */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #131a22;
+  --sidebar-muted: #5c6773;
+  --sidebar-border: #e3e7ec;
+  --sidebar-accent: #eef1f4;                 /* hover surface */
+  --sidebar-accent-foreground: #131a22;
+  --sidebar-primary: var(--identity);        /* the signal bar + active label */
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-ring: var(--ring);
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #0e1418;
+  --foreground: #e6eaed;
+  --card: #151d22;
+  --card-foreground: #e6eaed;
+  --popover: #151d22;
+  --popover-foreground: #e6eaed;
+
+  --primary: #4f9a8f;            /* teal lifted for legibility on dark */
+  --primary-foreground: #08110f;
+  --secondary: #1c262c;
+  --secondary-foreground: #e6eaed;
+  --muted: #1c262c;
+  --muted-foreground: #97a2ac;
+  --accent: #1c262c;
+  --accent-foreground: #e6eaed;
+
+  --destructive: #e5595e;
+  --destructive-foreground: #0e1418;
+  --success: #3fa97b;
+  --success-foreground: #06120c;
+  --warning: #d4933a;
+  --warning-foreground: #1a1205;
+
+  --border: #263038;
+  --input: #263038;
+  --ring: #4f9a8f;
+
+  --success-surface: #10241b;
+  --warning-surface: #2a2110;
+  --destructive-surface: #2a1315;
+
+  --chart-1: #4f9a8f;
+  --chart-2: #6b93c0;
+  --chart-3: #c08c5a;
+  --chart-4: #9585bc;
+  --chart-5: #3fa97b;
+  --chart-6: #d4933a;
+
+  --identity: #4f9a8f;
+  --identity-foreground: #06120c;
+
+  --sidebar: #101820;
+  --sidebar-foreground: #e6eaed;
+  --sidebar-muted: #97a2ac;
+  --sidebar-border: #263038;
+  --sidebar-accent: #1c262c;
+  --sidebar-accent-foreground: #e6eaed;
+  --sidebar-primary: var(--identity);
+  --sidebar-primary-foreground: #06120c;
+  --sidebar-ring: var(--ring);
+}
+
+/* ---------------------------------------- per-app identity (wayfinding only) */
+:root[data-app="portal"] { --identity: #3d6b99; --identity-foreground: #ffffff; }
+:root[data-app="admin"]  { --identity: #6b5b95; --identity-foreground: #ffffff; }
+:root[data-app="ad"]     { --identity: #9c6b3f; --identity-foreground: #ffffff; }
+:root[data-app="portal"].dark { --identity: #6b93c0; --identity-foreground: #06101a; }
+:root[data-app="admin"].dark  { --identity: #9585bc; --identity-foreground: #0d0a16; }
+:root[data-app="ad"].dark     { --identity: #c08c5a; --identity-foreground: #1a1205; }
+
+/* ------------------------------------------------- Tailwind theme mapping */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success-surface: var(--success-surface);
+  --color-warning-surface: var(--warning-surface);
+  --color-destructive-surface: var(--destructive-surface);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-identity: var(--identity);
+  --color-identity-foreground: var(--identity-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+
+  --font-sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Schibsted Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* --------------------------------------------------------------- base layer */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv05", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  #root { min-height: 100vh; }
+  h1, h2, h3, h4, .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+  h1, h2, h3 { text-wrap: balance; }
+  /* tabular figures everywhere digits align */
+  .tabular-nums, [data-slot="kpi-value"], td.num, th.num { font-variant-numeric: tabular-nums; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+}
+
+/* ---------------------------------------- signature: moving "signal bar" */
+/* A single accent bar the Sidebar positions/animates to the active item. */
+.signal-bar {
+  position: absolute;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--sidebar-primary);
+  transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1), height 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, height;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

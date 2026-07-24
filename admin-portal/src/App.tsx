@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AppProviders } from '@skykin/ui';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Layout from './components/Layout';
@@ -12,7 +13,9 @@ import AdminAdvertisersAnalytics from './pages/AdminAdvertisersAnalytics';
 import AdminCampaignsAnalytics from './pages/AdminCampaignsAnalytics';
 import AdminCampaignDetailAnalytics from './pages/AdminCampaignDetailAnalytics';
 import AdminSegmentCandidates from './pages/AdminSegmentCandidates';
+import AdminSdkUsers from './pages/AdminSdkUsers';
 import AdminPlans from './pages/AdminPlans';
+import AdminRoles from './pages/AdminRoles';
 import type { ReactNode } from 'react';
 
 function GuestRoute({ children }: { children: ReactNode }) {
@@ -23,7 +26,7 @@ function GuestRoute({ children }: { children: ReactNode }) {
 function AdminRoute({ children }: { children: ReactNode }) {
   const { token, isAdmin } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  if (!isAdmin) return <div className="p-8 text-center text-red-500 text-sm">Access Denied. Operator Admin only.</div>;
+  if (!isAdmin) return <div className="p-8 text-center text-sm text-destructive">Access denied — Operator Admin only.</div>;
   return <>{children}</>;
 }
 
@@ -32,6 +35,7 @@ export default function App() {
     <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
+          <AppProviders>
           <Routes>
             <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
             <Route path="/" element={<AdminRoute><Layout /></AdminRoute>}>
@@ -43,12 +47,15 @@ export default function App() {
               <Route path="campaigns/:id" element={<AdminCampaignDetailAnalytics />} />
               <Route path="campaigns" element={<AdminCampaignsAnalytics />} />
               <Route path="segment-candidates" element={<AdminSegmentCandidates />} />
+              <Route path="sdk-users" element={<AdminSdkUsers />} />
               <Route path="segments" element={<Navigate to="/plans" replace />} />
               <Route path="plans" element={<AdminPlans />} />
               <Route path="users" element={<AdminUsers />} />
+              <Route path="roles" element={<AdminRoles />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </AppProviders>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

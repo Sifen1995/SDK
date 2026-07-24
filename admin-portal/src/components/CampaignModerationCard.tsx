@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
-import type { Campaign, CampaignPreview } from '../types';
-import { ActiveBadge, ModerationBadge, ValidationBadge } from './StatusBadge';
+import { Card, CardContent, Button, StatusPill } from '@skykin/ui';
+import type { Campaign } from '../types';
 import CampaignPreviewPanel from './CampaignPreviewPanel';
 import { formatDate, formatLabel } from '../lib/campaignUtils';
+import { useCampaignPreview } from '../lib/queries';
 
 export type ModerationAction = 'approve-only' | 'reject' | 'go-live' | 'approve-and-go-live';
 
@@ -14,101 +13,54 @@ interface CampaignModerationCardProps {
   onAction: (action: ModerationAction) => void;
 }
 
-export default function CampaignModerationCard({
-  campaign: c,
-  processing,
-  mode,
-  onAction,
-}: CampaignModerationCardProps) {
-  const [preview, setPreview] = useState<CampaignPreview | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    setPreviewLoading(true);
-    api.previewCampaign(c.id)
-      .then(p => { if (!cancelled) setPreview(p); })
-      .catch(() => { if (!cancelled) setPreview(null); })
-      .finally(() => { if (!cancelled) setPreviewLoading(false); });
-    return () => { cancelled = true; };
-  }, [c.id]);
+export default function CampaignModerationCard({ campaign: c, processing, mode, onAction }: CampaignModerationCardProps) {
+  const { data: preview, isPending, isError, error } = useCampaignPreview(c.id);
 
   return (
-    <div className="moderation-card">
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <h3 className="font-bold text-lg text-primary">{c.name}</h3>
-            <ModerationBadge status={c.moderationStatus} />
-            <ValidationBadge status={c.validationStatus} />
-            {c.isActive && <ActiveBadge active />}
+    <Card>
+      <CardContent className="p-5">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <h3 className="font-display text-lg font-bold">{c.name}</h3>
+              <StatusPill status={c.moderationStatus} />
+              <StatusPill status={c.validationStatus} />
+              {c.isActive && <StatusPill status="active" />}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {formatLabel(c.channelCode || c.creativeFormat || 'channel')} · {formatLabel(c.targetIntent)}
+              {c.billingModel && ` · ${c.billingModel}`} · <span className="font-medium text-foreground">${c.totalBudgetCap} total</span>
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">Advertiser {c.advertiserId} · Submitted {formatDate(c.createdAt)}</p>
+
+            {c.moderationNotes && (
+              <p className="mt-3 rounded-lg border border-border bg-muted/50 p-3 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Moderator notes:</span> {c.moderationNotes}
+              </p>
+            )}
+            {c.validationNotes && c.validationStatus === 'failed' && (
+              <p className="mt-2 text-xs text-destructive">Validation: {c.validationNotes}</p>
+            )}
           </div>
 
-          <p className="text-sm text-muted">
-            {formatLabel(c.channelCode || c.creativeFormat || 'channel')} · {formatLabel(c.targetIntent)}
-            {c.billingModel && ` · ${c.billingModel}`}
-            {' · '}
-            <span className="font-medium text-primary">${c.totalBudgetCap} total</span>
-          </p>
-          <p className="text-xs text-faint mt-2">
-            Advertiser {c.advertiserId} · Submitted {formatDate(c.createdAt)}
-          </p>
-
-          {c.moderationNotes && (
-            <p className="text-xs text-muted mt-3 p-3 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border)]">
-              <span className="font-medium text-primary">Moderator notes:</span> {c.moderationNotes}
-            </p>
-          )}
-
-          {c.validationNotes && c.validationStatus === 'failed' && (
-            <p className="text-xs text-red-600 dark:text-red-400 mt-2">Validation: {c.validationNotes}</p>
-          )}
+          <CampaignPreviewPanel preview={preview} loading={isPending} error={isError ? (error as Error)?.message : undefined} />
         </div>
 
-        <CampaignPreviewPanel preview={preview} loading={previewLoading} />
-      </div>
-
-      <div className="moderation-card-actions">
-        {mode === 'pending' && c.moderationStatus === 'pending' && (
-          <>
-            <button
-              type="button"
-              onClick={() => onAction('approve-and-go-live')}
-              disabled={processing}
-              className="btn-primary"
-            >
-              Approve &amp; Go Live
-            </button>
-            <button
-              type="button"
-              onClick={() => onAction('approve-only')}
-              disabled={processing}
-              className="btn-secondary"
-            >
-              Approve only
-            </button>
-            <button
-              type="button"
-              onClick={() => onAction('reject')}
-              disabled={processing}
-              className="btn-danger-outline"
-            >
-              Reject
-            </button>
-          </>
-        )}
-
-        {mode === 'ready' && (
-          <button
-            type="button"
-            onClick={() => onAction('go-live')}
-            disabled={processing}
-            className="btn-success"
-          >
-            {processing ? 'Activating…' : 'Go Live'}
-          </button>
-        )}
-      </div>
-    </div>
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
+          {mode === 'pending' && c.moderationStatus === 'pending' && (
+            <>
+              <Button onClick={() => onAction('approve-and-go-live')} disabled={processing}>Approve &amp; go live</Button>
+              <Button variant="secondary" onClick={() => onAction('approve-only')} disabled={processing}>Approve only</Button>
+              <Button variant="outline" onClick={() => onAction('reject')} disabled={processing}>Reject</Button>
+            </>
+          )}
+          {mode === 'ready' && (
+            <Button onClick={() => onAction('go-live')} disabled={processing}>
+              {processing ? 'Activating…' : 'Go live'}
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
