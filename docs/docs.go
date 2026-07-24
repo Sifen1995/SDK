@@ -2132,6 +2132,61 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/telemetry/track": {
+            "post": {
+                "security": [
+                    {
+                        "APIKeyAuth": [],
+                        "SDKSecretAuth": []
+                    }
+                ],
+                "description": "Accepts a consented ad tracking log (impression/click/install/signup/purchase). Pushes to Redis Stream stream:billing_events (max ~100000) and returns immediately — Postgres write-behind is handled by billing_processor_group. Authorize with X-API-Key and X-SDK-Secret.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Bill Track"
+                ],
+                "summary": "Track consented ad billing event",
+                "parameters": [
+                    {
+                        "description": "Consented ad track payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_delivery_http.TelemetryTrackRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted — queued on stream:billing_events"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -2825,6 +2880,41 @@ const docTemplate = `{
                 "title": {
                     "type": "string",
                     "example": "New season styles"
+                }
+            }
+        },
+        "internal_delivery_http.TelemetryTrackRequest": {
+            "type": "object",
+            "required": [
+                "campaign_id",
+                "event_type"
+            ],
+            "properties": {
+                "campaign_id": {
+                    "description": "CampaignID of the served creative",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "event_type": {
+                    "description": "EventType: impression | click | install | signup | purchase",
+                    "type": "string",
+                    "example": "impression"
+                },
+                "occurred_at": {
+                    "description": "OccurredAt RFC3339 timestamp; defaults to server UTC now when omitted",
+                    "type": "string",
+                    "example": "2026-07-18T12:00:00Z"
+                },
+                "pseudonymous_id": {
+                    "description": "PseudonymousID from consent (optional audit field, not required for billing row)",
+                    "type": "string",
+                    "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                },
+                "transaction_value": {
+                    "description": "TransactionValue used for REV_SHARE / purchase events",
+                    "type": "number",
+                    "minimum": 0,
+                    "example": 0
                 }
             }
         },

@@ -1,7 +1,7 @@
 """ML inference HTTP service — FastAPI entrypoint for uvicorn app:app.
 
-Request contract matches the 47-feature pipeline in training/feature_engineering.py:
-  app usage (accessibility + usage scan) + UI text signals → extract_features → model.
+Request contract matches the 71-feature pipeline in training/feature_engineering.py:
+  app usage + UI signals + in-app behavioral events (embedding host) → extract_features → model.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from inference.model_loader import load_model
 from inference.predictor import predict_from_features, predict_from_session
-from training.feature_engineering import CATEGORIES
+from training.feature_engineering import CATEGORIES, FEATURE_SIZE
 
 logger = logging.getLogger("ml-service")
 logging.basicConfig(level=logging.INFO)
@@ -43,11 +43,28 @@ class CategoryUsage(BaseModel):
     switches: int = 0
 
 
+class BehavioralActions(BaseModel):
+    browseCategory: int = 0
+    viewItem: int = 0
+    stageTransaction: int = 0
+    initiateCheckout: int = 0
+    abandonTransaction: int = 0
+
+
+class BehavioralEvents(BaseModel):
+    """In-app funnel events from the embedding host (e-commerce / Telebirr-style flows)."""
+
+    has_data: float = 0.0
+    actions: BehavioralActions = Field(default_factory=BehavioralActions)
+    categories: dict[str, int] = Field(default_factory=dict)
+
+
 class SessionPayload(BaseModel):
-    """Raw session from Flutter accessibility + app-usage scan (before feature extraction)."""
+    """Raw session from Flutter accessibility + app-usage + host behavioral embedding."""
 
     app_usage: dict[str, CategoryUsage] = Field(default_factory=dict)
     ui_signals: dict[str, int] = Field(default_factory=dict)
+    behavioral_events: BehavioralEvents | None = None
     session_start: str | None = None
     session_duration_minutes: float = 1.0
     total_switches: int = 1
@@ -65,18 +82,16 @@ class HistoricalPayload(BaseModel):
 
 class PredictRequest(BaseModel):
     user_id: str
-    # Primary path: session dict → 47 features inside the service
     session: SessionPayload | None = None
     historical: HistoricalPayload | None = None
-    # Debug path: send the 47-float vector already built
     features: list[float] | None = None
 
     @model_validator(mode="after")
     def require_session_or_features(self) -> PredictRequest:
         if self.session is None and self.features is None:
-            raise ValueError("provide either session (app_usage + ui_signals) or features (length 47)")
-        if self.features is not None and len(self.features) != 47:
-            raise ValueError(f"features must have length 47, got {len(self.features)}")
+            raise ValueError("provide either session or features")
+        if self.features is not None and len(self.features) != FEATURE_SIZE:
+            raise ValueError(f"features must have length {FEATURE_SIZE}, got {len(self.features)}")
         return self
 
 
@@ -91,7 +106,7 @@ class PredictResponse(BaseModel):
 
 
 def _session_dict(session: SessionPayload) -> dict:
-    return {
+    out: dict[str, Any] = {
         "app_usage": {
             cat: {"minutes": usage.minutes, "switches": usage.switches}
             for cat, usage in session.app_usage.items()
@@ -102,10 +117,18 @@ def _session_dict(session: SessionPayload) -> dict:
         "total_switches": session.total_switches,
         "is_first_session": session.is_first_session,
     }
+    if session.behavioral_events is not None:
+        be = session.behavioral_events
+        out["behavioral_events"] = {
+            "has_data": be.has_data,
+            "actions": be.actions.model_dump(),
+            "categories": dict(be.categories),
+        }
+    return out
 
 
 def _heuristic_from_session(user_id: str, session: dict) -> dict:
-    """Fallback when keras weights are missing — score from dominant app/UI categories."""
+    """Fallback when keras weights are missing — score from app/UI/behavioral dominance."""
     scores: dict[str, float] = {
         "fashion_interest": 0.12,
         "crypto_interest": 0.12,
@@ -115,7 +138,6 @@ def _heuristic_from_session(user_id: str, session: dict) -> dict:
         "fitness_interest": 0.10,
         "shopping_interest": 0.14,
         "food_interest": 0.12,
-        "abandoned_cart": 0.08,
         "no_clear_intent": 0.20,
     }
     intent_for_cat = {
@@ -143,11 +165,23 @@ def _heuristic_from_session(user_id: str, session: dict) -> dict:
         intent = intent_for_cat.get(cat, "no_clear_intent")
         scores[intent] += bump
 
+    behavioral = session.get("behavioral_events") or {}
+    if float(behavioral.get("has_data", 0) or 0) > 0:
+        actions = behavioral.get("actions") or {}
+        stage = float(actions.get("stageTransaction", 0) or 0)
+        checkout = float(actions.get("initiateCheckout", 0) or 0)
+        cats = behavioral.get("categories") or {}
+        for cat, count in cats.items():
+            intent = intent_for_cat.get(cat, "no_clear_intent")
+            scores[intent] += float(count or 0) * 0.03
+        if stage + checkout >= 3:
+            scores["shopping_interest"] += 0.25
+
     shopping_m = float(app_usage.get("shopping", {}).get("minutes", 0) or 0)
     fashion_m = float(app_usage.get("fashion", {}).get("minutes", 0) or 0)
     shopping_ui = float(ui_signals.get("shopping", 0) or 0)
     if shopping_m + fashion_m > 8 and shopping_ui >= 5:
-        scores["abandoned_cart"] += 0.35
+        scores["shopping_interest"] += 0.2
 
     intent = max(scores, key=scores.get)
     confidence = min(0.99, round(scores[intent] / (scores[intent] + 0.5), 3))
@@ -183,7 +217,7 @@ def health() -> dict:
         "status": "ok",
         "model_loaded": _artifact is not None,
         "model_error": _load_error,
-        "feature_size": 47,
+        "feature_size": FEATURE_SIZE,
     }
 
 

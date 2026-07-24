@@ -1,0 +1,6 @@
+# Runtime-only deps for the predict API container (no training extras).
+uvicorn
+fastapi
+pydantic>=2.0.0
+numpy
+tensorflow

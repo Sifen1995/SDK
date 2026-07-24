@@ -3,8 +3,11 @@ package redis
 
 import (
 	"context"
-	"github.com/redis/go-redis/v9"
+	"fmt"
+	"strings"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type RedisClient struct {
@@ -100,4 +103,76 @@ func (c *RedisClient) Exists(ctx context.Context, key string) (bool, error) {
 		return false, err
 	}
 	return n > 0, nil
+}
+
+// IncrByFloat atomically adds incr to a float key and returns the new value.
+func (c *RedisClient) IncrByFloat(ctx context.Context, key string, incr float64) (float64, error) {
+	return c.Client.IncrByFloat(ctx, key, incr).Result()
+}
+
+// StreamMessage is one Redis Stream entry.
+type StreamMessage struct {
+	ID     string
+	Values map[string]string
+}
+
+// XAdd appends an entry to a Redis Stream, optionally capping approximate length.
+func (c *RedisClient) XAdd(ctx context.Context, stream string, maxLen int64, values map[string]interface{}) (string, error) {
+	args := &redis.XAddArgs{
+		Stream: stream,
+		Values: values,
+	}
+	if maxLen > 0 {
+		args.MaxLen = maxLen
+		args.Approx = true
+	}
+	return c.Client.XAdd(ctx, args).Result()
+}
+
+// XGroupCreateMkStream creates a consumer group (and stream if missing).
+// Ignores BUSYGROUP when the group already exists.
+func (c *RedisClient) XGroupCreateMkStream(ctx context.Context, stream, group, start string) error {
+	err := c.Client.XGroupCreateMkStream(ctx, stream, group, start).Err()
+	if err != nil && strings.Contains(err.Error(), "BUSYGROUP") {
+		return nil
+	}
+	return err
+}
+
+// XReadGroup reads pending or new stream messages for a consumer group.
+func (c *RedisClient) XReadGroup(
+	ctx context.Context,
+	group, consumer, stream, start string,
+	count int64,
+	block time.Duration,
+) ([]StreamMessage, error) {
+	streams, err := c.Client.XReadGroup(ctx, &redis.XReadGroupArgs{
+		Group:    group,
+		Consumer: consumer,
+		Streams:  []string{stream, start},
+		Count:    count,
+		Block:    block,
+	}).Result()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]StreamMessage, 0)
+	for _, s := range streams {
+		for _, msg := range s.Messages {
+			values := make(map[string]string, len(msg.Values))
+			for k, v := range msg.Values {
+				values[k] = fmt.Sprint(v)
+			}
+			out = append(out, StreamMessage{ID: msg.ID, Values: values})
+		}
+	}
+	return out, nil
+}
+
+// XAck acknowledges processed stream message IDs for a consumer group.
+func (c *RedisClient) XAck(ctx context.Context, stream, group string, ids ...string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return c.Client.XAck(ctx, stream, group, ids...).Err()
 }

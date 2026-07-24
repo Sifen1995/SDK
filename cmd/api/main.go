@@ -20,7 +20,6 @@ import (
 	"skykin-platform/internal/platform/route"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -84,13 +83,13 @@ func main() {
 
 	bus := messaging.NewBus()
 
-	var rdb *redis.Client
+	var rdb *platformredis.RedisClient
 	if cfg.RedisAddr != "" {
 		client, err := platformredis.NewRedisClient(cfg.RedisAddr)
 		if err != nil {
 			slog.Warn("redis unavailable, falling back to database-only mode", "error", err)
 		} else {
-			rdb = client.Client
+			rdb = client
 			slog.Info("redis client successfully initialized and connected", "addr", cfg.RedisAddr)
 		}
 	} else {
@@ -117,6 +116,7 @@ func main() {
 	classJobs := route.InitRouter(r, db, cfg, bus, checker, permHandler)
 	bootstrap.StartIntentLogWorker(db, cfg, slog.Default())
 	bootstrap.StartAnalyticsAggregateWorker(db, cfg, slog.Default())
+	bootstrap.StartBillingStreamWorker(db, cfg, slog.Default())
 	bootstrap.StartTargetingJob(db, bus, slog.Default(), 5*time.Minute)
 	bootstrap.StartIntentConsistencyJobs(classJobs, slog.Default())
 

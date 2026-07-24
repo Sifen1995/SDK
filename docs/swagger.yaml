@@ -492,6 +492,35 @@ definitions:
         example: New season styles
         type: string
     type: object
+  internal_delivery_http.TelemetryTrackRequest:
+    properties:
+      campaign_id:
+        description: CampaignID of the served creative
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      event_type:
+        description: 'EventType: impression | click | install | signup | purchase'
+        example: impression
+        type: string
+      occurred_at:
+        description: OccurredAt RFC3339 timestamp; defaults to server UTC now when
+          omitted
+        example: "2026-07-18T12:00:00Z"
+        type: string
+      pseudonymous_id:
+        description: PseudonymousID from consent (optional audit field, not required
+          for billing row)
+        example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+        type: string
+      transaction_value:
+        description: TransactionValue used for REV_SHARE / purchase events
+        example: 0
+        minimum: 0
+        type: number
+    required:
+    - campaign_id
+    - event_type
+    type: object
   internal_intents_interfaces_http.IngestIntentAdRequest:
     properties:
       channel_code:
@@ -2497,6 +2526,44 @@ paths:
       summary: Register a new developer
       tags:
       - Portal - Auth
+  /telemetry/track:
+    post:
+      consumes:
+      - application/json
+      description: Accepts a consented ad tracking log (impression/click/install/signup/purchase).
+        Pushes to Redis Stream stream:billing_events (max ~100000) and returns immediately
+        — Postgres write-behind is handled by billing_processor_group. Authorize with
+        X-API-Key and X-SDK-Secret.
+      parameters:
+      - description: Consented ad track payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_delivery_http.TelemetryTrackRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted — queued on stream:billing_events
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - APIKeyAuth: []
+        SDKSecretAuth: []
+      summary: Track consented ad billing event
+      tags:
+      - SDK - Bill Track
 securityDefinitions:
   APIKeyAuth:
     description: SDK publishable key (pk_live_...). Required for /api/v1 SDK routes.

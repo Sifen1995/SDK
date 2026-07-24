@@ -20,7 +20,6 @@ type RewardEvaluationPayload struct {
 }
 
 // RewardConsumer handles legacy impression-based reward evaluation.
-// Prefer IntentRewardConsumer for the consent-based pipeline.
 type RewardConsumer struct {
 	rewardRepo rewardsdomain.RewardRepository
 	userRepo   usersdomain.UserRepository

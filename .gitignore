@@ -18,4 +18,11 @@ coverage/
 .venv
 .vscode/
 *.sublime-project
-/api
+# Binaries
+api
+__pycache__/
+*.pyc
+ml/data/processed/training_data.csv
+ml/models/*.keras
+ml/models/*.tflite
+ml/.venv/
