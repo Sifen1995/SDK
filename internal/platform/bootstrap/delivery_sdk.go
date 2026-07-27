@@ -9,6 +9,7 @@ import (
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
 	deliveryHTTP "skykin-platform/internal/delivery/http"
+	deliveryWorker "skykin-platform/internal/delivery/worker"
 	platformredis "skykin-platform/internal/platform/redis"
 
 	"gorm.io/gorm"
@@ -69,4 +70,21 @@ func StartBillingStreamWorker(db *gorm.DB, cfg *configs.Config, logger *slog.Log
 		return
 	}
 	billingWorker.StartBillingConsumer(db, rdb, logger)
+}
+
+// StartDeliveryLogStreamWorker launches the delivery-module consumer for campaign_delivery_logs.
+func StartDeliveryLogStreamWorker(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	addr := strings.TrimSpace(cfg.RedisAddr)
+	if addr == "" {
+		return
+	}
+	rdb, err := platformredis.NewRedisClient(addr)
+	if err != nil {
+		logger.Warn("delivery log stream worker: redis unavailable", "error", err)
+		return
+	}
+	deliveryWorker.StartDeliveryLogConsumer(db, rdb, logger)
 }

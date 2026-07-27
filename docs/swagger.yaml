@@ -492,6 +492,20 @@ definitions:
         example: New season styles
         type: string
     type: object
+  internal_delivery_http.AnonymousTrackRequest:
+    properties:
+      campaign_id:
+        description: CampaignID of the served creative
+        example: c1a2b3c4-d5e6-7890-abcd-ef1234567890
+        type: string
+      event_type:
+        description: EventType for anonymous bill track (impression)
+        example: impression
+        type: string
+    required:
+    - campaign_id
+    - event_type
+    type: object
   internal_delivery_http.TelemetryTrackRequest:
     properties:
       campaign_id:
@@ -508,8 +522,8 @@ definitions:
         example: "2026-07-18T12:00:00Z"
         type: string
       pseudonymous_id:
-        description: PseudonymousID from consent (optional audit field, not required
-          for billing row)
+        description: PseudonymousID from consent; required for impression/click Redis
+          dedup
         example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
         type: string
       transaction_value:
@@ -2531,9 +2545,9 @@ paths:
       consumes:
       - application/json
       description: Accepts a consented ad tracking log (impression/click/install/signup/purchase).
-        Pushes to Redis Stream stream:billing_events (max ~100000) and returns immediately
-        — Postgres write-behind is handled by billing_processor_group. Authorize with
-        X-API-Key and X-SDK-Secret.
+        Impression/click events are deduplicated via Redis SETNX lock:telemetry:{pseudonymous_id}:{campaign_id}:{event_type}
+        (impression 5m, click 1h) before XADD to stream:billing_events. Duplicates
+        still return 202 without enqueueing. Authorize with X-API-Key and X-SDK-Secret.
       parameters:
       - description: Consented ad track payload
         in: body
@@ -2541,6 +2555,45 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/internal_delivery_http.TelemetryTrackRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted — queued on stream:billing_events (or silently deduplicated)
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - APIKeyAuth: []
+        SDKSecretAuth: []
+      summary: Track consented ad billing event
+      tags:
+      - SDK - Bill Track
+  /telemetry/track-anonymous:
+    post:
+      consumes:
+      - application/json
+      description: 'Accepts a minimal bill-track payload for non-consented users (campaign_id
+        + event_type). Enqueues to Redis Stream stream:billing_events with source=anonymous
+        and returns 202. Two independent consumer groups write behind: billing_processor_group
+        → billing_events; delivery_log_processor_group → campaign_delivery_logs. Authorize
+        with X-API-Key and X-SDK-Secret.'
+      parameters:
+      - description: Anonymous ad track payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_delivery_http.AnonymousTrackRequest'
       produces:
       - application/json
       responses:
@@ -2561,7 +2614,7 @@ paths:
       security:
       - APIKeyAuth: []
         SDKSecretAuth: []
-      summary: Track consented ad billing event
+      summary: Track anonymous (non-consented) ad impression
       tags:
       - SDK - Bill Track
 securityDefinitions:

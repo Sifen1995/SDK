@@ -117,6 +117,7 @@ func main() {
 	bootstrap.StartIntentLogWorker(db, cfg, slog.Default())
 	bootstrap.StartAnalyticsAggregateWorker(db, cfg, slog.Default())
 	bootstrap.StartBillingStreamWorker(db, cfg, slog.Default())
+	bootstrap.StartDeliveryLogStreamWorker(db, cfg, slog.Default())
 	bootstrap.StartTargetingJob(db, bus, slog.Default(), 5*time.Minute)
 	bootstrap.StartIntentConsistencyJobs(classJobs, slog.Default())
 

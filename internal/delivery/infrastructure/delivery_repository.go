@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	deliverydomain "skykin-platform/internal/delivery/domain"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type DeliveryRepository struct {
@@ -37,7 +37,7 @@ func (r *DeliveryRepository) CountToday(ctx context.Context, userID string, camp
 	return int(n), err
 }
 
-// RecordJob upserts a delivery_jobs row for analytics / frequency helpers.
+// RecordJob inserts a delivery_jobs row (ignores duplicate user+campaign pairs).
 func (r *DeliveryRepository) RecordJob(ctx context.Context, userID, campaignID string) error {
 	if r == nil || r.db == nil || userID == "" || campaignID == "" {
 		return nil
@@ -47,10 +47,17 @@ func (r *DeliveryRepository) RecordJob(ctx context.Context, userID, campaignID s
 		CampaignID: campaignID,
 		CreatedAt:  time.Now().UTC(),
 	}
-	return r.db.WithContext(ctx).
-		Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "user_id"}, {Name: "campaign_id"}},
-			DoNothing: true,
-		}).
-		Create(row).Error
+	err := r.db.WithContext(ctx).Create(row).Error
+	if err != nil && isDuplicateKey(err) {
+		return nil
+	}
+	return err
+}
+
+func isDuplicateKey(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate") || strings.Contains(msg, "23505")
 }

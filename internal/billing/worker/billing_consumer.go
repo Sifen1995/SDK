@@ -12,7 +12,6 @@ import (
 	billingInfra "skykin-platform/internal/billing/infrastructure"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
-	deliveryInfra "skykin-platform/internal/delivery/infrastructure"
 	platformredis "skykin-platform/internal/platform/redis"
 
 	"gorm.io/gorm"
@@ -27,6 +26,8 @@ const (
 )
 
 // StartBillingConsumer creates the Redis consumer group and processes stream:billing_events.
+// This worker only persists billing_events (+ Redis budget keys). Delivery logs are owned by
+// the delivery module's consumer group on the same stream.
 func StartBillingConsumer(db *gorm.DB, rdb *platformredis.RedisClient, logger *slog.Logger) {
 	if db == nil || rdb == nil {
 		return
@@ -56,7 +57,6 @@ func runBillingConsumer(ctx context.Context, db *gorm.DB, rdb *platformredis.Red
 			return
 		}
 
-		// Drain this consumer's pending entries first, then block for new ones.
 		msgs, err := rdb.XReadGroup(
 			ctx,
 			billingProcessorGroup,
@@ -107,14 +107,6 @@ func runBillingConsumer(ctx context.Context, db *gorm.DB, rdb *platformredis.Red
 	}
 }
 
-type resolvedBillingItem struct {
-	event      billingdomain.BillingEvent
-	campaign   *campaigndomain.Campaign
-	userID     string
-	eventType  string
-	occurredAt time.Time
-}
-
 func processBillingBatch(
 	ctx context.Context,
 	db *gorm.DB,
@@ -130,13 +122,13 @@ func processBillingBatch(
 	subCache := map[string]*billingdomain.AdvertiserSubscription{}
 	rateCache := map[string][]billingdomain.BillingRate{}
 
-	built := make([]resolvedBillingItem, 0, len(msgs))
+	built := make([]billingdomain.BillingEvent, 0, len(msgs))
 	ids := make([]string, 0, len(msgs))
 	chargesByCampaign := map[string]float64{}
 	skipped := 0
 
 	for _, msg := range msgs {
-		item, err := resolveStreamMessage(ctx, campaigns, subs, rates, campaignCache, subCache, rateCache, msg)
+		evt, campaign, err := resolveStreamMessage(ctx, campaigns, subs, rates, campaignCache, subCache, rateCache, msg)
 		if err != nil {
 			skipped++
 			logger.Warn("billing consumer: skip message",
@@ -148,46 +140,13 @@ func processBillingBatch(
 			ids = append(ids, msg.ID)
 			continue
 		}
-		built = append(built, *item)
+		built = append(built, *evt)
 		ids = append(ids, msg.ID)
-		chargesByCampaign[item.campaign.ID] += item.event.ChargeETB
+		chargesByCampaign[campaign.ID] += evt.ChargeETB
 	}
 
 	if len(built) > 0 {
-		events := make([]billingdomain.BillingEvent, len(built))
-		for i := range built {
-			events[i] = built[i].event
-		}
-		if err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-			if err := billingInfra.NewBillingEventRepository(tx).CreateBatch(ctx, events); err != nil {
-				return err
-			}
-			campRepo := campaignInfra.NewRepository(tx)
-			jobRepo := deliveryInfra.NewDeliveryRepository(tx)
-			for i := range built {
-				item := &built[i]
-				if item.userID == "" {
-					continue
-				}
-				status := deliveryStatusForEvent(item.eventType)
-				if status == "" {
-					continue
-				}
-				if err := campRepo.LogDelivery(ctx, &campaigndomain.DeliveryLog{
-					CampaignID:     item.campaign.ID,
-					UserID:         item.userID,
-					SessionID:      "telemetry",
-					DeliveryStatus: status,
-					LoggedAt:       item.occurredAt,
-				}); err != nil {
-					return fmt.Errorf("campaign_delivery_logs: %w", err)
-				}
-				if err := jobRepo.RecordJob(ctx, item.userID, item.campaign.ID); err != nil {
-					return fmt.Errorf("delivery_jobs: %w", err)
-				}
-			}
-			return nil
-		}); err != nil {
+		if err := billingInfra.NewBillingEventRepository(db).CreateBatch(ctx, built); err != nil {
 			return nil, err
 		}
 	}
@@ -242,19 +201,18 @@ func resolveStreamMessage(
 	subCache map[string]*billingdomain.AdvertiserSubscription,
 	rateCache map[string][]billingdomain.BillingRate,
 	msg platformredis.StreamMessage,
-) (*resolvedBillingItem, error) {
+) (*billingdomain.BillingEvent, *campaigndomain.Campaign, error) {
 	campaignID := strings.TrimSpace(msg.Values["campaign_id"])
 	eventType := strings.ToLower(strings.TrimSpace(msg.Values["event_type"]))
-	userID := strings.TrimSpace(msg.Values["pseudonymous_id"])
 	if campaignID == "" || eventType == "" {
-		return nil, fmt.Errorf("campaign_id and event_type are required")
+		return nil, nil, fmt.Errorf("campaign_id and event_type are required")
 	}
 
 	campaign, ok := campaignCache[campaignID]
 	if !ok {
 		c, err := campaigns.Get(ctx, campaignID)
 		if err != nil {
-			return nil, fmt.Errorf("load campaign: %w", err)
+			return nil, nil, fmt.Errorf("load campaign: %w", err)
 		}
 		campaign = c
 		campaignCache[campaignID] = c
@@ -264,7 +222,7 @@ func resolveStreamMessage(
 	if !ok {
 		s, err := subs.GetActiveByAdvertiser(ctx, campaign.AdvertiserID)
 		if err != nil {
-			return nil, fmt.Errorf("load subscription: %w", err)
+			return nil, nil, fmt.Errorf("load subscription: %w", err)
 		}
 		sub = s
 		subCache[campaign.AdvertiserID] = s
@@ -274,7 +232,7 @@ func resolveStreamMessage(
 	if !ok {
 		list, err := rates.ListByPlanID(ctx, sub.PlanID)
 		if err != nil {
-			return nil, fmt.Errorf("load rates: %w", err)
+			return nil, nil, fmt.Errorf("load rates: %w", err)
 		}
 		planRates = list
 		rateCache[sub.PlanID] = list
@@ -289,7 +247,7 @@ func resolveStreamMessage(
 		model = defaultModelForEvent(eventType)
 		rate, ok = findRate(planRates, eventType, model)
 		if !ok {
-			return nil, fmt.Errorf("no billing rate for plan=%s event=%s model=%s", sub.PlanID, eventType, model)
+			return nil, nil, fmt.Errorf("no billing rate for plan=%s event=%s model=%s", sub.PlanID, eventType, model)
 		}
 	}
 
@@ -297,37 +255,18 @@ func resolveStreamMessage(
 	occurredAt := parseOccurredAt(msg.Values["occurred_at"])
 	charge := computeCharge(model, rate.RateETB, txn)
 
-	return &resolvedBillingItem{
-		event: billingdomain.BillingEvent{
-			AdvertiserID:     campaign.AdvertiserID,
-			CampaignID:       campaign.ID,
-			SubscriptionID:   sub.ID,
-			EventType:        eventType,
-			BillingModel:     model,
-			RateApplied:      rate.RateETB,
-			TransactionValue: txn,
-			ChargeETB:        charge,
-			IsBilled:         false,
-			OccurredAt:       occurredAt,
-		},
-		campaign:   campaign,
-		userID:     userID,
-		eventType:  eventType,
-		occurredAt: occurredAt,
-	}, nil
-}
-
-func deliveryStatusForEvent(eventType string) string {
-	switch strings.ToLower(eventType) {
-	case "impression":
-		return campaigndomain.DeliveryRendered
-	case "click":
-		return campaigndomain.DeliveryClicked
-	case "install", "signup", "purchase":
-		return campaigndomain.DeliveryConverted
-	default:
-		return ""
-	}
+	return &billingdomain.BillingEvent{
+		AdvertiserID:     campaign.AdvertiserID,
+		CampaignID:       campaign.ID,
+		SubscriptionID:   sub.ID,
+		EventType:        eventType,
+		BillingModel:     model,
+		RateApplied:      rate.RateETB,
+		TransactionValue: txn,
+		ChargeETB:        charge,
+		IsBilled:         false,
+		OccurredAt:       occurredAt,
+	}, campaign, nil
 }
 
 func findRate(rates []billingdomain.BillingRate, eventType, model string) (billingdomain.BillingRate, bool) {

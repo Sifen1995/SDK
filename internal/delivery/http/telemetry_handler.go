@@ -22,6 +22,14 @@ const (
 	telemetryImpressionTTL  = 5 * time.Minute
 )
 
+// AnonymousTrackRequest is a non-consented impression (or related) bill track payload.
+type AnonymousTrackRequest struct {
+	// CampaignID of the served creative
+	CampaignID string `json:"campaign_id" binding:"required,uuid" example:"c1a2b3c4-d5e6-7890-abcd-ef1234567890"`
+	// EventType for anonymous bill track (impression)
+	EventType string `json:"event_type" binding:"required" example:"impression"`
+}
+
 // TelemetryTrackRequest is a consented ad interaction from the Flutter SDK.
 type TelemetryTrackRequest struct {
 	// CampaignID of the served creative
@@ -123,6 +131,56 @@ func (h *TelemetryHandler) Track(c *gin.Context) {
 	}
 	if pseudonymousID != "" {
 		values["pseudonymous_id"] = pseudonymousID
+	}
+
+	if _, err := h.rdb.XAdd(c.Request.Context(), billingEventsStream, billingEventsStreamMax, values); err != nil {
+		platformHTTP.Error(c, http.StatusServiceUnavailable, "telemetry enqueue failed", err.Error())
+		return
+	}
+
+	c.Status(http.StatusAccepted)
+}
+
+// TrackAnonymous godoc
+// @Summary      Track anonymous (non-consented) ad impression
+// @Description  Accepts a minimal bill-track payload for non-consented users (campaign_id + event_type). Enqueues to Redis Stream stream:billing_events with source=anonymous and returns 202. Two independent consumer groups write behind: billing_processor_group → billing_events; delivery_log_processor_group → campaign_delivery_logs. Authorize with X-API-Key and X-SDK-Secret.
+// @Tags         SDK - Bill Track
+// @Accept       json
+// @Produce      json
+// @Security     APIKeyAuth && SDKSecretAuth
+// @Param        body  body  AnonymousTrackRequest  true  "Anonymous ad track payload"
+// @Success      202  "Accepted — queued on stream:billing_events"
+// @Failure      400  {object}  platformHTTP.APIError
+// @Failure      401  {object}  platformHTTP.APIError
+// @Failure      503  {object}  platformHTTP.APIError
+// @Router       /telemetry/track-anonymous [post]
+func (h *TelemetryHandler) TrackAnonymous(c *gin.Context) {
+	if h == nil || h.rdb == nil {
+		platformHTTP.Error(c, http.StatusServiceUnavailable, "telemetry stream unavailable", "")
+		return
+	}
+
+	var req AnonymousTrackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		platformHTTP.Error(c, http.StatusBadRequest, "invalid anonymous track payload", err.Error())
+		return
+	}
+
+	eventType := strings.ToLower(strings.TrimSpace(req.EventType))
+	if eventType != "impression" {
+		platformHTTP.Error(c, http.StatusBadRequest, "invalid event_type", "anonymous track currently accepts impression only")
+		return
+	}
+
+	campaignID := strings.TrimSpace(req.CampaignID)
+	occurredAt := time.Now().UTC().Format(time.RFC3339Nano)
+
+	values := map[string]interface{}{
+		"campaign_id":       campaignID,
+		"event_type":        eventType,
+		"transaction_value": "0.0000",
+		"occurred_at":       occurredAt,
+		"source":            "anonymous",
 	}
 
 	if _, err := h.rdb.XAdd(c.Request.Context(), billingEventsStream, billingEventsStreamMax, values); err != nil {

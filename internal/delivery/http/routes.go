@@ -9,6 +9,7 @@ func RegisterSDKRoutes(r *gin.RouterGroup, campaigns *CampaignHandler, telemetry
 	}
 	if telemetry != nil {
 		r.POST("/telemetry/track", telemetry.Track)
+		r.POST("/telemetry/track-anonymous", telemetry.TrackAnonymous)
 	}
 }
 
