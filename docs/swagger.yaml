@@ -2540,6 +2540,44 @@ paths:
       summary: Register a new developer
       tags:
       - Portal - Auth
+  /telemetry/anonymous-click:
+    post:
+      consumes:
+      - application/json
+      description: Accepts an anonymous click callback for a campaign using a signed
+        token. The endpoint validates the token, queues the event for async billing
+        processing, and returns 202 Accepted immediately.
+      parameters:
+      - description: Campaign ID
+        in: query
+        name: campaign_id
+        required: true
+        type: string
+      - description: Signed click token
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Track anonymous CPC click
+      tags:
+      - SDK - Bill Track
   /telemetry/track:
     post:
       consumes:
