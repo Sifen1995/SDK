@@ -3,12 +3,19 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	billingdomain "skykin-platform/internal/billing/domain"
+	billingInfra "skykin-platform/internal/billing/infrastructure"
+	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	deliverydomain "skykin-platform/internal/delivery/domain"
+	deliveryInfra "skykin-platform/internal/delivery/infrastructure"
 	"skykin-platform/internal/platform/redis"
 )
 
@@ -54,31 +61,79 @@ func (w *CPCWorker) Start(ctx context.Context) {
 
 func (w *CPCWorker) processCPCClick(ctx context.Context, payload ClickQueuePayload) error {
 	return w.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 1. Write interaction record to campaign_delivery_logs (user_id is NULL)
-		sqlDelivery := `
-			INSERT INTO campaign_delivery_logs (id, campaign_id, user_id, session_id, delivery_status, created_at)
-			VALUES (?, ?, NULL, 'ANONYMOUS_CPC', 'CLICKED', ?);
-		`
-		if err := tx.Exec(sqlDelivery, uuid.New().String(), payload.CampaignID, payload.ClickedAt).Error; err != nil {
-			return err
+		// 1. Fetch campaign to get advertiser_id
+		campaignRepo := campaignInfra.NewRepository(tx)
+		campaign, err := campaignRepo.Get(ctx, payload.CampaignID)
+		if err != nil {
+			return fmt.Errorf("fetch campaign: %w", err)
+		}
+		if campaign == nil {
+			return fmt.Errorf("campaign not found: %s", payload.CampaignID)
 		}
 
-		// 2. Write charge entry to billing_events (user_id is NULL)
-		sqlBilling := `
-			INSERT INTO billing_events (id, campaign_id, user_id, event_type, amount, channel_code, created_at)
-			SELECT 
-				?, 
-				c.id, 
-				NULL, 
-				'CPC', 
-				c.cpc_rate, 
-				'IN_APP_BANNER', 
-				?
-			FROM campaigns c
-			WHERE c.id = ?;
-		`
-		if err := tx.Exec(sqlBilling, uuid.New().String(), payload.ClickedAt, payload.CampaignID).Error; err != nil {
-			return err
+		// 2. Fetch subscription for the advertiser
+		subRepo := billingInfra.NewSubscriptionRepository(tx)
+		sub, err := subRepo.GetActiveByAdvertiser(ctx, campaign.AdvertiserID)
+		if err != nil {
+			return fmt.Errorf("fetch subscription: %w", err)
+		}
+		if sub == nil {
+			return fmt.Errorf("no active subscription for advertiser: %s", campaign.AdvertiserID)
+		}
+
+		// 3. Fetch billing rates to find CPC rate
+		rateRepo := billingInfra.NewBillingRateRepository(tx)
+		rates, err := rateRepo.ListByPlanID(ctx, sub.PlanID)
+		if err != nil {
+			return fmt.Errorf("fetch billing rates: %w", err)
+		}
+
+		// Find CPC rate
+		var cpcRate billingdomain.BillingRate
+		found := false
+		for _, r := range rates {
+			if r.IsActive && strings.EqualFold(r.EventType, "click") && strings.EqualFold(r.Model, "CPC") {
+				cpcRate = r
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("no active CPC rate found for plan: %s", sub.PlanID)
+		}
+
+		// 4. Create and persist DeliveryLog
+		deliveryLog := deliverydomain.DeliveryLog{
+			ID:             uuid.New().String(),
+			CampaignID:     payload.CampaignID,
+			UserID:         deliverydomain.AnonymousUserID,
+			SessionID:      "ANONYMOUS_CPC",
+			DeliveryStatus: deliverydomain.StatusClicked,
+			LoggedAt:       payload.ClickedAt,
+		}
+		deliveryLogRepo := deliveryInfra.NewDeliveryLogRepository(tx)
+		if err := deliveryLogRepo.CreateBatch(ctx, []deliverydomain.DeliveryLog{deliveryLog}); err != nil {
+			return fmt.Errorf("persist delivery log: %w", err)
+		}
+
+		// 5. Create and persist BillingEvent
+		billingEvent := billingdomain.BillingEvent{
+			ID:               uuid.New().String(),
+			AdvertiserID:     campaign.AdvertiserID,
+			CampaignID:       payload.CampaignID,
+			SubscriptionID:   sub.ID,
+			EventType:        "click",
+			BillingModel:     "CPC",
+			RateApplied:      cpcRate.RateETB,
+			TransactionValue: 0,
+			ChargeETB:        cpcRate.RateETB,
+			IsBilled:         false,
+			OccurredAt:       payload.ClickedAt,
+			CreatedAt:        time.Now().UTC(),
+		}
+		billingEventRepo := billingInfra.NewBillingEventRepository(tx)
+		if err := billingEventRepo.CreateBatch(ctx, []billingdomain.BillingEvent{billingEvent}); err != nil {
+			return fmt.Errorf("persist billing event: %w", err)
 		}
 
 		return nil
