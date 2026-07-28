@@ -3,8 +3,9 @@ import { useQueryState, parseAsInteger } from 'nuqs';
 import {
   Card, CardContent, Button, KpiCard, StatusPill,
   LoadingState, ErrorState, EmptyState,
+  Tooltip, TooltipTrigger, TooltipContent, TooltipProvider
 } from '@skykin/ui';
-import { Megaphone, Send, CreditCard, Layers, Sparkles, ArrowRight, Plus } from 'lucide-react';
+import { Megaphone, Send, CreditCard, Layers, Sparkles, ArrowRight, Plus, Target } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useCampaigns } from '../lib/queries';
@@ -107,28 +108,62 @@ export default function Campaigns() {
           {campaigns.map(c => {
             const cap = c.dailyBudgetCap || c.totalBudgetCap || 0;
             return (
-              <Card key={c.id}>
-                <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between">
-                  <Link to={`/campaigns/${c.id}`} className="min-w-0 flex-1 group">
-                    <div className="mb-1 flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold group-hover:underline">{c.name}</h3>
+              <Card key={c.id} className="overflow-hidden transition-all hover:border-primary/30 hover:shadow-md">
+                <CardContent className="flex flex-col p-0 sm:flex-row">
+                  <Link to={`/campaigns/${c.id}`} className="min-w-0 flex-1 group p-5 bg-gradient-to-b from-card to-card/50 border-b sm:border-b-0 sm:border-r border-border/50">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold text-base group-hover:text-primary transition-colors">{c.name}</h3>
                       <StatusPill status={c.isActive ? 'active' : 'inactive'} />
                       <StatusPill status={c.moderationStatus} />
                       <StatusPill status={c.validationStatus} />
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {formatLabel(c.channelCode || 'channel')} · {formatLabel(c.targetIntent)}{c.billingModel && ` · ${c.billingModel}`}
-                    </p>
-                    {c.moderationNotes && c.moderationStatus === 'rejected' && <p className="mt-1 text-xs text-destructive">{c.moderationNotes}</p>}
-                    <p className="mt-2 text-xs text-muted-foreground">Created {formatDate(c.createdAt)}</p>
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/50 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-card hover:text-foreground transition-all cursor-help">
+                              <Layers className="size-3.5 text-primary/70" />
+                              {formatLabel(c.channelCode || 'channel')}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-foreground text-background">
+                            <p className="text-xs font-medium">Delivery Channel</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/50 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-card hover:text-foreground transition-all cursor-help">
+                              <Target className="size-3.5 text-primary/70" />
+                              {formatLabel(c.targetIntent)}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-foreground text-background">
+                            <p className="text-xs font-medium">Targeted Intent</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      {c.billingModel && (
+                         <div className="flex items-center rounded-md bg-muted/60 px-2.5 py-1 text-[11px] font-bold text-foreground border border-border shadow-sm">
+                           {c.billingModel}
+                         </div>
+                      )}
+                    </div>
+                    {c.moderationNotes && c.moderationStatus === 'rejected' && (
+                       <div className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive border border-destructive/20">{c.moderationNotes}</div>
+                    )}
+                    <p className="mt-4 text-[11px] font-medium text-muted-foreground/80 uppercase tracking-wider">Created {formatDate(c.createdAt)}</p>
                   </Link>
-                  <div className="w-full shrink-0 sm:w-52">
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Budget</span>
-                      <span className="tabular-nums">{formatEtb(c.budgetSpent)} <span className="text-muted-foreground">/ {formatEtb(cap)}</span></span>
+                  <div className="w-full shrink-0 flex flex-col justify-center sm:w-64 p-5 bg-muted/10">
+                    <div className="mb-2 flex items-end justify-between text-xs">
+                      <span className="font-medium text-muted-foreground uppercase tracking-wider text-[10px]">Budget Spent</span>
+                      <span className="tabular-nums font-semibold text-sm">{formatEtb(c.budgetSpent)} <span className="text-muted-foreground font-normal text-xs">/ {formatEtb(cap)}</span></span>
                     </div>
                     <Progress value={c.budgetSpent} max={cap} />
-                    <Button asChild variant="outline" size="sm" className="mt-3 w-full">
+                    <Button asChild variant="outline" size="sm" className="mt-5 w-full bg-background hover:bg-muted shadow-sm">
                       <Link to={`/campaigns/${c.id}`}>View details</Link>
                     </Button>
                   </div>
@@ -158,7 +193,7 @@ function UpsellCallout({ eyebrow, title, body, cta, to, usage }: {
 }) {
   const pct = usage && usage.total > 0 ? Math.min(100, Math.round((usage.used / usage.total) * 100)) : null;
   return (
-    <div className="relative overflow-hidden rounded-xl bg-primary p-6 text-primary-foreground">
+    <div className="brand-hero overflow-hidden rounded-xl p-6 text-white shadow-md">
       <div className="pointer-events-none absolute inset-0 opacity-90" style={{ background: 'radial-gradient(circle at 12% 88%, rgb(255 255 255 / 0.12), transparent 45%)' }} />
       <div className="relative flex flex-col gap-4">
         <div>

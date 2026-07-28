@@ -31,7 +31,7 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen">
-      <div className="relative hidden w-[48%] flex-col justify-between overflow-hidden bg-primary p-12 text-primary-foreground lg:flex">
+      <div className="brand-hero hidden w-[48%] flex-col justify-between overflow-hidden p-12 text-white lg:flex">
         <div className="pointer-events-none absolute inset-0 opacity-90" style={{ background: 'radial-gradient(circle at 15% 85%, rgb(255 255 255 / 0.12), transparent 48%), radial-gradient(circle at 85% 15%, rgb(255 255 255 / 0.08), transparent 40%)' }} />
         <div className="relative">
           <span className="mb-8 flex size-12 items-center justify-center rounded-xl bg-white/15"><SkykinMark className="size-7 text-white" /></span>
@@ -52,7 +52,7 @@ export default function Login() {
         <div className="flex flex-1 items-center justify-center px-6 pb-12">
           <div className="w-full max-w-md">
             <div className="mb-8 text-center lg:hidden">
-              <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-identity/12 text-identity"><SkykinMark className="size-8" /></span>
+              <span className="mx-auto mb-4 flex size-14 items-center justify-center brand-chip rounded-2xl"><SkykinMark className="size-8" /></span>
               <h1 className="font-display text-2xl font-bold">Skykin Ad Portal</h1>
             </div>
             <div className="mb-6 hidden lg:block">

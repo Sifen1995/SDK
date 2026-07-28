@@ -27,7 +27,12 @@ export default function Profile() {
   if (isError && !user) return <ErrorState message={(error as Error)?.message} onRetry={() => refetch()} />;
   if (!user) return null;
 
-  const meta = ROLE_META[user.role];
+  const meta = ROLE_META[user.role] || {
+    label: user.role || 'User',
+    description: 'Portal user',
+    canWrite: false,
+    selfRegister: false,
+  };
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -37,12 +42,12 @@ export default function Profile() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="relative overflow-hidden bg-primary px-6 py-8 text-primary-foreground">
+        <div className="brand-hero overflow-hidden px-6 py-8 text-white">
           <div className="pointer-events-none absolute inset-0 opacity-90" style={{ background: 'radial-gradient(circle at 90% 10%, rgb(255 255 255 / 0.12), transparent 45%)' }} />
           <div className="relative flex items-center gap-4">
-            <div className="flex size-16 items-center justify-center rounded-2xl bg-white/20 text-2xl font-bold">{user.name.charAt(0).toUpperCase()}</div>
+            <div className="flex size-16 items-center justify-center rounded-2xl bg-white/20 text-2xl font-bold">{(user.name || 'U').charAt(0).toUpperCase()}</div>
             <div>
-              <h3 className="font-display text-xl font-semibold">{user.name}</h3>
+              <h3 className="font-display text-xl font-semibold">{user.name || 'Unknown User'}</h3>
               <p className="text-sm text-white/80">{user.email}</p>
               <Badge variant="secondary" className="mt-2 bg-white/20 text-white">{meta.label}</Badge>
             </div>

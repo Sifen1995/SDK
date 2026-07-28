@@ -97,13 +97,13 @@ export function AppShell({
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-50 flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-200',
-          'lg:sticky lg:top-0 lg:z-auto lg:translate-x-0',
+          'lg:sticky lg:top-0 lg:z-auto lg:translate-x-0 lg:shadow-[6px_0_24px_-18px_rgba(8,38,62,0.55)]',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex h-16 items-center gap-2.5 border-b border-sidebar-border px-5">
+        <div className="flex h-[72px] items-center gap-2.5 border-b border-sidebar-border px-5">
           {brand.mark && (
-            <span className="flex size-9 items-center justify-center overflow-hidden rounded-md bg-identity/12">
+            <span className="flex items-center justify-center">
               {brand.mark}
             </span>
           )}
@@ -176,7 +176,7 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border bg-background/85 px-4 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between gap-3 border-b border-border bg-background/72 px-4 backdrop-blur-md [backdrop-filter:blur(12px)_saturate(140%)] lg:px-8">
           <div className="flex min-w-0 items-center gap-2">
             <button
               type="button"
@@ -188,7 +188,7 @@ export function AppShell({
             </button>
             <div className="min-w-0">{title}</div>
           </div>
-          <div className="flex items-center gap-2.5">{topbarRight}</div>
+          <div className="flex items-center gap-4">{topbarRight}</div>
         </header>
         <main className="flex-1 overflow-x-hidden px-6 py-6 lg:px-8">
           <div className="mx-auto w-full max-w-6xl">{children}</div>

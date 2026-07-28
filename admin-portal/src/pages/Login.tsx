@@ -29,7 +29,7 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen">
-      <div className="relative hidden w-[46%] flex-col justify-between overflow-hidden bg-primary p-12 text-primary-foreground lg:flex">
+      <div className="brand-hero hidden w-[46%] flex-col justify-between overflow-hidden p-12 text-white lg:flex">
         <div
           className="pointer-events-none absolute inset-0 opacity-90"
           style={{ background: 'radial-gradient(circle at 20% 80%, rgb(255 255 255 / 0.12), transparent 45%), radial-gradient(circle at 85% 15%, rgb(255 255 255 / 0.08), transparent 40%)' }}
@@ -53,7 +53,7 @@ export default function Login() {
       <div className="flex flex-1 items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center lg:hidden">
-            <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-identity/12 text-identity">
+            <span className="mx-auto mb-4 flex size-14 items-center justify-center brand-chip rounded-2xl">
               <SkykinMark className="size-8" />
             </span>
             <h1 className="font-display text-2xl font-bold">Skykin Admin</h1>

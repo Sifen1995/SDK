@@ -74,7 +74,7 @@ export default function Layout() {
 
   return (
     <AppShell
-      brand={{ name: 'Skykin', sub: 'Operator', mark: <SkykinMark className="size-5 text-identity" /> }}
+      brand={{ name: 'Skykin', sub: 'Operator', mark: <SkykinMark className="h-10 w-auto text-identity drop-shadow-md" /> }}
       groups={groups}
       title={
         <div>
@@ -83,12 +83,15 @@ export default function Layout() {
         </div>
       }
       topbarRight={
-        <>
+        <div className="flex items-center gap-4">
           <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
-          <Avatar>
-            <AvatarFallback>{initials(user?.name)}</AvatarFallback>
-          </Avatar>
-        </>
+          <div className="flex items-center gap-3 rounded-full border border-border bg-card p-1 pr-4 shadow-sm hover:bg-accent/50 transition-colors">
+            <Avatar className="size-8">
+              <AvatarFallback className="text-xs">{initials(user?.name)}</AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium">{user?.name || 'Operator'}</span>
+          </div>
+        </div>
       }
       sidebarFooter={
         <div className="space-y-1.5">

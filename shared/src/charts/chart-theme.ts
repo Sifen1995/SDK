@@ -32,7 +32,7 @@ export const chartTooltip = {
     background: 'var(--popover)',
     border: '1px solid var(--border)',
     borderRadius: '8px',
-    boxShadow: '0 8px 24px rgb(0 0 0 / 0.12)',
+    boxShadow: '0 12px 32px rgba(8, 38, 62, 0.14), 0 3px 8px rgba(8, 38, 62, 0.06)',
     color: 'var(--popover-foreground)',
     fontSize: 12,
   },

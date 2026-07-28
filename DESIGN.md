@@ -7,9 +7,11 @@ new engineer can extend any portal without re-deriving these decisions.
 ## Apps & audiences
 | App | Path prefix | Audience | Identity accent |
 |---|---|---|---|
-| `portal` | `/api/v1/portal` | **Developers** — SDK app registration + API keys | Steel blue `#3D6B99` |
-| `ad-portal` | `/api/v1/ad-portal` | **Advertisers** — campaigns, subscription, audience | Warm bronze `#9C6B3F` |
-| `admin-portal` | `/api/v1/ad-portal/admin` | **Operators** — analytics, moderation, catalog, RBAC | Muted plum `#6B5B95` |
+| `portal` | `/api/v1/portal` | **Developers** — SDK app registration + API keys | Core brand blue `#0083D5` |
+| `ad-portal` | `/api/v1/ad-portal` | **Advertisers** — campaigns, subscription, audience | Bright sky `#2F92CF` |
+| `admin-portal` | `/api/v1/ad-portal/admin` | **Operators** — analytics, moderation, catalog, RBAC | Deep navy `#08263E` |
+
+All three accents are points on the brand axis (navy → blue → sky) — no unrelated hues.
 
 ## Shared package
 Everything reusable lives in **`shared/` (`@skykin/ui`)**, imported by all three apps
@@ -28,17 +30,23 @@ Tokens follow the **shadcn contract** (`--background`, `--foreground`, `--primar
 `--*-surface`, `--identity`). Components reference **only** these tokens via Tailwind
 (`bg-primary`, `text-muted-foreground`, …) — never a raw hex or palette utility.
 
-- **Core accent (shared):** deep muted teal `--primary #1F4E4A` (lifts to `#4F9A8F` on dark).
+Palette is re-based on the two brand colors sampled from the logo — **navy `#08263E`**
+and **blue `#0083D5`** (exposed as `--brand-navy` / `--brand-blue`). Everything else is
+derived from these; no unrelated hues.
+- **Core accent (shared):** brand blue `--primary #0083D5` (lifts to `#2AA3E8` on dark).
   Used for **every primary action in all three apps**.
-- **Neutrals:** cool, teal-biased — paper `#FCFCFF`, ink `#131A22`, slate `#5C6773`, line `#E3E7EC`.
-- **Semantic (separate from accent):** success `#2E7D5B`, warning `#B7791F`, destructive `#B4232A`,
+- **Neutrals:** cool, navy-biased — ground `#EDF2F8`, ink `#0B2436`, slate `#56697C`, line `#DCE5EE`.
+- **Semantic (separate from accent):** success `#1E7A54`, warning `#B4791C`, destructive `#C0332F`,
   each with a low-chroma `*-surface` for pills/tiles. Status pills use `StatusPill` /
   `statusTone()` — a muted 3-color scheme (green/amber/red) + neutral. No rainbow.
 - **Identity accent (`--identity`):** set by `data-app` on `<html>` (`portal|ad|admin`).
   **Wayfinding only** — the active-nav signal bar, active nav icon, avatars, wordmark, and
   nav-scoped badges. Never a primary button or large fill.
+- **Brand surfaces:** `.brand-chip` (navy→blue gradient mark) and `.brand-hero` (deep
+  navy→blue "front door" for auth heroes/banners; always white-on-dark) are the two places
+  the raw brand colors appear as fills.
 - **Charts:** one shared theme (`@skykin/ui` `chartAxis/chartGrid/chartTooltip/chartColor/
-  CHART_COLORS`) drawing from `--chart-1..6`. Reused across every recharts view.
+  CHART_COLORS`) drawing from `--chart-1..6` — a navy→blue→sky ramp. Reused across every recharts view.
 
 ## Type (self-hosted via `@fontsource`, no CDN)
 - **Display — Schibsted Grotesk** (`--font-display`): headings, wordmark, KPI numbers.
@@ -48,8 +56,15 @@ Tokens follow the **shadcn contract** (`--background`, `--foreground`, `--primar
 
 ## Layout, elevation, motion
 - Spacing 4/8/12/16/24/32; radius scale off `--radius: 0.5rem` (`--radius-sm/md/lg/xl`).
-- **Hairline-border-first**: rely on `border-border` + subtle `shadow-sm`; two elevation
-  levels only (cards, overlays). No heavy drop-shadow cards.
+- **Elevation ramp** (`--elevation-xs…xl`, mapped onto Tailwind's `shadow-xs…xl`): six
+  deliberate layers with **navy-tinted shadows** (`rgba(8,38,62,·)`, never pure black; dark
+  theme uses black). Ground (recessed `--background`) → rail/topbar (xs) → cards & KPI tiles
+  (sm) → primary content / hover (md) → floating menus (lg) → modals (xl). Most surfaces stay
+  low; height is spent only where hierarchy needs it. Hairline `border-border` still frames.
+- **Glass** (`.glass` + `--glass-*`): translucent + backdrop-blur, used surgically on chrome
+  and overlays only — sticky topbar, dropdown/select menus, dialog scrim. **Never on data**
+  (cards, tables, charts stay opaque for legibility). `.lift` adds a hover translate+shadow
+  for interactive tiles (KPI cards).
 - Motion is near-instant (150–200ms) and purposeful; `prefers-reduced-motion` is honored
   globally in `tokens.css`.
 - **Responsive:** the `AppShell` sidebar is a static rail on `lg+` and an off-canvas drawer

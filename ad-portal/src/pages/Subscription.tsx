@@ -32,7 +32,7 @@ export default function SubscriptionPage() {
       {subscribe.isError && <InlineError message={(subscribe.error as Error).message} />}
 
       {subscribed && subscription && (
-        <div className="relative overflow-hidden rounded-xl bg-primary p-6 text-primary-foreground">
+        <div className="brand-hero overflow-hidden rounded-xl p-6 text-white shadow-md">
           <div className="pointer-events-none absolute inset-0 opacity-90" style={{ background: 'radial-gradient(circle at 12% 88%, rgb(255 255 255 / 0.12), transparent 45%)' }} />
           <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>

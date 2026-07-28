@@ -1,7 +1,8 @@
 import { Outlet, useNavigate } from 'react-router-dom';
-import { AppShell, SkykinMark, Avatar, AvatarFallback, Button, type NavGroup } from '@skykin/ui';
+import { AppShell, SkykinMark, ThemeToggle, Avatar, AvatarFallback, Button, type NavGroup } from '@skykin/ui';
 import { LayoutGrid, PlusCircle, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 function initials(name?: string, email?: string) {
   const src = name || email || '';
@@ -21,6 +22,7 @@ const groups: NavGroup[] = [
 
 export default function Layout() {
   const { developer, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   // Auth screens own the full viewport — render them without the app shell.
@@ -35,7 +37,7 @@ export default function Layout() {
 
   return (
     <AppShell
-      brand={{ name: 'Skykin', sub: 'Developer', mark: <SkykinMark className="size-5 text-identity" /> }}
+      brand={{ name: 'Skykin', sub: 'Developer', mark: <SkykinMark className="h-10 w-auto text-identity drop-shadow-md" /> }}
       groups={groups}
       title={
         <div>
@@ -44,9 +46,15 @@ export default function Layout() {
         </div>
       }
       topbarRight={
-        <Avatar>
-          <AvatarFallback>{initials(developer.name, developer.email)}</AvatarFallback>
-        </Avatar>
+        <div className="flex items-center gap-4">
+          <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
+          <div className="flex items-center gap-3 rounded-full border border-border bg-card p-1 pr-4 shadow-sm hover:bg-accent/50 transition-colors">
+            <Avatar className="size-8">
+              <AvatarFallback className="text-xs">{initials(developer.name, developer.email)}</AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium">{developer.name || 'Developer'}</span>
+          </div>
+        </div>
       }
       sidebarFooter={
         <div className="space-y-1.5">

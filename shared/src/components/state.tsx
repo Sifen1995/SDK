@@ -57,12 +57,16 @@ export function ErrorState({
   className?: string;
 }) {
   return (
-    <div className={cn('flex flex-col items-center justify-center rounded-lg border border-destructive/30 bg-destructive-surface px-6 py-14 text-center', className)} role="alert">
-      <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-destructive/12 text-destructive">
+    <div className={cn('flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 px-6 py-14 text-center', className)} role="alert">
+      <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
         <AlertTriangle className="size-6" />
       </div>
       <h3 className="font-display text-base font-semibold text-foreground">{title}</h3>
-      {message && <p className="mt-1.5 max-w-md text-sm text-muted-foreground">{message}</p>}
+      {message && (
+        <div className="mt-2 rounded-md bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive">
+          {message}
+        </div>
+      )}
       {onRetry && (
         <Button variant="outline" size="sm" className="mt-5" onClick={onRetry}>
           Try again

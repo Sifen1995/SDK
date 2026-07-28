@@ -18,21 +18,25 @@ function GuestRoute({ children }: { children: ReactNode }) {
   return token ? <Navigate to="/" replace /> : <>{children}</>;
 }
 
+import { ThemeProvider } from './context/ThemeContext';
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppProviders>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
-            <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
-            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/applications/new" element={<ProtectedRoute><NewApplication /></ProtectedRoute>} />
-          </Route>
-        </Routes>
-        </AppProviders>
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppProviders>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+              <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/applications/new" element={<ProtectedRoute><NewApplication /></ProtectedRoute>} />
+            </Route>
+          </Routes>
+          </AppProviders>
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

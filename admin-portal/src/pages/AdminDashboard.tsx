@@ -111,18 +111,9 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card><CardContent className="p-5 pt-5 text-center">
-          <p className="text-xs text-muted-foreground">Unique users reached</p>
-          <p className="mt-1 font-display text-xl font-bold tabular-nums">{fmtNum(stats.unique_users_reached)}</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-5 pt-5 text-center">
-          <p className="text-xs text-muted-foreground">Active subscriptions</p>
-          <p className="mt-1 font-display text-xl font-bold tabular-nums">{fmtNum(stats.active_subscriptions)}</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-5 pt-5 text-center">
-          <p className="text-xs text-muted-foreground">Segment sales revenue</p>
-          <p className="mt-1 font-display text-xl font-bold tabular-nums text-success">{fmtEtb(stats.segment_revenue_total_etb)}</p>
-        </CardContent></Card>
+        <KpiCard label="Unique users reached" value={fmtNum(stats.unique_users_reached)} icon={Users} />
+        <KpiCard label="Active subscriptions" value={fmtNum(stats.active_subscriptions)} icon={Activity} />
+        <KpiCard label="Segment sales revenue" value={fmtEtb(stats.segment_revenue_total_etb)} icon={DollarSign} className="border-success/30 [&_.text-foreground]:text-success [&_span[data-slot=kpi-value]]:text-success" />
       </div>
     </div>
   );
