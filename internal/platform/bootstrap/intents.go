@@ -48,7 +48,8 @@ func NewIntentSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *int
 
 	campaignRepo := campaignInfra.NewRepository(db)
 	cachedCampaigns := campaignInfra.NewCachedCampaignRepository(campaignRepo, redisCampaign, platformRDB)
-	adSelector := campaignApp.NewIntentAdSelector(cachedCampaigns)
+	linkBuilder := campaignInfra.NewPlayLinkBuilder(strings.TrimSpace(cfg.ClickTokenSecret))
+	adSelector := campaignApp.NewIntentAdSelector(cachedCampaigns, linkBuilder)
 
 	svc := intentApp.NewIntentService(profileRepo, cache, adSelector)
 	return intentHTTP.NewHandler(svc, aggregateIngest)

@@ -2,7 +2,11 @@ package worker
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -160,6 +164,12 @@ func mapStreamToDeliveryLog(msg platformredis.StreamMessage) (*deliverydomain.De
 		return nil, errUnsupportedEvent
 	}
 
+	if eventType == "install" {
+		if err := validateInstallToken(msg.Values["install_token"], campaignID); err != nil {
+			return nil, err
+		}
+	}
+
 	userID := strings.TrimSpace(msg.Values["pseudonymous_id"])
 	sessionID := "telemetry"
 	if userID == "" {
@@ -193,6 +203,30 @@ func statusForEvent(eventType string) string {
 	}
 }
 
+func validateInstallToken(token any, campaignID string) error {
+	secret := strings.TrimSpace(os.Getenv("CLICK_TOKEN_SECRET"))
+	if secret == "" {
+		return nil
+	}
+
+	strToken, ok := token.(string)
+	if !ok {
+		return errInvalidInstallToken
+	}
+	strToken = strings.TrimSpace(strToken)
+	if strToken == "" {
+		return errInvalidInstallToken
+	}
+
+	h := hmac.New(sha256.New, []byte(secret))
+	_, _ = h.Write([]byte(campaignID))
+	expected := hex.EncodeToString(h.Sum(nil))
+	if !hmac.Equal([]byte(strToken), []byte(expected)) {
+		return errInvalidInstallToken
+	}
+	return nil
+}
+
 func parseOccurredAt(raw string) time.Time {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -212,6 +246,7 @@ type simpleError string
 func (e simpleError) Error() string { return string(e) }
 
 const (
-	errRequiredFields   = simpleError("campaign_id and event_type are required")
-	errUnsupportedEvent = simpleError("unsupported event_type for delivery log")
+	errRequiredFields      = simpleError("campaign_id and event_type are required")
+	errUnsupportedEvent    = simpleError("unsupported event_type for delivery log")
+	errInvalidInstallToken = simpleError("invalid install token")
 )

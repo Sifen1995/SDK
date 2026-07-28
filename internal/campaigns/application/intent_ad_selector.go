@@ -10,13 +10,14 @@ import (
 
 // IntentAdSelector implements intents/application.AdSelector using the cached plan-tier ranker.
 type IntentAdSelector struct {
-	campaigns *infrastructure.CachedCampaignRepository
+	campaigns   *infrastructure.CachedCampaignRepository
+	linkBuilder *infrastructure.PlayLinkBuilder
 }
 
 var _ intentsApp.AdSelector = (*IntentAdSelector)(nil)
 
-func NewIntentAdSelector(campaigns *infrastructure.CachedCampaignRepository) *IntentAdSelector {
-	return &IntentAdSelector{campaigns: campaigns}
+func NewIntentAdSelector(campaigns *infrastructure.CachedCampaignRepository, linkBuilder *infrastructure.PlayLinkBuilder) *IntentAdSelector {
+	return &IntentAdSelector{campaigns: campaigns, linkBuilder: linkBuilder}
 }
 
 // SelectAd finds the highest-plan-tier eligible campaign for an intent and channel.
@@ -43,7 +44,7 @@ func (s *IntentAdSelector) SelectAd(
 		if err != nil {
 			continue
 		}
-		content, err := infrastructure.CampaignAdContent(campaign, code)
+		content, err := infrastructure.CampaignAdContent(campaign, code, s.linkBuilder)
 		if err != nil {
 			continue
 		}

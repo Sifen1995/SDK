@@ -41,7 +41,8 @@ type TelemetryTrackRequest struct {
 	// TransactionValue used for REV_SHARE / purchase events
 	TransactionValue float64 `json:"transaction_value" binding:"omitempty,gte=0" example:"0"`
 	// OccurredAt RFC3339 timestamp; defaults to server UTC now when omitted
-	OccurredAt string `json:"occurred_at" binding:"omitempty" example:"2026-07-18T12:00:00Z"`
+	OccurredAt   string `json:"occurred_at" binding:"omitempty" example:"2026-07-18T12:00:00Z"`
+	InstallToken string `json:"install_token,omitempty"`
 }
 
 type billingStreamPublisher interface {
@@ -60,7 +61,7 @@ func NewTelemetryHandler(rdb *platformredis.RedisClient) *TelemetryHandler {
 
 // Track godoc
 // @Summary      Track consented ad billing event
-// @Description  Accepts a consented ad tracking log (impression/click/install/signup/purchase). Impression/click events are deduplicated via Redis SETNX lock:telemetry:{pseudonymous_id}:{campaign_id}:{event_type} (impression 5m, click 1h) before XADD to stream:billing_events. Duplicates still return 202 without enqueueing. Authorize with X-API-Key and X-SDK-Secret.
+// @Description  Accepts a consented ad tracking log (impression/click/install/signup/purchase). Impression/click events are deduplicated via Redis SETNX lock:telemetry:{pseudonymous_id}:{campaign_id}:{event_type} (impression 5m, click 1h) before XADD to stream:billing_events. Duplicates still return 202 without enqueueing. Install events require install_token. Authorize with X-API-Key and X-SDK-Secret.
 // @Tags         SDK - Bill Track
 // @Accept       json
 // @Produce      json
@@ -93,6 +94,11 @@ func (h *TelemetryHandler) Track(c *gin.Context) {
 
 	campaignID := strings.TrimSpace(req.CampaignID)
 	pseudonymousID := strings.TrimSpace(req.PseudonymousID)
+
+	if eventType == "install" && strings.TrimSpace(req.InstallToken) == "" {
+		platformHTTP.Error(c, http.StatusBadRequest, "missing_token", "install_token is required for install events")
+		return
+	}
 
 	// High-speed dedup gate for spam impressions/clicks before stream write-behind.
 	if ttl, ok := telemetryDedupTTL(eventType); ok {
@@ -128,6 +134,9 @@ func (h *TelemetryHandler) Track(c *gin.Context) {
 		"event_type":        eventType,
 		"transaction_value": strconv.FormatFloat(req.TransactionValue, 'f', 4, 64),
 		"occurred_at":       occurredAt,
+	}
+	if eventType == "install" {
+		values["install_token"] = strings.TrimSpace(req.InstallToken)
 	}
 	if pseudonymousID != "" {
 		values["pseudonymous_id"] = pseudonymousID

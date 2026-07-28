@@ -3,6 +3,8 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	billingdomain "skykin-platform/internal/billing/domain"
@@ -219,7 +221,15 @@ func (r *Repository) LogDelivery(ctx context.Context, log *campaigndomain.Delive
 }
 
 // CampaignAdContent builds the SDK ad payload from a campaign.
-func CampaignAdContent(c *campaigndomain.Campaign, channelCode string) (map[string]any, error) {
+func CampaignAdContent(c *campaigndomain.Campaign, channelCode string, linkBuilder ...*PlayLinkBuilder) (map[string]any, error) {
+	destination := c.DestinationURL
+
+	if destination != "" {
+		builder := resolvePlayLinkBuilder(linkBuilder)
+		if builder != nil && c.ID != "" {
+			destination = builder.BuildConsentedInstallURL(destination, c.ID)
+		}
+	}
 	canvas := c.CanvasJSON
 	if canvas == nil {
 		canvas = map[string]any{}
@@ -228,11 +238,22 @@ func CampaignAdContent(c *campaigndomain.Campaign, channelCode string) (map[stri
 		"title":           c.Title,
 		"body_text":       c.BodyText,
 		"image_url":       c.ImageURL,
-		"destination_url": c.DestinationURL,
+		"destination_url": destination,
 		"channel_code":    channelCode,
 		"canvas_json":     canvas,
 	}
 	return content, nil
+}
+
+func resolvePlayLinkBuilder(linkBuilders []*PlayLinkBuilder) *PlayLinkBuilder {
+	if len(linkBuilders) > 0 && linkBuilders[0] != nil {
+		return linkBuilders[0]
+	}
+	secret := strings.TrimSpace(os.Getenv("CLICK_TOKEN_SECRET"))
+	if secret == "" {
+		return nil
+	}
+	return NewPlayLinkBuilder(secret)
 }
 
 func toEligibleDomainCampaigns(rows []eligibleCampaignScan) ([]campaigndomain.Campaign, error) {

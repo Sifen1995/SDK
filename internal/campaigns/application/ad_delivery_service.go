@@ -10,11 +10,12 @@ import (
 
 // AdDeliveryService builds campaign ad payloads and logs dispatches.
 type AdDeliveryService struct {
-	repo *infrastructure.Repository
+	repo        *infrastructure.Repository
+	linkBuilder *infrastructure.PlayLinkBuilder
 }
 
-func NewAdDeliveryService(repo *infrastructure.Repository) *AdDeliveryService {
-	return &AdDeliveryService{repo: repo}
+func NewAdDeliveryService(repo *infrastructure.Repository, linkBuilder *infrastructure.PlayLinkBuilder) *AdDeliveryService {
+	return &AdDeliveryService{repo: repo, linkBuilder: linkBuilder}
 }
 
 type AdPayload struct {
@@ -33,7 +34,7 @@ func (s *AdDeliveryService) BuildAdForIntent(ctx context.Context, intent string)
 		if err != nil {
 			continue
 		}
-		content, err := infrastructure.CampaignAdContent(c, code)
+		content, err := infrastructure.CampaignAdContent(c, code, s.linkBuilder)
 		if err != nil {
 			continue
 		}
