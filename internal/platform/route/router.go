@@ -1,11 +1,13 @@
 package route
 
 import (
+	"context"
 	"log/slog"
 
 	"skykin-platform/configs"
 	adportalRoutes "skykin-platform/internal/ad_portal/routes"
 	authRoutes "skykin-platform/internal/auth/routes"
+	billingWorker "skykin-platform/internal/billing/worker"
 	consentHTTP "skykin-platform/internal/consent/interfaces/http"
 	deliveryHTTP "skykin-platform/internal/delivery/http"
 	intentHTTP "skykin-platform/internal/intents/interfaces/http"
@@ -14,6 +16,7 @@ import (
 	"skykin-platform/internal/platform/bootstrap"
 	"skykin-platform/internal/platform/messaging"
 	platformMiddleware "skykin-platform/internal/platform/middleware"
+	platformredis "skykin-platform/internal/platform/redis"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -40,6 +43,14 @@ func InitRouter(
 	consentHandler := bootstrap.NewConsentSystem(db, bus, slog.Default())
 	intentHandler := bootstrap.NewIntentSystem(db, cfg, slog.Default())
 	deliverySDK := bootstrap.NewDeliverySDKSystem(db, cfg, slog.Default())
+
+	if cfg.RedisAddr != "" {
+		if rdb, err := platformredis.NewRedisClient(cfg.RedisAddr); err == nil {
+			go billingWorker.NewCPCWorker(rdb, db, slog.Default()).Start(context.Background())
+		} else {
+			slog.Default().Warn("cpc queue worker disabled", "error", err)
+		}
+	}
 
 	sdkGroup := r.Group("/api/v1")
 	sdkGroup.Use(sdkAuthMiddleware)

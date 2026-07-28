@@ -41,8 +41,9 @@ type TelemetryTrackRequest struct {
 	// TransactionValue used for REV_SHARE / purchase events
 	TransactionValue float64 `json:"transaction_value" binding:"omitempty,gte=0" example:"0"`
 	// OccurredAt RFC3339 timestamp; defaults to server UTC now when omitted
-	OccurredAt   string `json:"occurred_at" binding:"omitempty" example:"2026-07-18T12:00:00Z"`
-	InstallToken string `json:"install_token,omitempty"`
+	OccurredAt string `json:"occurred_at" binding:"omitempty" example:"2026-07-18T12:00:00Z"`
+	// InstallToken is optional and only required for install events.
+	InstallToken string `json:"install_token,omitempty" binding:"omitempty" example:"signed-install-token"`
 }
 
 type billingStreamPublisher interface {

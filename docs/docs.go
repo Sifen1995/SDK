@@ -2195,7 +2195,7 @@ const docTemplate = `{
                         "SDKSecretAuth": []
                     }
                 ],
-                "description": "Accepts a consented ad tracking log (impression/click/install/signup/purchase). Impression/click events are deduplicated via Redis SETNX lock:telemetry:{pseudonymous_id}:{campaign_id}:{event_type} (impression 5m, click 1h) before XADD to stream:billing_events. Duplicates still return 202 without enqueueing. Authorize with X-API-Key and X-SDK-Secret.",
+                "description": "Accepts a consented ad tracking log (impression/click/install/signup/purchase). Impression/click events are deduplicated via Redis SETNX lock:telemetry:{pseudonymous_id}:{campaign_id}:{event_type} (impression 5m, click 1h) before XADD to stream:billing_events. Duplicates still return 202 without enqueueing. Install events require install_token. Authorize with X-API-Key and X-SDK-Secret.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3027,6 +3027,11 @@ const docTemplate = `{
                     "description": "EventType: impression | click | install | signup | purchase",
                     "type": "string",
                     "example": "impression"
+                },
+                "install_token": {
+                    "description": "InstallToken is optional and only required for install events.",
+                    "type": "string",
+                    "example": "signed-install-token"
                 },
                 "occurred_at": {
                     "description": "OccurredAt RFC3339 timestamp; defaults to server UTC now when omitted",

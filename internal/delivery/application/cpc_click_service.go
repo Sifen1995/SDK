@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"skykin-platform/internal/platform/redis"
@@ -50,8 +51,13 @@ func (s *CPCClickService) ProcessClick(ctx context.Context, campaignID, token st
 }
 
 func (s *CPCClickService) validateToken(campaignID, token string) bool {
-	var sig, hourBucket string
-	if n, err := fmt.Sscanf(token, "%s.%s", &sig, &hourBucket); err != nil || n != 2 {
+	parts := strings.Split(token, ".")
+	if len(parts) != 2 {
+		return false
+	}
+	sig := strings.TrimSpace(parts[0])
+	hourBucket := strings.TrimSpace(parts[1])
+	if sig == "" || hourBucket == "" {
 		return false
 	}
 
