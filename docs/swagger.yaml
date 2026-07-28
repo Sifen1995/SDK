@@ -359,15 +359,6 @@ definitions:
     type: object
   internal_campaigns_interfaces_http.CreateCampaignRequest:
     properties:
-      billing_model:
-        description: Financial & Operational Controls
-        enum:
-        - CPM
-        - CPC
-        - CPI
-        - CPA
-        - REV_SHARE
-        type: string
       body_text:
         type: string
       canvas_json:
@@ -408,7 +399,6 @@ definitions:
       total_budget_cap:
         type: number
     required:
-    - billing_model
     - body_text
     - channel_id
     - daily_budget_cap
@@ -494,6 +484,16 @@ definitions:
     type: object
   internal_delivery_http.AnonymousTrackRequest:
     properties:
+      billing_model:
+        description: BillingModel is selected by the SDK for this billable event.
+        enum:
+        - CPM
+        - CPC
+        - CPI
+        - CPA
+        - REV_SHARE
+        example: CPM
+        type: string
       campaign_id:
         description: CampaignID of the served creative
         example: c1a2b3c4-d5e6-7890-abcd-ef1234567890
@@ -503,11 +503,22 @@ definitions:
         example: impression
         type: string
     required:
+    - billing_model
     - campaign_id
     - event_type
     type: object
   internal_delivery_http.TelemetryTrackRequest:
     properties:
+      billing_model:
+        description: BillingModel is selected by the SDK for this billable event.
+        enum:
+        - CPM
+        - CPC
+        - CPI
+        - CPA
+        - REV_SHARE
+        example: CPM
+        type: string
       campaign_id:
         description: CampaignID of the served creative
         example: 550e8400-e29b-41d4-a716-446655440000
@@ -536,6 +547,7 @@ definitions:
         minimum: 0
         type: number
     required:
+    - billing_model
     - campaign_id
     - event_type
     type: object
@@ -2548,9 +2560,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Accepts an anonymous click callback for a campaign using a signed
-        token. The endpoint validates the token, queues the event for async billing
-        processing, and returns 202 Accepted immediately.
+      description: Accepts an anonymous click callback with its billing model. The
+        endpoint validates the token, queues the event for async billing processing,
+        and returns 202 Accepted immediately.
       parameters:
       - description: Campaign ID
         in: query
@@ -2560,6 +2572,11 @@ paths:
       - description: Signed click token
         in: query
         name: token
+        required: true
+        type: string
+      - description: Billing model (CPM, CPC, CPI, CPA, or REV_SHARE)
+        in: query
+        name: billing_model
         required: true
         type: string
       produces:
@@ -2579,7 +2596,7 @@ paths:
           description: Unauthorized
           schema:
             type: string
-      summary: Track anonymous CPC click
+      summary: Track anonymous billing click
       tags:
       - SDK - Bill Track
   /telemetry/track:

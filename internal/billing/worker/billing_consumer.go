@@ -238,17 +238,13 @@ func resolveStreamMessage(
 		rateCache[sub.PlanID] = list
 	}
 
-	model := strings.TrimSpace(campaign.BillingModel)
+	model := strings.ToUpper(strings.TrimSpace(msg.Values["billing_model"]))
 	if model == "" {
-		model = defaultModelForEvent(eventType)
+		return nil, nil, fmt.Errorf("billing_model is required")
 	}
 	rate, ok := findRate(planRates, eventType, model)
 	if !ok {
-		model = defaultModelForEvent(eventType)
-		rate, ok = findRate(planRates, eventType, model)
-		if !ok {
-			return nil, nil, fmt.Errorf("no billing rate for plan=%s event=%s model=%s", sub.PlanID, eventType, model)
-		}
+		return nil, nil, fmt.Errorf("no billing rate for plan=%s event=%s model=%s", sub.PlanID, eventType, model)
 	}
 
 	txn, _ := strconv.ParseFloat(strings.TrimSpace(msg.Values["transaction_value"]), 64)
@@ -279,23 +275,6 @@ func findRate(rates []billingdomain.BillingRate, eventType, model string) (billi
 		}
 	}
 	return billingdomain.BillingRate{}, false
-}
-
-func defaultModelForEvent(eventType string) string {
-	switch eventType {
-	case "impression":
-		return "CPM"
-	case "click":
-		return "CPC"
-	case "install":
-		return "CPI"
-	case "signup":
-		return "CPA"
-	case "purchase":
-		return "REV_SHARE"
-	default:
-		return "CPC"
-	}
 }
 
 func computeCharge(model string, rateETB, transactionValue float64) float64 {

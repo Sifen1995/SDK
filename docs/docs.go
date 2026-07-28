@@ -2135,7 +2135,7 @@ const docTemplate = `{
         },
         "/telemetry/anonymous-click": {
             "post": {
-                "description": "Accepts an anonymous click callback for a campaign using a signed token. The endpoint validates the token, queues the event for async billing processing, and returns 202 Accepted immediately.",
+                "description": "Accepts an anonymous click callback with its billing model. The endpoint validates the token, queues the event for async billing processing, and returns 202 Accepted immediately.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2145,7 +2145,7 @@ const docTemplate = `{
                 "tags": [
                     "SDK - Bill Track"
                 ],
-                "summary": "Track anonymous CPC click",
+                "summary": "Track anonymous billing click",
                 "parameters": [
                     {
                         "type": "string",
@@ -2158,6 +2158,13 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Signed click token",
                         "name": "token",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Billing model (CPM, CPC, CPI, CPA, or REV_SHARE)",
+                        "name": "billing_model",
                         "in": "query",
                         "required": true
                     }
@@ -2820,7 +2827,6 @@ const docTemplate = `{
         "internal_campaigns_interfaces_http.CreateCampaignRequest": {
             "type": "object",
             "required": [
-                "billing_model",
                 "body_text",
                 "channel_id",
                 "daily_budget_cap",
@@ -2831,17 +2837,6 @@ const docTemplate = `{
                 "total_budget_cap"
             ],
             "properties": {
-                "billing_model": {
-                    "description": "Financial \u0026 Operational Controls",
-                    "type": "string",
-                    "enum": [
-                        "CPM",
-                        "CPC",
-                        "CPI",
-                        "CPA",
-                        "REV_SHARE"
-                    ]
-                },
                 "body_text": {
                     "type": "string"
                 },
@@ -2995,10 +2990,17 @@ const docTemplate = `{
         "internal_delivery_http.AnonymousTrackRequest": {
             "type": "object",
             "required": [
+                "billing_model",
                 "campaign_id",
                 "event_type"
             ],
             "properties": {
+                "billing_model": {
+                    "description": "BillingModel is selected by the SDK for this billable event.",
+                    "type": "string",
+                    "enum": ["CPM", "CPC", "CPI", "CPA", "REV_SHARE"],
+                    "example": "CPM"
+                },
                 "campaign_id": {
                     "description": "CampaignID of the served creative",
                     "type": "string",
@@ -3014,10 +3016,17 @@ const docTemplate = `{
         "internal_delivery_http.TelemetryTrackRequest": {
             "type": "object",
             "required": [
+                "billing_model",
                 "campaign_id",
                 "event_type"
             ],
             "properties": {
+                "billing_model": {
+                    "description": "BillingModel is selected by the SDK for this billable event.",
+                    "type": "string",
+                    "enum": ["CPM", "CPC", "CPI", "CPA", "REV_SHARE"],
+                    "example": "CPM"
+                },
                 "campaign_id": {
                     "description": "CampaignID of the served creative",
                     "type": "string",

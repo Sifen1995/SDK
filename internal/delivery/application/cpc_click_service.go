@@ -13,15 +13,18 @@ import (
 	"skykin-platform/internal/platform/redis"
 )
 
+var ErrClickQueueUnavailable = fmt.Errorf("anonymous click queue unavailable")
+
 type CPCClickService struct {
 	secretKey []byte
 	rdb       *redis.RedisClient
 }
 
 type AnonymousClickEvent struct {
-	CampaignID string    `json:"campaign_id"`
-	ClickedAt  time.Time `json:"clicked_at"`
-	EventType  string    `json:"event_type"` // "CLICK"
+	CampaignID   string    `json:"campaign_id"`
+	ClickedAt    time.Time `json:"clicked_at"`
+	EventType    string    `json:"event_type"` // "CLICK"
+	BillingModel string    `json:"billing_model"`
 }
 
 func NewCPCClickService(secretKey string, rdb *redis.RedisClient) *CPCClickService {
@@ -31,15 +34,19 @@ func NewCPCClickService(secretKey string, rdb *redis.RedisClient) *CPCClickServi
 	}
 }
 
-func (s *CPCClickService) ProcessClick(ctx context.Context, campaignID, token string) error {
+func (s *CPCClickService) ProcessClick(ctx context.Context, campaignID, token, billingModel string) error {
+	if s == nil || s.rdb == nil {
+		return ErrClickQueueUnavailable
+	}
 	if !s.validateToken(campaignID, token) {
 		return fmt.Errorf("invalid token signature or expired timestamp")
 	}
 
 	event := AnonymousClickEvent{
-		CampaignID: campaignID,
-		ClickedAt:  time.Now().UTC(),
-		EventType:  "CLICK",
+		CampaignID:   campaignID,
+		ClickedAt:    time.Now().UTC(),
+		EventType:    "CLICK",
+		BillingModel: strings.ToUpper(strings.TrimSpace(billingModel)),
 	}
 
 	data, err := json.Marshal(event)

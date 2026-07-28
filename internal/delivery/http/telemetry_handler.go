@@ -28,6 +28,8 @@ type AnonymousTrackRequest struct {
 	CampaignID string `json:"campaign_id" binding:"required,uuid" example:"c1a2b3c4-d5e6-7890-abcd-ef1234567890"`
 	// EventType for anonymous bill track (impression)
 	EventType string `json:"event_type" binding:"required" example:"impression"`
+	// BillingModel is selected by the SDK for this billable event.
+	BillingModel string `json:"billing_model" binding:"required,oneof=CPM CPC CPI CPA REV_SHARE" example:"CPM"`
 }
 
 // TelemetryTrackRequest is a consented ad interaction from the Flutter SDK.
@@ -36,6 +38,8 @@ type TelemetryTrackRequest struct {
 	CampaignID string `json:"campaign_id" binding:"required,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
 	// EventType: impression | click | install | signup | purchase
 	EventType string `json:"event_type" binding:"required" example:"impression"`
+	// BillingModel is selected by the SDK for this billable event.
+	BillingModel string `json:"billing_model" binding:"required,oneof=CPM CPC CPI CPA REV_SHARE" example:"CPM"`
 	// PseudonymousID from consent; required for impression/click Redis dedup
 	PseudonymousID string `json:"pseudonymous_id" binding:"omitempty,uuid" example:"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"`
 	// TransactionValue used for REV_SHARE / purchase events
@@ -43,7 +47,7 @@ type TelemetryTrackRequest struct {
 	// OccurredAt RFC3339 timestamp; defaults to server UTC now when omitted
 	OccurredAt string `json:"occurred_at" binding:"omitempty" example:"2026-07-18T12:00:00Z"`
 	// InstallToken is optional and only required for install events.
-	InstallToken string `json:"install_token,omitempty" binding:"omitempty" example:"signed-install-token"`
+	InstallToken *string `json:"install_token,omitempty" binding:"omitempty" example:"signed-install-token"`
 }
 
 type billingStreamPublisher interface {
@@ -86,6 +90,7 @@ func (h *TelemetryHandler) Track(c *gin.Context) {
 	}
 
 	eventType := strings.ToLower(strings.TrimSpace(req.EventType))
+	billingModel := strings.ToUpper(strings.TrimSpace(req.BillingModel))
 	switch eventType {
 	case "impression", "click", "install", "signup", "purchase":
 	default:
@@ -96,7 +101,7 @@ func (h *TelemetryHandler) Track(c *gin.Context) {
 	campaignID := strings.TrimSpace(req.CampaignID)
 	pseudonymousID := strings.TrimSpace(req.PseudonymousID)
 
-	if eventType == "install" && strings.TrimSpace(req.InstallToken) == "" {
+	if eventType == "install" && (req.InstallToken == nil || strings.TrimSpace(*req.InstallToken) == "") {
 		platformHTTP.Error(c, http.StatusBadRequest, "missing_token", "install_token is required for install events")
 		return
 	}
@@ -133,11 +138,12 @@ func (h *TelemetryHandler) Track(c *gin.Context) {
 	values := map[string]interface{}{
 		"campaign_id":       campaignID,
 		"event_type":        eventType,
+		"billing_model":     billingModel,
 		"transaction_value": strconv.FormatFloat(req.TransactionValue, 'f', 4, 64),
 		"occurred_at":       occurredAt,
 	}
 	if eventType == "install" {
-		values["install_token"] = strings.TrimSpace(req.InstallToken)
+		values["install_token"] = strings.TrimSpace(*req.InstallToken)
 	}
 	if pseudonymousID != "" {
 		values["pseudonymous_id"] = pseudonymousID
@@ -153,7 +159,7 @@ func (h *TelemetryHandler) Track(c *gin.Context) {
 
 // TrackAnonymous godoc
 // @Summary      Track anonymous (non-consented) ad impression
-// @Description  Accepts a minimal bill-track payload for non-consented users (campaign_id + event_type). Enqueues to Redis Stream stream:billing_events with source=anonymous and returns 202. Two independent consumer groups write behind: billing_processor_group → billing_events; delivery_log_processor_group → campaign_delivery_logs. Authorize with X-API-Key and X-SDK-Secret.
+// @Description  Accepts a non-consented bill-track payload (campaign_id, event_type, and billing_model). Enqueues to Redis Stream stream:billing_events with source=anonymous and returns 202. Two independent consumer groups write behind: billing_processor_group → billing_events; delivery_log_processor_group → campaign_delivery_logs. Authorize with X-API-Key and X-SDK-Secret.
 // @Tags         SDK - Bill Track
 // @Accept       json
 // @Produce      json
@@ -177,6 +183,7 @@ func (h *TelemetryHandler) TrackAnonymous(c *gin.Context) {
 	}
 
 	eventType := strings.ToLower(strings.TrimSpace(req.EventType))
+	billingModel := strings.ToUpper(strings.TrimSpace(req.BillingModel))
 	if eventType != "impression" {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid event_type", "anonymous track currently accepts impression only")
 		return
@@ -188,6 +195,7 @@ func (h *TelemetryHandler) TrackAnonymous(c *gin.Context) {
 	values := map[string]interface{}{
 		"campaign_id":       campaignID,
 		"event_type":        eventType,
+		"billing_model":     billingModel,
 		"transaction_value": "0.0000",
 		"occurred_at":       occurredAt,
 		"source":            "anonymous",

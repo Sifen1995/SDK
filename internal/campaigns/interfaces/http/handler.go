@@ -62,7 +62,6 @@ func toCreateCommand(req CreateCampaignRequest) application.CreateCampaignComman
 		ImageURL:           req.ImageURL,
 		DestinationURL:     req.DestinationURL,
 		CanvasJSON:         req.CanvasJSON,
-		BillingModel:       req.BillingModel,
 		DailyBudgetCap:     req.DailyBudgetCap,
 		TotalBudgetCap:     req.TotalBudgetCap,
 		FrequencyCapPerDay: req.FrequencyCapPerDay,
