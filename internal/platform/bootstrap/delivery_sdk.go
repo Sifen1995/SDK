@@ -50,8 +50,8 @@ func NewDeliverySDKSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger)
 	out := &DeliverySDKHandlers{
 		Campaigns: deliveryHTTP.NewCampaignHandler(anonSvc),
 	}
+	out.Telemetry = deliveryHTTP.NewTelemetryHandler(platformRDB)
 	if platformRDB != nil {
-		out.Telemetry = deliveryHTTP.NewTelemetryHandler(platformRDB)
 		if strings.TrimSpace(secretKey) != "" {
 			cpcService := deliveryApp.NewCPCClickService(secretKey, platformRDB)
 			out.CPC = deliveryHTTP.NewCPCClickHandler(cpcService)
