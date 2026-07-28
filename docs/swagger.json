@@ -2127,6 +2127,60 @@
                 }
             }
         },
+        "/telemetry/anonymous-click": {
+            "post": {
+                "description": "Accepts an anonymous click callback for a campaign using a signed token. The endpoint validates the token, queues the event for async billing processing, and returns 202 Accepted immediately.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Bill Track"
+                ],
+                "summary": "Track anonymous CPC click",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "campaign_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Signed click token",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/telemetry/track": {
             "post": {
                 "security": [
@@ -2135,7 +2189,7 @@
                         "SDKSecretAuth": []
                     }
                 ],
-                "description": "Accepts a consented ad tracking log (impression/click/install/signup/purchase). Pushes to Redis Stream stream:billing_events (max ~100000) and returns immediately — Postgres write-behind is handled by billing_processor_group. Authorize with X-API-Key and X-SDK-Secret.",
+                "description": "Accepts a consented ad tracking log (impression/click/install/signup/purchase). Impression/click events are deduplicated via Redis SETNX lock:telemetry:{pseudonymous_id}:{campaign_id}:{event_type} (impression 5m, click 1h) before XADD to stream:billing_events. Duplicates still return 202 without enqueueing. Install events require install_token. Authorize with X-API-Key and X-SDK-Secret.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2154,6 +2208,61 @@
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/internal_delivery_http.TelemetryTrackRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted — queued on stream:billing_events (or silently deduplicated)"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/telemetry/track-anonymous": {
+            "post": {
+                "security": [
+                    {
+                        "APIKeyAuth": [],
+                        "SDKSecretAuth": []
+                    }
+                ],
+                "description": "Accepts a minimal bill-track payload for non-consented users (campaign_id + event_type). Enqueues to Redis Stream stream:billing_events with source=anonymous and returns 202. Two independent consumer groups write behind: billing_processor_group → billing_events; delivery_log_processor_group → campaign_delivery_logs. Authorize with X-API-Key and X-SDK-Secret.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Bill Track"
+                ],
+                "summary": "Track anonymous (non-consented) ad impression",
+                "parameters": [
+                    {
+                        "description": "Anonymous ad track payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_delivery_http.AnonymousTrackRequest"
                         }
                     }
                 ],
@@ -2877,6 +2986,25 @@
                 }
             }
         },
+        "internal_delivery_http.AnonymousTrackRequest": {
+            "type": "object",
+            "required": [
+                "campaign_id",
+                "event_type"
+            ],
+            "properties": {
+                "campaign_id": {
+                    "description": "CampaignID of the served creative",
+                    "type": "string",
+                    "example": "c1a2b3c4-d5e6-7890-abcd-ef1234567890"
+                },
+                "event_type": {
+                    "description": "EventType for anonymous bill track (impression)",
+                    "type": "string",
+                    "example": "impression"
+                }
+            }
+        },
         "internal_delivery_http.TelemetryTrackRequest": {
             "type": "object",
             "required": [
@@ -2894,13 +3022,18 @@
                     "type": "string",
                     "example": "impression"
                 },
+                "install_token": {
+                    "description": "InstallToken is optional and only required for install events.",
+                    "type": "string",
+                    "example": "signed-install-token"
+                },
                 "occurred_at": {
                     "description": "OccurredAt RFC3339 timestamp; defaults to server UTC now when omitted",
                     "type": "string",
                     "example": "2026-07-18T12:00:00Z"
                 },
                 "pseudonymous_id": {
-                    "description": "PseudonymousID from consent (optional audit field, not required for billing row)",
+                    "description": "PseudonymousID from consent; required for impression/click Redis dedup",
                     "type": "string",
                     "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
                 },

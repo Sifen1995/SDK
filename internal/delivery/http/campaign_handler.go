@@ -4,14 +4,14 @@ import (
 	"context"
 	"net/http"
 
-	campaigndomain "skykin-platform/internal/campaigns/domain"
+	campaignApp "skykin-platform/internal/campaigns/application"
 	platformHTTP "skykin-platform/internal/platform/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 type activeMasterLister interface {
-	ListActiveMaster(ctx context.Context) ([]campaigndomain.Campaign, error)
+	ListActiveMaster(ctx context.Context) ([]campaignApp.CampaignWithClickToken, error)
 }
 
 // CampaignHandler serves anonymous SDK campaign delivery endpoints.
@@ -52,11 +52,11 @@ func (h *CampaignHandler) ListAnonymousCampaigns(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-func toAnonymousCampaignDTO(c *campaigndomain.Campaign) AnonymousCampaignDTO {
+func toAnonymousCampaignDTO(c *campaignApp.CampaignWithClickToken) AnonymousCampaignDTO {
 	if c == nil {
 		return AnonymousCampaignDTO{}
 	}
-	canvas := c.CanvasJSON
+	canvas := c.Campaign.CanvasJSON
 	if canvas == nil {
 		canvas = map[string]any{}
 	}

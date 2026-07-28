@@ -7,17 +7,18 @@ import (
 )
 
 type Config struct {
-	DBHost       string
-	DBPort       string
-	DBUser       string
-	DBPassword   string
-	DBName       string
-	JwtSecret    string
-	Port         string
-	MLServiceURL string
-	RedisAddr       string // optional, e.g. redis:6379; empty uses in-memory dedup
-	AdminEmail      string
-	AdminPassword   string
+	DBHost           string
+	DBPort           string
+	DBUser           string
+	DBPassword       string
+	DBName           string
+	ClickTokenSecret string
+	JwtSecret        string
+	Port             string
+	MLServiceURL     string
+	RedisAddr        string // optional, e.g. redis:6379; empty uses in-memory dedup
+	AdminEmail       string
+	AdminPassword    string
 }
 
 func LoadConfig() (*Config, error) {
@@ -29,17 +30,18 @@ func LoadConfig() (*Config, error) {
 		port = "8081"
 	}
 	return &Config{
-		DBHost:       os.Getenv("DB_HOST"),
-		DBPort:       os.Getenv("DB_PORT"),
-		DBUser:       os.Getenv("DB_USER"),
-		DBPassword:   os.Getenv("DB_PASSWORD"),
-		DBName:       os.Getenv("DB_NAME"),
-		JwtSecret:    os.Getenv("JWT_SECRET"),
-		Port:         port,
-		MLServiceURL: os.Getenv("ML_SERVICE_URL"),
-		RedisAddr:     os.Getenv("REDIS_ADDR"),
-		AdminEmail:    envOr("ADMIN_EMAIL", "admin@skykin.com"),
-		AdminPassword: envOr("ADMIN_PASSWORD", "Admin12345!"),
+		DBHost:           os.Getenv("DB_HOST"),
+		DBPort:           os.Getenv("DB_PORT"),
+		DBUser:           os.Getenv("DB_USER"),
+		DBPassword:       os.Getenv("DB_PASSWORD"),
+		DBName:           os.Getenv("DB_NAME"),
+		ClickTokenSecret: os.Getenv("CLICK_TOKEN_SECRET"),
+		JwtSecret:        os.Getenv("JWT_SECRET"),
+		Port:             port,
+		MLServiceURL:     os.Getenv("ML_SERVICE_URL"),
+		RedisAddr:        os.Getenv("REDIS_ADDR"),
+		AdminEmail:       envOr("ADMIN_EMAIL", "admin@skykin.com"),
+		AdminPassword:    envOr("ADMIN_PASSWORD", "Admin12345!"),
 	}, nil
 }
 

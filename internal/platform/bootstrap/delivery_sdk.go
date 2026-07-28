@@ -8,7 +8,9 @@ import (
 	billingWorker "skykin-platform/internal/billing/worker"
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	deliveryApp "skykin-platform/internal/delivery/application"
 	deliveryHTTP "skykin-platform/internal/delivery/http"
+	deliveryWorker "skykin-platform/internal/delivery/worker"
 	platformredis "skykin-platform/internal/platform/redis"
 
 	"gorm.io/gorm"
@@ -18,6 +20,7 @@ import (
 type DeliverySDKHandlers struct {
 	Campaigns *deliveryHTTP.CampaignHandler
 	Telemetry *deliveryHTTP.TelemetryHandler
+	CPC       *deliveryHTTP.CPCClickHandler
 }
 
 // NewDeliverySDKSystem wires anonymous campaigns and telemetry track ingest.
@@ -41,13 +44,20 @@ func NewDeliverySDKSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger)
 	}
 
 	cached := campaignInfra.NewCachedCampaignRepository(campaignRepo, redisCampaign, platformRDB)
-	anonSvc := campaignApp.NewAnonymousCampaignService(cached)
+	secretKey := cfg.ClickTokenSecret
+	anonSvc := campaignApp.NewAnonymousCampaignService(cached, secretKey)
 
 	out := &DeliverySDKHandlers{
 		Campaigns: deliveryHTTP.NewCampaignHandler(anonSvc),
 	}
 	if platformRDB != nil {
 		out.Telemetry = deliveryHTTP.NewTelemetryHandler(platformRDB)
+		if strings.TrimSpace(secretKey) != "" {
+			cpcService := deliveryApp.NewCPCClickService(secretKey, platformRDB)
+			out.CPC = deliveryHTTP.NewCPCClickHandler(cpcService)
+		} else {
+			logger.Warn("delivery sdk: anonymous CPC click handler disabled (click token secret required)")
+		}
 	} else {
 		logger.Warn("delivery sdk: telemetry track disabled (redis required)")
 	}
@@ -69,4 +79,21 @@ func StartBillingStreamWorker(db *gorm.DB, cfg *configs.Config, logger *slog.Log
 		return
 	}
 	billingWorker.StartBillingConsumer(db, rdb, logger)
+}
+
+// StartDeliveryLogStreamWorker launches the delivery-module consumer for campaign_delivery_logs.
+func StartDeliveryLogStreamWorker(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	addr := strings.TrimSpace(cfg.RedisAddr)
+	if addr == "" {
+		return
+	}
+	rdb, err := platformredis.NewRedisClient(addr)
+	if err != nil {
+		logger.Warn("delivery log stream worker: redis unavailable", "error", err)
+		return
+	}
+	deliveryWorker.StartDeliveryLogConsumer(db, rdb, logger)
 }

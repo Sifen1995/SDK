@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"log/slog"
+	"strings"
 
 	"skykin-platform/configs"
 	campaignApp "skykin-platform/internal/campaigns/application"
@@ -18,7 +19,8 @@ func RegisterDownstreamConsumers(db *gorm.DB, cfg *configs.Config, bus *messagin
 	_ = cfg
 
 	campaignRepo := campaignInfra.NewRepository(db)
-	adDelivery := campaignApp.NewAdDeliveryService(campaignRepo)
+	linkBuilder := campaignInfra.NewPlayLinkBuilder(strings.TrimSpace(cfg.ClickTokenSecret))
+	adDelivery := campaignApp.NewAdDeliveryService(campaignRepo, linkBuilder)
 
 	campaignEvents.NewDeliveryConsumer(adDelivery, slog.Default()).Register(bus)
 }
