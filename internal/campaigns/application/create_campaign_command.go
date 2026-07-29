@@ -14,7 +14,6 @@ type CreateCampaignCommand struct {
 	ImageURL           string
 	DestinationURL     string
 	CanvasJSON         map[string]any
-	BillingModel       string
 	DailyBudgetCap     float64
 	TotalBudgetCap     float64
 	FrequencyCapPerDay int

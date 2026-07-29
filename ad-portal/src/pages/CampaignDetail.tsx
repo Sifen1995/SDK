@@ -73,7 +73,7 @@ export default function CampaignDetail() {
             <ValidationBadge status={campaign.validationStatus} />
           </div>
           <p className="text-muted mt-1">
-            {formatLabel(campaign.channelCode || 'channel')} · {formatLabel(campaign.targetIntent)} · {campaign.billingModel}
+            {formatLabel(campaign.channelCode || 'channel')} · {formatLabel(campaign.targetIntent)}
           </p>
         </div>
       </div>
@@ -99,7 +99,6 @@ export default function CampaignDetail() {
           <dl className="space-y-3 text-sm">
             <DetailRow label="ID" value={campaign.id} mono />
             <DetailRow label="Channel" value={formatLabel(campaign.channelCode)} />
-            <DetailRow label="Billing" value={campaign.billingModel} />
             <DetailRow label="Frequency cap" value={`${campaign.frequencyCapPerDay}/day`} />
             <DetailRow
               label="Destination"

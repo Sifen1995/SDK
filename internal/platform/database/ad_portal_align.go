@@ -50,6 +50,7 @@ func alignAdPortalSchema(db *gorm.DB) {
 	_ = db.Exec(`ALTER TABLE advertisers ALTER COLUMN company_name SET NOT NULL`).Error
 	_ = db.Exec(`ALTER TABLE campaigns DROP COLUMN IF EXISTS application_id`).Error
 	_ = db.Exec(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS destination_url TEXT`).Error
+	_ = db.Exec(`ALTER TABLE campaigns DROP COLUMN IF EXISTS billing_model`).Error
 	_ = db.Exec(`ALTER TABLE campaigns DROP COLUMN IF EXISTS creative_format`).Error
 	_ = db.Exec(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(20) NOT NULL DEFAULT 'pending'`).Error
 	_ = db.Exec(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS moderation_notes TEXT`).Error

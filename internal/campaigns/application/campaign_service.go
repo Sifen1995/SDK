@@ -11,9 +11,9 @@ import (
 	billingapp "skykin-platform/internal/billing/application"
 	billingdomain "skykin-platform/internal/billing/domain"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
-	campaignvalidation "skykin-platform/internal/campaigns/validation"
 	campaignEvents "skykin-platform/internal/campaigns/events"
 	"skykin-platform/internal/campaigns/infrastructure"
+	campaignvalidation "skykin-platform/internal/campaigns/validation"
 	"skykin-platform/internal/platform/messaging"
 )
 
@@ -98,7 +98,6 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 		ImageURL:           cmd.ImageURL,
 		DestinationURL:     cmd.DestinationURL,
 		CanvasJSON:         canvas,
-		BillingModel:       cmd.BillingModel,
 		DailyBudgetCap:     cmd.DailyBudgetCap,
 		TotalBudgetCap:     cmd.TotalBudgetCap,
 		FrequencyCapPerDay: cmd.FrequencyCapPerDay,

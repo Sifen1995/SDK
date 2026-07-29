@@ -27,8 +27,7 @@ type CampaignRow struct {
 	DestinationURL string         `gorm:"type:text"`
 	CanvasJSON     datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'"`
 
-	BillingModel   string  `gorm:"type:varchar(20);not null;default:'CPC'"`
-	DailyBudgetCap float64 `gorm:"type:numeric(12,2);not null;default:0"`
+	DailyBudgetCap     float64 `gorm:"type:numeric(12,2);not null;default:0"`
 	TotalBudgetCap     float64 `gorm:"type:numeric(12,2);not null;default:0"`
 	BudgetSpent        float64 `gorm:"type:numeric(12,2);not null;default:0"`
 	FrequencyCapPerDay int     `gorm:"not null;default:3"`
@@ -73,8 +72,7 @@ func (row *CampaignRow) ToDomain() (*domain.Campaign, error) {
 		ImageURL:           row.ImageURL,
 		DestinationURL:     row.DestinationURL,
 		CanvasJSON:         canvas,
-		BillingModel:   row.BillingModel,
-		DailyBudgetCap: row.DailyBudgetCap,
+		DailyBudgetCap:     row.DailyBudgetCap,
 		TotalBudgetCap:     row.TotalBudgetCap,
 		BudgetSpent:        row.BudgetSpent,
 		FrequencyCapPerDay: row.FrequencyCapPerDay,
@@ -116,8 +114,7 @@ func CampaignRowFromDomain(c *domain.Campaign) (*CampaignRow, error) {
 		ImageURL:           c.ImageURL,
 		DestinationURL:     c.DestinationURL,
 		CanvasJSON:         raw,
-		BillingModel:   c.BillingModel,
-		DailyBudgetCap: c.DailyBudgetCap,
+		DailyBudgetCap:     c.DailyBudgetCap,
 		TotalBudgetCap:     c.TotalBudgetCap,
 		BudgetSpent:        c.BudgetSpent,
 		FrequencyCapPerDay: c.FrequencyCapPerDay,

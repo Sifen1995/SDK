@@ -238,17 +238,12 @@ func resolveStreamMessage(
 		rateCache[sub.PlanID] = list
 	}
 
-	model := strings.TrimSpace(campaign.BillingModel)
-	if model == "" {
-		model = defaultModelForEvent(eventType)
-	}
+	// Campaigns no longer store billing model. The legacy telemetry contract
+	// also does not include it, so resolve the model from the event type.
+	model := defaultModelForEvent(eventType)
 	rate, ok := findRate(planRates, eventType, model)
 	if !ok {
-		model = defaultModelForEvent(eventType)
-		rate, ok = findRate(planRates, eventType, model)
-		if !ok {
-			return nil, nil, fmt.Errorf("no billing rate for plan=%s event=%s model=%s", sub.PlanID, eventType, model)
-		}
+		return nil, nil, fmt.Errorf("no billing rate for plan=%s event=%s model=%s", sub.PlanID, eventType, model)
 	}
 
 	txn, _ := strconv.ParseFloat(strings.TrimSpace(msg.Values["transaction_value"]), 64)

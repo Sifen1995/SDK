@@ -359,15 +359,6 @@ definitions:
     type: object
   internal_campaigns_interfaces_http.CreateCampaignRequest:
     properties:
-      billing_model:
-        description: Financial & Operational Controls
-        enum:
-        - CPM
-        - CPC
-        - CPI
-        - CPA
-        - REV_SHARE
-        type: string
       body_text:
         type: string
       canvas_json:
@@ -408,7 +399,6 @@ definitions:
       total_budget_cap:
         type: number
     required:
-    - billing_model
     - body_text
     - channel_id
     - daily_budget_cap
@@ -1091,8 +1081,6 @@ definitions:
   skykin-platform_internal_campaigns_domain.Campaign:
     properties:
       advertiserID:
-        type: string
-      billingModel:
         type: string
       bodyText:
         type: string

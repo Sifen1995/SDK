@@ -5,7 +5,6 @@ import { useSubscription } from '../context/SubscriptionContext';
 import ImageUrlInput from '../components/ImageUrlInput';
 import { formatEtb } from '../lib/campaignUtils';
 import {
-  BILLING_MODELS,
   TARGET_INTENTS,
   channelNeedsImage,
   channelNeedsRichCopy,
@@ -29,7 +28,6 @@ export default function CampaignNew() {
   const [name, setName] = useState('');
   const [channelId, setChannelId] = useState('');
   const [targetIntent, setTargetIntent] = useState('general_interest');
-  const [billingModel, setBillingModel] = useState('CPC');
   const [title, setTitle] = useState('');
   const [bodyText, setBodyText] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -143,7 +141,6 @@ export default function CampaignNew() {
         image_url: imageUrl.trim() || undefined,
         destination_url: destinationUrl.trim(),
         canvas_json: {},
-        billing_model: billingModel,
         daily_budget_cap: Number(dailyBudget),
         total_budget_cap: Number(totalBudget),
         frequency_cap_per_day: Number(frequencyCap),
@@ -298,14 +295,6 @@ export default function CampaignNew() {
                   <p className="text-xs text-faint mt-1">Must match your selected segment&apos;s intent signals.</p>
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-primary mb-1.5">Billing model</label>
-                <select value={billingModel} onChange={e => setBillingModel(e.target.value)} className="field-input">
-                  {BILLING_MODELS.map(m => (
-                    <option key={m.value} value={m.value}>{m.label} — {m.description}</option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
         )}
@@ -374,7 +363,7 @@ export default function CampaignNew() {
             <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] p-4 text-sm">
               <p className="font-medium text-primary mb-2">Review summary</p>
               <ul className="space-y-1 text-muted">
-                <li><span className="text-primary">{name}</span> · {selectedChannel?.name} · {billingModel}</li>
+                <li><span className="text-primary">{name}</span> · {selectedChannel?.name}</li>
                 <li>Intent: {targetIntent.replace(/_/g, ' ')}</li>
                 <li>Segment: {selectedSegment ? `${selectedSegment.name} (${formatEtb(selectedSegment.estimated_price_etb)})` : 'None'}</li>
               </ul>

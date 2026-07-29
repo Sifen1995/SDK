@@ -2820,7 +2820,6 @@ const docTemplate = `{
         "internal_campaigns_interfaces_http.CreateCampaignRequest": {
             "type": "object",
             "required": [
-                "billing_model",
                 "body_text",
                 "channel_id",
                 "daily_budget_cap",
@@ -2831,17 +2830,6 @@ const docTemplate = `{
                 "total_budget_cap"
             ],
             "properties": {
-                "billing_model": {
-                    "description": "Financial \u0026 Operational Controls",
-                    "type": "string",
-                    "enum": [
-                        "CPM",
-                        "CPC",
-                        "CPI",
-                        "CPA",
-                        "REV_SHARE"
-                    ]
-                },
                 "body_text": {
                     "type": "string"
                 },
@@ -3863,9 +3851,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "advertiserID": {
-                    "type": "string"
-                },
-                "billingModel": {
                     "type": "string"
                 },
                 "bodyText": {

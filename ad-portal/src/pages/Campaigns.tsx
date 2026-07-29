@@ -141,7 +141,6 @@ export default function Campaigns() {
                 </div>
                 <p className="text-sm text-muted">
                   {formatLabel(c.channelCode || 'channel')} · {formatLabel(c.targetIntent)}
-                  {c.billingModel && ` · ${c.billingModel}`}
                 </p>
                 {(c.moderationNotes && c.moderationStatus === 'rejected') && (
                   <p className="text-xs text-red-600 dark:text-red-400 mt-1">{c.moderationNotes}</p>
