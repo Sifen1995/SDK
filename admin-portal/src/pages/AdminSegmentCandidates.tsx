@@ -1,233 +1,171 @@
-import { useCallback, useEffect, useState } from 'react';
-import { api } from '../lib/api';
-import type { SegmentCandidate, ApproveSegmentCandidateRequest } from '../types';
-import { NotesModal } from '../components/Modal';
-import { CheckCircle, XCircle, Brain, Users, Calendar, BarChart3 } from 'lucide-react';
+import { useState } from 'react';
+import { useQueryState, parseAsString } from 'nuqs';
+import {
+  Card, CardContent, Button, Input, Label, Tabs, TabsList, TabsTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  LoadingState, ErrorState, EmptyState, InlineError, StatusPill,
+} from '@skykin/ui';
+import { CheckCircle, XCircle, BrainCircuit, Users, Calendar, BarChart3, FileCheck } from 'lucide-react';
+import type { SegmentCandidate } from '../types';
+import { useSegmentCandidates, useApproveCandidate, useRejectCandidate, useRunIntentConsistency } from '../lib/queries';
 
-type ModalState =
-  | { type: 'none' }
-  | { type: 'approve'; candidate: SegmentCandidate }
-  | { type: 'reject'; candidateId: string };
+function titleCase(s: string) {
+  return s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
 
 export default function AdminSegmentCandidates() {
-  const [candidates, setCandidates] = useState<SegmentCandidate[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string>('pending');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [actionError, setActionError] = useState('');
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [modal, setModal] = useState<ModalState>({ type: 'none' });
-  const [runningAnalysis, setRunningAnalysis] = useState(false);
+  const [status, setStatus] = useQueryState('status', parseAsString.withDefault('pending'));
+  const { data: candidates, isPending, isError, error, refetch } = useSegmentCandidates(status);
 
-  // Approve form state
-  const [approveName, setApproveName] = useState('');
-  const [approveDesc, setApproveDesc] = useState('');
-  const [approveCpm, setApproveCpm] = useState('');
+  const approve = useApproveCandidate();
+  const reject = useRejectCandidate();
+  const runAnalysis = useRunIntentConsistency();
 
-  const loadCandidates = useCallback(async () => {
-    try {
-      setLoading(true);
-      setActionError('');
-      const list = await api.listSegmentCandidates(statusFilter);
-      setCandidates(list ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load candidates');
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter]);
+  const [approveTarget, setApproveTarget] = useState<SegmentCandidate | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<SegmentCandidate | null>(null);
+  const [form, setForm] = useState({ name: '', description: '', cpm: '4.50' });
+  const [rejectNotes, setRejectNotes] = useState('');
 
-  useEffect(() => { loadCandidates(); }, [loadCandidates]);
-
-  async function handleRunAnalysis() {
-    setRunningAnalysis(true);
-    try {
-      await api.runIntentConsistency();
-      setActionError('');
-      setTimeout(() => loadCandidates(), 2000);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Analysis failed');
-    } finally {
-      setRunningAnalysis(false);
-    }
+  function openApprove(c: SegmentCandidate) {
+    setForm({ name: titleCase(c.intent_name), description: '', cpm: '4.50' });
+    approve.reset();
+    setApproveTarget(c);
   }
 
-  function openApprove(candidate: SegmentCandidate) {
-    setApproveName(candidate.intent_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
-    setApproveDesc('');
-    setApproveCpm('4.50');
-    setModal({ type: 'approve', candidate });
+  function submitApprove() {
+    if (!approveTarget) return;
+    approve.mutate(
+      { id: approveTarget.id, data: { name: form.name, description: form.description, estimated_cpm: parseFloat(form.cpm) || 0 } },
+      { onSuccess: () => setApproveTarget(null) },
+    );
   }
 
-  async function handleApprove() {
-    if (modal.type !== 'approve') return;
-    const data: ApproveSegmentCandidateRequest = {
-      name: approveName,
-      description: approveDesc,
-      estimated_cpm: parseFloat(approveCpm) || 0,
-    };
-    setProcessingId(modal.candidate.id);
-    try {
-      await api.approveSegmentCandidate(modal.candidate.id, data);
-      setModal({ type: 'none' });
-      await loadCandidates();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Approve failed');
-    } finally {
-      setProcessingId(null);
-    }
-  }
-
-  async function handleReject(notes: string) {
-    if (modal.type !== 'reject') return;
-    setProcessingId(modal.candidateId);
-    try {
-      await api.rejectSegmentCandidate(modal.candidateId, notes);
-      setModal({ type: 'none' });
-      await loadCandidates();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Reject failed');
-    } finally {
-      setProcessingId(null);
-    }
+  function submitReject() {
+    if (!rejectTarget) return;
+    reject.mutate(
+      { id: rejectTarget.id, notes: rejectNotes },
+      { onSuccess: () => { setRejectTarget(null); setRejectNotes(''); } },
+    );
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-primary">Segment Candidates</h1>
-          <p className="text-sm text-muted mt-0.5">Review AI-discovered audience segments from intent analysis.</p>
+          <h2 className="font-display text-lg font-semibold">Segment candidates</h2>
+          <p className="text-sm text-muted-foreground">Review AI-discovered audience segments from intent analysis.</p>
         </div>
-        <button
-          type="button"
-          onClick={handleRunAnalysis}
-          disabled={runningAnalysis}
-          className="btn-primary text-xs"
-        >
-          <Brain size={14} />
-          {runningAnalysis ? 'Analyzing…' : 'Run Intent Analysis'}
-        </button>
+        <Button size="sm" onClick={() => runAnalysis.mutate()} disabled={runAnalysis.isPending}>
+          <BrainCircuit className="size-4" />
+          {runAnalysis.isPending ? 'Analyzing…' : 'Run intent analysis'}
+        </Button>
       </div>
 
-      <div className="tab-bar mb-5">
-        {['pending', 'approved', 'rejected'].map(s => (
-          <button
-            key={s}
-            type="button"
-            className={`tab-btn text-xs ${statusFilter === s ? 'tab-btn-active' : ''}`}
-            onClick={() => setStatusFilter(s)}
-          >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
-      </div>
+      {runAnalysis.isError && <InlineError message={(runAnalysis.error as Error).message} />}
 
-      {actionError && <div className="alert-error mb-4 text-sm">{actionError}</div>}
-      {error && <div className="alert-error mb-4 text-sm">{error}</div>}
+      <Tabs value={status} onValueChange={setStatus}>
+        <TabsList>
+          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="approved">Approved</TabsTrigger>
+          <TabsTrigger value="rejected">Rejected</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      {loading ? (
-        <div className="text-muted text-sm">Loading candidates…</div>
-      ) : candidates.length === 0 ? (
-        <div className="card-static p-10 text-center border-dashed">
-          <p className="text-sm text-muted">No {statusFilter} segment candidates found.</p>
-          {statusFilter === 'pending' && (
-            <p className="text-xs text-faint mt-2">Run an intent consistency analysis to discover new candidates.</p>
-          )}
-        </div>
+      {isPending ? (
+        <LoadingState label="Loading candidates…" />
+      ) : isError ? (
+        <ErrorState message={(error as Error)?.message} onRetry={() => refetch()} />
+      ) : !candidates || candidates.length === 0 ? (
+        <EmptyState
+          icon={FileCheck}
+          title={`No ${status} candidates`}
+          description={status === 'pending' ? 'Run an intent-consistency analysis to discover new candidates.' : undefined}
+        />
       ) : (
         <div className="space-y-3">
           {candidates.map(c => (
-            <div key={c.id} className="card-static p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <Card key={c.id}>
+              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-primary">{c.intent_name}</h3>
-                  <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted">
-                    <span className="inline-flex items-center gap-1"><Users size={12} /> {c.user_count.toLocaleString()} users</span>
-                    <span className="inline-flex items-center gap-1"><BarChart3 size={12} /> {(c.avg_confidence * 100).toFixed(1)}% confidence</span>
-                    <span className="inline-flex items-center gap-1"><Calendar size={12} /> {c.avg_days_active.toFixed(1)} avg days</span>
+                  <h3 className="text-sm font-semibold">{titleCase(c.intent_name)}</h3>
+                  <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 tabular-nums"><Users className="size-3" /> {c.user_count.toLocaleString()} users</span>
+                    <span className="inline-flex items-center gap-1 tabular-nums"><BarChart3 className="size-3" /> {(c.avg_confidence * 100).toFixed(1)}% confidence</span>
+                    <span className="inline-flex items-center gap-1 tabular-nums"><Calendar className="size-3" /> {c.avg_days_active.toFixed(1)} avg days</span>
                   </div>
-                  <p className="text-[11px] text-faint mt-1">Scanned {new Date(c.scanned_at).toLocaleDateString()}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Scanned {new Date(c.scanned_at).toLocaleDateString()}</p>
                 </div>
-                {statusFilter === 'pending' && (
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => openApprove(c)}
-                      disabled={processingId === c.id}
-                      className="btn-success text-xs py-1.5 px-3"
-                    >
-                      <CheckCircle size={13} /> Approve
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setModal({ type: 'reject', candidateId: c.id })}
-                      disabled={processingId === c.id}
-                      className="btn-danger-outline text-xs py-1.5 px-3"
-                    >
-                      <XCircle size={13} /> Reject
-                    </button>
+                {status === 'pending' ? (
+                  <div className="flex shrink-0 gap-2">
+                    <Button variant="outline" size="sm" onClick={() => openApprove(c)}>
+                      <CheckCircle className="size-4 text-success" /> Approve
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => { reject.reset(); setRejectNotes(''); setRejectTarget(c); }}>
+                      <XCircle className="size-4 text-destructive" /> Reject
+                    </Button>
                   </div>
+                ) : (
+                  <StatusPill status={c.status} />
                 )}
-                {statusFilter !== 'pending' && (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    c.status === 'approved'
-                      ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                      : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                  }`}>
-                    {c.status}
-                  </span>
-                )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
 
-      {/* Approve Modal */}
-      {modal.type === 'approve' && (
-        <div className="modal-backdrop" onClick={() => setModal({ type: 'none' })}>
-          <div className="modal-card max-w-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="text-base font-semibold text-primary">Approve & Publish Segment</h3>
-              <p className="text-xs text-muted mt-1">This will create a purchasable audience segment from {modal.candidate.user_count} users.</p>
+      {/* Approve dialog */}
+      <Dialog open={!!approveTarget} onOpenChange={o => !o && setApproveTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve &amp; publish segment</DialogTitle>
+            <DialogDescription>
+              Creates a purchasable audience segment{approveTarget ? ` from ${approveTarget.user_count.toLocaleString()} users` : ''}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="seg-name">Segment name</Label>
+              <Input id="seg-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
-            <div className="space-y-4 mb-4">
-              <div>
-                <label className="block text-xs font-medium text-primary mb-1">Segment Name</label>
-                <input value={approveName} onChange={e => setApproveName(e.target.value)} className="field-input text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-primary mb-1">Description</label>
-                <textarea value={approveDesc} onChange={e => setApproveDesc(e.target.value)} rows={2} className="field-input text-sm resize-y" placeholder="Users with sustained interest in…" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-primary mb-1">Estimated CPM (ETB)</label>
-                <input type="number" step="0.01" value={approveCpm} onChange={e => setApproveCpm(e.target.value)} className="field-input text-sm" />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="seg-desc">Description</Label>
+              <Input id="seg-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Users with sustained interest in…" />
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn-secondary text-xs" onClick={() => setModal({ type: 'none' })}>Cancel</button>
-              <button type="button" className="btn-success text-xs" onClick={handleApprove} disabled={!approveName.trim() || processingId !== null}>
-                {processingId ? 'Publishing…' : 'Approve & Publish'}
-              </button>
+            <div className="space-y-1.5">
+              <Label htmlFor="seg-cpm">Estimated CPM (ETB)</Label>
+              <Input id="seg-cpm" type="number" step="0.01" value={form.cpm} onChange={e => setForm(f => ({ ...f, cpm: e.target.value }))} />
             </div>
+            {approve.isError && <InlineError message={(approve.error as Error).message} />}
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setApproveTarget(null)}>Cancel</Button>
+            <Button onClick={submitApprove} disabled={!form.name.trim() || approve.isPending}>
+              {approve.isPending ? 'Publishing…' : 'Approve & publish'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <NotesModal
-        open={modal.type === 'reject'}
-        title="Reject candidate"
-        description="This candidate will not be published as a segment."
-        label="Rejection reason"
-        placeholder="Insufficient user volume…"
-        confirmLabel="Reject"
-        variant="danger"
-        loading={processingId !== null}
-        onConfirm={handleReject}
-        onCancel={() => setModal({ type: 'none' })}
-      />
+      {/* Reject dialog */}
+      <Dialog open={!!rejectTarget} onOpenChange={o => !o && setRejectTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject candidate</DialogTitle>
+            <DialogDescription>This candidate will not be published as a segment.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="reject-notes">Rejection reason</Label>
+            <Input id="reject-notes" value={rejectNotes} onChange={e => setRejectNotes(e.target.value)} placeholder="Insufficient user volume…" />
+            {reject.isError && <InlineError message={(reject.error as Error).message} />}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRejectTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={submitReject} disabled={reject.isPending}>
+              {reject.isPending ? 'Rejecting…' : 'Reject'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

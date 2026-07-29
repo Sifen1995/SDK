@@ -1,6 +1,13 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import ThemeToggle from './ThemeToggle';
+import { Outlet, useLocation } from 'react-router-dom';
+import {
+  AppShell,
+  SkykinMark,
+  ThemeToggle,
+  Avatar,
+  AvatarFallback,
+  Button,
+  type NavGroup,
+} from '@skykin/ui';
 import {
   LayoutDashboard,
   DollarSign,
@@ -11,131 +18,100 @@ import {
   UserPlus,
   FileCheck,
   Settings,
+  Contact,
+  KeyRound,
   LogOut,
-  type LucideIcon,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
-type NavItem = {
-  name: string;
-  path: string;
-  icon: LucideIcon;
-  exact?: boolean;
-};
+const groups: NavGroup[] = [
+  { label: 'Overview', items: [{ label: 'Dashboard', to: '/', end: true, icon: LayoutDashboard }] },
+  {
+    label: 'Analytics',
+    items: [
+      { label: 'Revenue', to: '/revenue', icon: DollarSign },
+      { label: 'Delivery', to: '/delivery', icon: TrendingUp },
+      { label: 'Advertisers', to: '/advertisers', icon: Users },
+      { label: 'SDK Users', to: '/sdk-users', icon: Contact },
+      { label: 'Campaigns', to: '/campaigns', end: true, icon: Megaphone },
+    ],
+  },
+  {
+    label: 'Management',
+    items: [
+      { label: 'Moderation', to: '/campaigns/pending', icon: ShieldCheck },
+      { label: 'Segment Candidates', to: '/segment-candidates', icon: FileCheck },
+      { label: 'Plans & Billing', to: '/plans', icon: Settings },
+      { label: 'Operator Team', to: '/users', icon: UserPlus },
+      { label: 'Roles & Permissions', to: '/roles', icon: KeyRound },
+    ],
+  },
+];
 
-type NavCategory = {
-  title: string;
-  items: NavItem[];
-};
+const titles: { match: (p: string) => boolean; label: string }[] = [
+  { match: p => p === '/', label: 'Platform Overview' },
+  { match: p => p.startsWith('/revenue'), label: 'Revenue Analytics' },
+  { match: p => p.startsWith('/delivery'), label: 'Delivery Analytics' },
+  { match: p => p.startsWith('/advertisers'), label: 'Advertisers' },
+  { match: p => p.startsWith('/campaigns/pending'), label: 'Moderation Queue' },
+  { match: p => p.startsWith('/campaigns'), label: 'Campaigns' },
+  { match: p => p.startsWith('/segment-candidates'), label: 'Segment Candidates' },
+  { match: p => p.startsWith('/plans'), label: 'Plans & Billing' },
+  { match: p => p.startsWith('/users'), label: 'Operator Team' },
+];
 
-export default function AdminLayout() {
+function initials(name?: string) {
+  if (!name) return 'OP';
+  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || 'OP';
+}
+
+export default function Layout() {
   const { user, logout } = useAuth();
-  const location = useLocation();
-
-  const navCategories: NavCategory[] = [
-    {
-      title: 'Overview',
-      items: [{ name: 'Dashboard', path: '/', exact: true, icon: LayoutDashboard }],
-    },
-    {
-      title: 'Analytics',
-      items: [
-        { name: 'Revenue', path: '/revenue', icon: DollarSign },
-        { name: 'Delivery', path: '/delivery', icon: TrendingUp },
-        { name: 'Advertisers', path: '/advertisers', icon: Users },
-        { name: 'Campaigns', path: '/campaigns', exact: true, icon: Megaphone },
-      ],
-    },
-    {
-      title: 'Management',
-      items: [
-        { name: 'Moderation', path: '/campaigns/pending', icon: ShieldCheck },
-        { name: 'Segment Candidates', path: '/segment-candidates', icon: FileCheck },
-        { name: 'Plans & Billing', path: '/plans', icon: Settings },
-        { name: 'Operator Team', path: '/users', icon: UserPlus },
-      ],
-    },
-  ];
-
-  const allItems = navCategories.flatMap(c => c.items);
-
-  const currentItem = allItems.find(item =>
-    item.exact ? location.pathname === item.path : location.pathname.startsWith(item.path),
-  );
+  const { theme, toggleTheme } = useTheme();
+  const { pathname } = useLocation();
+  const title = titles.find(t => t.match(pathname))?.label ?? 'Admin';
 
   return (
-    <div className="admin-shell min-h-screen flex">
-      <aside className="admin-sidebar w-60 flex flex-col shrink-0">
-        <div className="p-5 border-b border-[var(--sidebar-border)]">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="admin-sidebar-logo">Sk</div>
-            <div>
-              <span className="font-semibold text-sm tracking-tight text-[var(--sidebar-text)]">Skykin Admin</span>
-              <p className="text-[9px] uppercase tracking-wider text-[var(--sidebar-muted)] mt-0.5">Operator console</p>
-            </div>
-          </Link>
+    <AppShell
+      brand={{ name: 'Skykin', sub: 'Operator', mark: <SkykinMark className="h-10 w-auto text-identity drop-shadow-md" /> }}
+      groups={groups}
+      title={
+        <div>
+          <h1 className="font-display text-base font-semibold text-foreground">{title}</h1>
+          <p className="hidden text-[11px] text-muted-foreground sm:block">Platform administration</p>
         </div>
-
-        <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
-          {navCategories.map((category, idx) => (
-            <div key={idx}>
-              <h3 className="px-3 text-[9px] font-semibold text-[var(--sidebar-muted)] uppercase tracking-wider mb-1.5">
-                {category.title}
-              </h3>
-              <div className="space-y-0.5">
-                {category.items.map(item => {
-                  const isActive = item.exact
-                    ? location.pathname === item.path
-                    : location.pathname.startsWith(item.path);
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={`admin-nav-link text-[13px] ${isActive ? 'admin-nav-link-active' : ''}`}
-                    >
-                      <Icon size={15} strokeWidth={2} />
-                      {item.name}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
-
-        <div className="p-3 border-t border-[var(--sidebar-border)] shrink-0">
-          <div className="px-3 py-2 mb-1.5 rounded-lg bg-[var(--sidebar-hover)]">
-            <p className="text-xs font-medium text-[var(--sidebar-text)] truncate">{user?.name}</p>
-            <p className="text-[10px] text-[var(--sidebar-muted)] truncate">{user?.email}</p>
+      }
+      topbarRight={
+        <div className="flex items-center gap-4">
+          <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
+          <div className="flex items-center gap-3 rounded-full border border-border bg-card p-1 pr-4 shadow-sm hover:bg-accent/50 transition-colors">
+            <Avatar className="size-8">
+              <AvatarFallback className="text-xs">{initials(user?.name)}</AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium">{user?.name || 'Operator'}</span>
           </div>
-          <button type="button" onClick={logout} className="admin-nav-link w-full justify-center text-[13px]">
-            <LogOut size={14} strokeWidth={2} />
+        </div>
+      }
+      sidebarFooter={
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+            <Avatar className="size-8">
+              <AvatarFallback className="text-[10px]">{initials(user?.name)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-sidebar-foreground">{user?.name}</p>
+              <p className="truncate text-[10px] text-sidebar-muted">{user?.email}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sidebar-muted" onClick={logout}>
+            <LogOut className="size-4" />
             Sign out
-          </button>
+          </Button>
         </div>
-      </aside>
-
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[var(--bg-subtle)]">
-        <header className="admin-topbar h-14 flex items-center justify-between px-6 lg:px-8 shrink-0">
-          <div>
-            <h2 className="text-sm font-semibold text-primary">{currentItem?.name || 'Admin Area'}</h2>
-            <p className="text-[11px] text-muted hidden sm:block">Platform administration</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle variant="header" />
-            <button type="button" onClick={logout} className="header-btn text-xs">
-              <LogOut size={13} strokeWidth={2} />
-              Sign out
-            </button>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-auto p-5 lg:p-7">
-          <div className="max-w-6xl mx-auto">
-            <Outlet />
-          </div>
-        </div>
-      </main>
-    </div>
+      }
+    >
+      <Outlet />
+    </AppShell>
   );
 }

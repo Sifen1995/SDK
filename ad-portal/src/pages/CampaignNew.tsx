@@ -1,30 +1,31 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../lib/api';
-import { useSubscription } from '../context/SubscriptionContext';
-import ImageUrlInput from '../components/ImageUrlInput';
-import { formatEtb } from '../lib/campaignUtils';
 import {
-  BILLING_MODELS,
-  TARGET_INTENTS,
-  channelNeedsImage,
-  channelNeedsRichCopy,
-  type AudienceSegment,
-  type DeliveryChannel,
-} from '../types';
+  Card, CardContent, Button, Input, Label, Badge,
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+  LoadingState, EmptyState, InlineError, cn,
+} from '@skykin/ui';
+import { ArrowLeft, Check, Lock } from 'lucide-react';
+import { useSubscription } from '../context/SubscriptionContext';
+import { useChannels, useSegments, useCreateCampaign } from '../lib/queries';
+import { formatEtb } from '../lib/campaignUtils';
+import { googleDriveToDirectImageUrl } from '../lib/googleDrive';
+import { BILLING_MODELS, TARGET_INTENTS, channelNeedsImage, channelNeedsRichCopy } from '../types';
 
 const STEPS = ['Audience', 'Setup', 'Creative', 'Budget'] as const;
 
 export default function CampaignNew() {
   const navigate = useNavigate();
   const { subscribed, subscription, loading: subLoading } = useSubscription();
+  const channelsQ = useChannels();
+  const segmentsQ = useSegments();
+  const create = useCreateCampaign();
+
+  const channels = channelsQ.data ?? [];
+  const segments = segmentsQ.data?.segments ?? [];
+  const audiencemartEnabled = segmentsQ.data?.audiencemart_enabled ?? false;
 
   const [step, setStep] = useState(0);
-  const [channels, setChannels] = useState<DeliveryChannel[]>([]);
-  const [segments, setSegments] = useState<AudienceSegment[]>([]);
-  const [audiencemartEnabled, setAudiencemartEnabled] = useState(false);
-  const [catalogLoading, setCatalogLoading] = useState(true);
-
   const [segmentId, setSegmentId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [channelId, setChannelId] = useState('');
@@ -37,388 +38,257 @@ export default function CampaignNew() {
   const [dailyBudget, setDailyBudget] = useState('200');
   const [totalBudget, setTotalBudget] = useState('2000');
   const [frequencyCap, setFrequencyCap] = useState('3');
+  const [stepError, setStepError] = useState('');
 
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  useEffect(() => { if (channels.length && !channelId) setChannelId(channels[0].id); }, [channels, channelId]);
 
   const selectedChannel = channels.find(c => c.id === channelId);
   const selectedSegment = segments.find(s => s.id === segmentId) ?? null;
   const channelCode = selectedChannel?.code ?? '';
+  const needsImage = channelNeedsImage(channelCode);
+  const needsRichCopy = channelNeedsRichCopy(channelCode);
 
   const intentOptions = useMemo(() => {
     if (selectedSegment?.top_intent_signals?.length) {
-      return selectedSegment.top_intent_signals.map(value => ({
-        value,
-        label: value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-      }));
+      return selectedSegment.top_intent_signals.map(v => ({ value: v, label: v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }));
     }
     return TARGET_INTENTS.map(i => ({ value: i.value, label: i.label }));
   }, [selectedSegment]);
 
   useEffect(() => {
-    if (intentOptions.length && !intentOptions.some(o => o.value === targetIntent)) {
-      setTargetIntent(intentOptions[0].value);
-    }
+    if (intentOptions.length && !intentOptions.some(o => o.value === targetIntent)) setTargetIntent(intentOptions[0].value);
   }, [intentOptions, targetIntent]);
-
-  useEffect(() => {
-    if (!subscribed) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [ch, seg] = await Promise.all([api.listChannels(), api.listSegments()]);
-        if (cancelled) return;
-        setChannels(ch);
-        setSegments(seg.segments ?? []);
-        setAudiencemartEnabled(seg.audiencemart_enabled);
-        if (ch.length > 0) setChannelId(ch[0].id);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load catalog');
-      } finally {
-        if (!cancelled) setCatalogLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [subscribed]);
 
   function validateStep(current: number): string | null {
     if (current === 1) {
-      if (!name.trim() || name.trim().length < 3) return 'Campaign name must be at least 3 characters';
+      if (name.trim().length < 3) return 'Campaign name must be at least 3 characters';
       if (!channelId) return 'Select a delivery channel';
     }
     if (current === 2) {
       if (!bodyText.trim()) return 'Body text is required';
-      if (channelNeedsImage(channelCode) && !imageUrl.trim()) return 'Image URL is required for banner campaigns';
-      if (channelNeedsRichCopy(channelCode) && !title.trim()) return 'Title is required for this channel';
+      if (needsImage && !imageUrl.trim()) return 'Image URL is required for banner campaigns';
+      if (needsRichCopy && !title.trim()) return 'Title is required for this channel';
       if (!destinationUrl.trim()) return 'Destination URL is required';
     }
     if (current === 3) {
-      const daily = Number(dailyBudget);
-      const total = Number(totalBudget);
-      const freq = Number(frequencyCap);
+      const daily = Number(dailyBudget), total = Number(totalBudget), freq = Number(frequencyCap);
       if (!daily || daily <= 0) return 'Daily budget must be greater than 0';
       if (!total || total <= 0) return 'Total budget must be greater than 0';
       if (total < daily) return 'Total budget must be at least the daily cap';
       if (!freq || freq < 1) return 'Frequency cap must be at least 1';
       const maxDaily = subscription?.plan.max_daily_budget_etb;
-      if (maxDaily && daily > maxDaily) {
-        return `Daily budget exceeds your plan limit of ${formatEtb(maxDaily)}`;
-      }
+      if (maxDaily && daily > maxDaily) return `Daily budget exceeds your plan limit of ${formatEtb(maxDaily)}`;
     }
     return null;
   }
 
   function goNext() {
     const err = validateStep(step);
-    if (err) {
-      setError(err);
-      return;
-    }
-    setError('');
+    if (err) return setStepError(err);
+    setStepError('');
     setStep(s => Math.min(s + 1, STEPS.length - 1));
   }
+  function goBack() { setStepError(''); setStep(s => Math.max(s - 1, 0)); }
 
-  function goBack() {
-    setError('');
-    setStep(s => Math.max(s - 1, 0));
-  }
-
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const err = validateStep(3);
-    if (err) {
-      setError(err);
-      return;
-    }
-    setError('');
-    setLoading(true);
-    try {
-      const campaign = await api.createCampaign({
-        name: name.trim(),
-        target_intent: targetIntent,
-        channel_id: channelId,
-        segment_id: segmentId,
-        title: title.trim() || undefined,
-        body_text: bodyText.trim(),
-        image_url: imageUrl.trim() || undefined,
-        destination_url: destinationUrl.trim(),
-        canvas_json: {},
-        billing_model: billingModel,
-        daily_budget_cap: Number(dailyBudget),
-        total_budget_cap: Number(totalBudget),
-        frequency_cap_per_day: Number(frequencyCap),
-      });
-      navigate(`/campaigns/${campaign.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create campaign');
-    } finally {
-      setLoading(false);
-    }
+    if (err) return setStepError(err);
+    setStepError('');
+    create.mutate(
+      {
+        name: name.trim(), target_intent: targetIntent, channel_id: channelId, segment_id: segmentId,
+        title: title.trim() || undefined, body_text: bodyText.trim(), image_url: imageUrl.trim() || undefined,
+        destination_url: destinationUrl.trim(), canvas_json: {}, billing_model: billingModel,
+        daily_budget_cap: Number(dailyBudget), total_budget_cap: Number(totalBudget), frequency_cap_per_day: Number(frequencyCap),
+      },
+      { onSuccess: c => navigate(`/campaigns/${c.id}`) },
+    );
   }
 
-  if (subLoading || catalogLoading) {
-    return <p className="text-muted">Preparing campaign builder…</p>;
-  }
+  if (subLoading || channelsQ.isPending || segmentsQ.isPending) return <LoadingState label="Preparing campaign builder…" />;
 
   if (!subscribed) {
     return (
-      <div className="max-w-lg mx-auto text-center card p-10">
-        <div className="text-4xl mb-4">🔒</div>
-        <h1 className="text-xl font-bold text-primary">Subscription required</h1>
-        <p className="text-muted mt-2">Subscribe to a plan before creating campaigns.</p>
-        <Link to="/subscription" className="btn-primary mt-6 inline-flex">View plans</Link>
+      <div className="mx-auto max-w-lg">
+        <EmptyState icon={Lock} title="Subscription required" description="Subscribe to a plan before creating campaigns."
+          action={<Button asChild><Link to="/subscription">View plans</Link></Button>} />
       </div>
     );
   }
 
-  const needsImage = channelNeedsImage(channelCode);
-  const needsRichCopy = channelNeedsRichCopy(channelCode);
+  const error = stepError || (create.isError ? (create.error as Error).message : '');
 
   return (
-    <div className="max-w-3xl">
-      <Link to="/" className="text-sm text-brand-600 hover:text-brand-700 font-medium">
-        ← Back to campaigns
-      </Link>
-      <h1 className="text-2xl font-bold text-primary mt-4">New campaign</h1>
-      <p className="text-muted mt-1">
-        Build your campaign in four steps. Segment purchase is included when you submit.
-      </p>
+    <div className="max-w-3xl space-y-6">
+      <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit"><Link to="/"><ArrowLeft className="size-4" /> Back to campaigns</Link></Button>
+      <div>
+        <h2 className="font-display text-xl font-bold">New campaign</h2>
+        <p className="text-sm text-muted-foreground">Build your campaign in four steps. Segment purchase is included when you submit.</p>
+      </div>
 
-      <div className="wizard-steps mt-8 mb-8">
+      <div className="grid grid-cols-4 gap-2">
         {STEPS.map((label, i) => (
-          <div key={label} className={`wizard-step ${i === step ? 'wizard-step-active' : ''} ${i < step ? 'wizard-step-done' : ''}`}>
-            <span className="wizard-step-num">{i < step ? '✓' : i + 1}</span>
-            <span className="wizard-step-label">{label}</span>
+          <div key={label} className={cn('flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors', i === step ? 'border-identity bg-identity/5' : i < step ? 'border-border' : 'border-border opacity-60')}>
+            <span className={cn('flex size-7 items-center justify-center rounded-full text-xs font-bold', i <= step ? 'bg-identity text-identity-foreground' : 'bg-muted text-muted-foreground')}>
+              {i < step ? <Check className="size-4" /> : i + 1}
+            </span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
           </div>
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} className="card p-6 sm:p-8 space-y-6">
-        {error && (
-          <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 px-4 py-3 text-sm">
-            {error}
-          </div>
-        )}
+      <form onSubmit={handleSubmit}>
+        <Card>
+          <CardContent className="space-y-6 p-6">
+            {error && <InlineError message={error} />}
 
-        {step === 0 && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="font-semibold text-primary">Audience targeting</h2>
-              <p className="text-sm text-muted mt-1">
-                Optionally attach an Audiencemart segment. The segment fee is charged when you create the campaign.
-              </p>
-            </div>
-
-            {!audiencemartEnabled ? (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] p-5">
-                <p className="font-medium text-primary">Intent-only targeting</p>
-                <p className="text-sm text-muted mt-1">
-                  Your {subscription?.plan.name ?? 'current'} plan targets users by predicted intent without purchasable segments.
-                  <Link to="/subscription" className="text-brand-600 hover:underline ml-1">Upgrade</Link> for Audiencemart.
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSegmentId(null)}
-                  className={`segment-card text-left ${segmentId === null ? 'segment-card-selected' : ''}`}
-                >
-                  <p className="font-semibold text-primary">No segment</p>
-                  <p className="text-xs text-muted mt-1">Target by intent only — no Audiencemart purchase</p>
-                </button>
-
-                {segments.map(seg => (
-                  <button
-                    key={seg.id}
-                    type="button"
-                    onClick={() => setSegmentId(seg.id)}
-                    className={`segment-card text-left ${segmentId === seg.id ? 'segment-card-selected' : ''}`}
-                  >
-                    <div className="flex justify-between items-start gap-3">
-                      <div>
-                        <p className="font-semibold text-primary">{seg.name}</p>
-                        <p className="text-xs text-muted mt-1 line-clamp-2">{seg.description}</p>
-                      </div>
-                      <span className="segment-price shrink-0">{formatEtb(seg.estimated_price_etb)}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      <span className="segment-meta">~{seg.approximate_size.toLocaleString()} users</span>
-                      {seg.top_intent_signals.map(sig => (
-                        <span key={sig} className="segment-meta">{sig.replace(/_/g, ' ')}</span>
-                      ))}
-                    </div>
-                  </button>
-                ))}
-
-                {segments.length === 0 && (
-                  <p className="text-sm text-muted">No segments available for purchase right now.</p>
+            {step === 0 && (
+              <div className="space-y-5">
+                <div>
+                  <h3 className="font-display font-semibold">Audience targeting</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">Optionally attach an AudienceMart segment. The fee is charged when you create the campaign.</p>
+                </div>
+                {!audiencemartEnabled ? (
+                  <div className="rounded-lg border border-border bg-muted/50 p-5">
+                    <p className="font-medium">Intent-only targeting</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Your {subscription?.plan.name ?? 'current'} plan targets by predicted intent without purchasable segments.
+                      <Link to="/subscription" className="ml-1 text-identity hover:underline">Upgrade</Link> for AudienceMart.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    <SegmentButton selected={segmentId === null} onClick={() => setSegmentId(null)}>
+                      <p className="font-semibold">No segment</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Target by intent only — no AudienceMart purchase</p>
+                    </SegmentButton>
+                    {segments.map(seg => (
+                      <SegmentButton key={seg.id} selected={segmentId === seg.id} onClick={() => setSegmentId(seg.id)}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold">{seg.name}</p>
+                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{seg.description}</p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-identity/10 px-2.5 py-0.5 text-sm font-bold tabular-nums text-identity">{formatEtb(seg.estimated_price_etb)}</span>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          <Badge variant="secondary">~{seg.approximate_size.toLocaleString()} users</Badge>
+                          {seg.top_intent_signals.map(sig => <Badge key={sig} variant="outline">{sig.replace(/_/g, ' ')}</Badge>)}
+                        </div>
+                      </SegmentButton>
+                    ))}
+                    {segments.length === 0 && <p className="text-sm text-muted-foreground">No segments available for purchase right now.</p>}
+                  </div>
                 )}
               </div>
             )}
-          </div>
-        )}
 
-        {step === 1 && (
-          <div className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-primary mb-1.5">Campaign name</label>
-              <input required value={name} onChange={e => setName(e.target.value)} className="field-input" placeholder="Fashion Spring Sale" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-primary mb-2">Delivery channel</label>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {channels.map(ch => (
-                  <button
-                    key={ch.id}
-                    type="button"
-                    onClick={() => setChannelId(ch.id)}
-                    className={`channel-card text-left ${channelId === ch.id ? 'channel-card-selected' : ''}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-sm text-primary">{ch.name}</p>
-                      {ch.is_premium && <span className="premium-badge">Premium</span>}
-                    </div>
-                    <p className="text-xs text-muted mt-1">{ch.description}</p>
-                  </button>
-                ))}
+            {step === 1 && (
+              <div className="space-y-5">
+                <div className="space-y-1.5"><Label htmlFor="cname">Campaign name</Label><Input id="cname" value={name} onChange={e => setName(e.target.value)} placeholder="Fashion Spring Sale" /></div>
+                <div>
+                  <Label className="mb-2 block">Delivery channel</Label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {channels.map(ch => (
+                      <SegmentButton key={ch.id} selected={channelId === ch.id} onClick={() => setChannelId(ch.id)}>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold">{ch.name}</p>
+                          {ch.is_premium && <Badge variant="warning">Premium</Badge>}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{ch.description}</p>
+                      </SegmentButton>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Target intent</Label>
+                    <Select value={targetIntent} onValueChange={setTargetIntent}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{intentOptions.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Billing model</Label>
+                    <Select value={billingModel} onValueChange={setBillingModel}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{BILLING_MODELS.map(m => <SelectItem key={m.value} value={m.value}>{m.label} — {m.description}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-primary mb-1.5">Target intent</label>
-                <select value={targetIntent} onChange={e => setTargetIntent(e.target.value)} className="field-input">
-                  {intentOptions.map(i => (
-                    <option key={i.value} value={i.value}>{i.label}</option>
-                  ))}
-                </select>
-                {selectedSegment && (
-                  <p className="text-xs text-faint mt-1">Must match your selected segment&apos;s intent signals.</p>
+            {step === 2 && (
+              <div className="space-y-5">
+                <p className="text-sm text-muted-foreground">Creative for <strong className="text-foreground">{selectedChannel?.name}</strong>{selectedChannel?.is_premium && ' (premium channel)'}</p>
+                {(needsRichCopy || !needsImage) && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="title">Title {needsRichCopy && <span className="text-identity">*</span>}</Label>
+                    <Input id="title" value={title} onChange={e => setTitle(e.target.value)} maxLength={channelCode === 'SMS_PLUS' ? 40 : 50} placeholder="Headline" />
+                  </div>
                 )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-primary mb-1.5">Billing model</label>
-                <select value={billingModel} onChange={e => setBillingModel(e.target.value)} className="field-input">
-                  {BILLING_MODELS.map(m => (
-                    <option key={m.value} value={m.value}>{m.label} — {m.description}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="space-y-5">
-            <p className="text-sm text-muted">
-              Creative for <strong className="text-primary">{selectedChannel?.name}</strong>
-              {selectedChannel?.is_premium && ' (premium channel)'}
-            </p>
-
-            {(needsRichCopy || !needsImage) && (
-              <div>
-                <label className="block text-sm font-medium text-primary mb-1.5">
-                  Title {needsRichCopy && <span className="text-brand-600">*</span>}
-                </label>
-                <input
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  maxLength={channelCode === 'SMS_PLUS' ? 40 : 50}
-                  className="field-input"
-                  placeholder="Headline"
-                />
+                <div className="space-y-1.5">
+                  <Label htmlFor="body">Body text <span className="text-identity">*</span></Label>
+                  <textarea id="body" required value={bodyText} onChange={e => setBodyText(e.target.value)} maxLength={channelCode === 'SMS_PLUS' ? 160 : 120} rows={3}
+                    className="flex w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Your ad copy…" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="image">{needsImage ? <>Image URL <span className="text-identity">*</span></> : 'Image URL (optional)'}</Label>
+                  <Input id="image" value={imageUrl} onChange={e => setImageUrl(e.target.value)}
+                    onBlur={e => { const d = googleDriveToDirectImageUrl(e.target.value); if (d) setImageUrl(d); }}
+                    placeholder="https://… or a Google Drive share link" />
+                  {imageUrl.trim() && <img src={imageUrl} alt="" className="mt-2 max-h-40 rounded-lg border border-border object-contain" onError={e => ((e.target as HTMLImageElement).style.display = 'none')} />}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="dest">Destination URL <span className="text-identity">*</span></Label>
+                  <Input id="dest" type="url" required value={destinationUrl} onChange={e => setDestinationUrl(e.target.value)} placeholder="https://example.com/sale" />
+                </div>
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-primary mb-1.5">
-                Body text <span className="text-brand-600">*</span>
-              </label>
-              <textarea
-                required
-                value={bodyText}
-                onChange={e => setBodyText(e.target.value)}
-                maxLength={channelCode === 'SMS_PLUS' ? 160 : 120}
-                rows={3}
-                className="field-input resize-y"
-                placeholder="Your ad copy…"
-              />
-            </div>
-
-            {needsImage ? (
-              <ImageUrlInput value={imageUrl} onChange={setImageUrl} required />
-            ) : (
-              <ImageUrlInput value={imageUrl} onChange={setImageUrl} label="Optional image" />
+            {step === 3 && (
+              <div className="space-y-5">
+                <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
+                  <p className="mb-2 font-medium">Review summary</p>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li><span className="text-foreground">{name}</span> · {selectedChannel?.name} · {billingModel}</li>
+                    <li>Intent: {targetIntent.replace(/_/g, ' ')}</li>
+                    <li>Segment: {selectedSegment ? `${selectedSegment.name} (${formatEtb(selectedSegment.estimated_price_etb)})` : 'None'}</li>
+                  </ul>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-1.5"><Label>Daily budget (ETB)</Label><Input type="number" min="1" required value={dailyBudget} onChange={e => setDailyBudget(e.target.value)} /></div>
+                  <div className="space-y-1.5"><Label>Total budget (ETB)</Label><Input type="number" min="1" required value={totalBudget} onChange={e => setTotalBudget(e.target.value)} /></div>
+                  <div className="space-y-1.5"><Label>Freq. cap / day</Label><Input type="number" min="1" required value={frequencyCap} onChange={e => setFrequencyCap(e.target.value)} /></div>
+                </div>
+                <div className="rounded-md border border-identity/30 bg-identity/5 px-3 py-2 text-sm text-foreground">
+                  After submission your campaign enters <strong>pending moderation</strong>. An operator reviews and activates it — you cannot self-activate.
+                </div>
+              </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-primary mb-1.5">
-                Destination URL <span className="text-brand-600">*</span>
-              </label>
-              <input
-                type="url"
-                required
-                value={destinationUrl}
-                onChange={e => setDestinationUrl(e.target.value)}
-                className="field-input"
-                placeholder="https://example.com/sale"
-              />
+            <div className="flex gap-3 border-t border-border pt-4">
+              {step > 0 && <Button type="button" variant="secondary" onClick={goBack}>Back</Button>}
+              {step < STEPS.length - 1 ? (
+                <Button type="button" onClick={goNext}>Continue</Button>
+              ) : (
+                <Button type="submit" disabled={create.isPending}>{create.isPending ? 'Creating…' : 'Submit for review'}</Button>
+              )}
+              <Button asChild variant="ghost" className="ml-auto"><Link to="/">Cancel</Link></Button>
             </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="space-y-5">
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] p-4 text-sm">
-              <p className="font-medium text-primary mb-2">Review summary</p>
-              <ul className="space-y-1 text-muted">
-                <li><span className="text-primary">{name}</span> · {selectedChannel?.name} · {billingModel}</li>
-                <li>Intent: {targetIntent.replace(/_/g, ' ')}</li>
-                <li>Segment: {selectedSegment ? `${selectedSegment.name} (${formatEtb(selectedSegment.estimated_price_etb)})` : 'None'}</li>
-              </ul>
-            </div>
-
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-primary mb-1.5">Daily budget (ETB)</label>
-                <input type="number" min="1" step="1" required value={dailyBudget} onChange={e => setDailyBudget(e.target.value)} className="field-input" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-primary mb-1.5">Total budget (ETB)</label>
-                <input type="number" min="1" step="1" required value={totalBudget} onChange={e => setTotalBudget(e.target.value)} className="field-input" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-primary mb-1.5">Freq. cap / day</label>
-                <input type="number" min="1" step="1" required value={frequencyCap} onChange={e => setFrequencyCap(e.target.value)} className="field-input" />
-              </div>
-            </div>
-
-            <div className="alert-info text-sm">
-              After submission your campaign enters <strong>pending moderation</strong>. An operator will review and activate it — you cannot self-activate.
-            </div>
-          </div>
-        )}
-
-        <div className="flex gap-3 pt-2 border-t border-[var(--border)]">
-          {step > 0 && (
-            <button type="button" onClick={goBack} className="btn-secondary">
-              Back
-            </button>
-          )}
-          {step < STEPS.length - 1 ? (
-            <button type="button" onClick={goNext} className="btn-primary">
-              Continue
-            </button>
-          ) : (
-            <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? 'Creating…' : 'Submit for review'}
-            </button>
-          )}
-          <Link to="/" className="btn-ghost ml-auto">Cancel</Link>
-        </div>
+          </CardContent>
+        </Card>
       </form>
     </div>
+  );
+}
+
+function SegmentButton({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className={cn('rounded-lg border p-4 text-left transition-colors', selected ? 'border-identity bg-identity/5 ring-1 ring-identity' : 'border-border hover:bg-muted/50')}>
+      {children}
+    </button>
   );
 }

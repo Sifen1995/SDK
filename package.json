@@ -1,0 +1,16 @@
+{
+  "name": "skykin-frontends",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "portal",
+    "ad-portal",
+    "admin-portal"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  }
+}

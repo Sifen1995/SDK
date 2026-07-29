@@ -1,0 +1,331 @@
+/* ============================================================================
+   Skykin "Signal" design system — single source of truth
+   Consumed by portal / ad-portal / admin-portal via `@import "@skykin/ui/styles.css"`.
+   Direction: clean-corporate with real depth. Palette re-based on the two brand
+   colors sampled from the logo — navy #08263E + blue #0083D5 — with no unrelated
+   hues. Brand blue is the shared primary action; navy carries chrome and depth.
+   Each app is identified only by a wayfinding accent (--identity), now a point on
+   the brand axis. shadcn token contract + Skykin elevation/glass additions.
+   ============================================================================ */
+
+/* Fonts (self-hosted via @fontsource — no CDN) */
+@import "@fontsource-variable/schibsted-grotesk/wght.css";
+@import "@fontsource-variable/schibsted-grotesk/wght-italic.css";
+@import "@fontsource-variable/hanken-grotesk/wght.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* scan the shared package's own components for utility classes */
+@source "../**/*.{ts,tsx}";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ tokens */
+:root {
+  /* fixed brand anchors — sampled from the logo, never derived */
+  --brand-navy: #08263e;
+  --brand-blue: #0083d5;
+
+  --background: #ffffff;         /* recessed cool, navy-biased ground */
+  --foreground: #0b2436;         /* near-black navy ink */
+  --card: #ffffff;
+  --card-foreground: #0b2436;
+  --popover: #ffffff;
+  --popover-foreground: #0b2436;
+
+  --primary: #0083d5;            /* brand blue — shared primary action */
+  --primary-foreground: #ffffff;
+  --secondary: #e7eef5;
+  --secondary-foreground: #0b2436;
+  --muted: #e7eef5;
+  --muted-foreground: #56697c;   /* navy-desaturated slate */
+  --accent: #e7eef5;             /* shadcn "accent" = neutral hover surface (NOT identity) */
+  --accent-foreground: #0b2436;
+
+  --destructive: #c0332f;
+  --destructive-foreground: #ffffff;
+  --success: #1e7a54;
+  --success-foreground: #ffffff;
+  --warning: #b4791c;
+  --warning-foreground: #ffffff;
+
+  --border: #dce5ee;
+  --input: #dce5ee;
+  --ring: #0083d5;
+
+  /* muted status surfaces (pills/tiles) — tinted, low-chroma */
+  --success-surface: #e2f1ea;
+  --warning-surface: #f7eeda;
+  --destructive-surface: #f8e7e6;
+
+  /* chart ramp — every step lives on the navy→blue→sky axis */
+  --chart-1: #0083d5;            /* brand blue */
+  --chart-2: #08263e;            /* navy */
+  --chart-3: #37a6e5;            /* sky */
+  --chart-4: #0b5a8f;            /* deep ocean */
+  --chart-5: #7cc3ee;            /* pale sky */
+  --chart-6: #35566f;            /* steel navy */
+
+  /* per-app wayfinding accent (overridden by [data-app]) */
+  --identity: #0083d5;
+  --identity-foreground: #ffffff;
+
+  /* sidebar shell */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0b2436;
+  --sidebar-muted: #56697c;
+  --sidebar-border: #e2eaf1;
+  --sidebar-accent: #eef4fa;                 /* neutral hover surface */
+  --sidebar-accent-foreground: #0b2436;
+  --sidebar-primary: var(--identity);        /* the signal bar + active label */
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-ring: var(--ring);
+
+  --radius: 0.5rem;
+
+  /* elevation ramp — navy-tinted shadows, never pure black */
+  --elevation-xs: 0 1px 2px rgba(8, 38, 62, 0.05);
+  --elevation-sm: 0 1px 2px rgba(8, 38, 62, 0.05), 0 2px 6px rgba(8, 38, 62, 0.05);
+  --elevation-md: 0 2px 4px rgba(8, 38, 62, 0.06), 0 10px 24px rgba(8, 38, 62, 0.10);
+  --elevation-lg: 0 12px 32px rgba(8, 38, 62, 0.14), 0 3px 8px rgba(8, 38, 62, 0.06);
+  --elevation-xl: 0 28px 60px rgba(8, 38, 62, 0.20);
+
+  /* glass — used surgically (chrome + overlays only, never on data) */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-blur: blur(12px) saturate(140%);
+  --glass-border: rgba(255, 255, 255, 0.55);
+
+  /* ambient background wash behind panels */
+  --bg-wash: radial-gradient(1200px 620px at 12% -10%, rgba(0, 131, 213, 0.06), transparent 62%);
+}
+
+.dark {
+  --background: #071019;         /* navy-black ground */
+  --foreground: #e6eef5;
+  --card: #0f2233;               /* layer 2 — lifts from ground by lightness */
+  --card-foreground: #e6eef5;
+  --popover: #12283b;
+  --popover-foreground: #e6eef5;
+
+  --primary: #2aa3e8;            /* brand blue lifted for legibility on dark */
+  --primary-foreground: #04121d;
+  --secondary: #16293a;
+  --secondary-foreground: #e6eef5;
+  --muted: #16293a;
+  --muted-foreground: #8da2b4;
+  --accent: #16293a;
+  --accent-foreground: #e6eef5;
+
+  --destructive: #e5595e;
+  --destructive-foreground: #0e1418;
+  --success: #34b07d;
+  --success-foreground: #06120c;
+  --warning: #d4933a;
+  --warning-foreground: #1a1205;
+
+  --border: #1c3346;
+  --input: #1c3346;
+  --ring: #2aa3e8;
+
+  --success-surface: #0e241b;
+  --warning-surface: #2a2110;
+  --destructive-surface: #2a1315;
+
+  --chart-1: #2aa3e8;
+  --chart-2: #6fb9e6;
+  --chart-3: #a8d5f2;
+  --chart-4: #4f8fc0;
+  --chart-5: #7cc3ee;
+  --chart-6: #5f7d94;
+
+  --identity: #2aa3e8;
+  --identity-foreground: #04121d;
+
+  --sidebar: #0b1a28;
+  --sidebar-foreground: #e6eef5;
+  --sidebar-muted: #8da2b4;
+  --sidebar-border: #16293a;
+  --sidebar-accent: #16293a;
+  --sidebar-accent-foreground: #e6eef5;
+  --sidebar-primary: var(--identity);
+  --sidebar-primary-foreground: #04121d;
+  --sidebar-ring: var(--ring);
+
+  --elevation-xs: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --elevation-sm: 0 1px 2px rgba(0, 0, 0, 0.40), 0 1px 3px rgba(0, 0, 0, 0.30);
+  --elevation-md: 0 2px 4px rgba(0, 0, 0, 0.35), 0 12px 28px rgba(0, 0, 0, 0.50);
+  --elevation-lg: 0 16px 40px rgba(0, 0, 0, 0.55), 0 4px 10px rgba(0, 0, 0, 0.40);
+  --elevation-xl: 0 32px 64px rgba(0, 0, 0, 0.65);
+
+  --glass-bg: rgba(15, 34, 51, 0.70);
+  --glass-blur: blur(12px) saturate(140%);
+  --glass-border: rgba(255, 255, 255, 0.08);
+
+  --bg-wash: radial-gradient(1200px 620px at 12% -10%, rgba(42, 163, 232, 0.08), transparent 62%);
+}
+
+/* ---------------------------------------- per-app identity (wayfinding only) */
+/* Three points on the brand axis — no unrelated hues.
+   admin = deep navy · portal = core brand blue · ad = bright sky. */
+:root[data-app="portal"] { --identity: #0083d5; --identity-foreground: #ffffff; }
+:root[data-app="admin"]  { --identity: #08263e; --identity-foreground: #ffffff; }
+:root[data-app="ad"]     { --identity: #2f92cf; --identity-foreground: #ffffff; }
+:root[data-app="portal"].dark { --identity: #2aa3e8; --identity-foreground: #04121d; }
+:root[data-app="admin"].dark  { --identity: #7ba7cc; --identity-foreground: #06121d; }
+:root[data-app="ad"].dark     { --identity: #8fcdf3; --identity-foreground: #04121d; }
+
+/* ------------------------------------------------- Tailwind theme mapping */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success-surface: var(--success-surface);
+  --color-warning-surface: var(--warning-surface);
+  --color-destructive-surface: var(--destructive-surface);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-blue: var(--brand-blue);
+  --color-identity: var(--identity);
+  --color-identity-foreground: var(--identity-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+
+  /* map the navy-tinted elevation ramp onto Tailwind's shadow scale so every
+     existing `shadow-sm|md|lg|xl` utility picks it up and stays theme-aware */
+  --shadow-xs: var(--elevation-xs);
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
+  --shadow-xl: var(--elevation-xl);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+
+  --font-sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Schibsted Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* --------------------------------------------------------------- base layer */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--background);
+    background-image: var(--bg-wash);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv05", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  #root { min-height: 100vh; }
+  h1, h2, h3, h4, .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+  h1, h2, h3 { text-wrap: balance; }
+  /* tabular figures everywhere digits align */
+  .tabular-nums, [data-slot="kpi-value"], td.num, th.num { font-variant-numeric: tabular-nums; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+}
+
+/* -------------------------------------------------- elevation + glass utilities */
+@layer components {
+  /* Glass: translucent surface + blur + top inset highlight. Chrome/overlays
+     ONLY — never place over columns of data (legibility first). */
+  .glass {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-color: var(--glass-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30);
+  }
+  /* graceful fallback where backdrop-filter is unsupported */
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .glass { background: var(--card); }
+  }
+
+  /* Brand mark chip — the one place the two brand colors meet as a gradient. */
+  .brand-chip {
+    background: linear-gradient(140deg, var(--brand-blue), var(--brand-navy));
+    color: #ffffff;
+  }
+
+  /* Brand hero — the deep navy→blue "front door" surface (auth heroes, banners).
+     Always light-on-dark, so it holds white text regardless of theme. */
+  .brand-hero {
+    position: relative;
+    background: linear-gradient(135deg, var(--brand-navy) 0%, #0a3d63 42%, var(--brand-blue) 100%);
+    color: #ffffff;
+  }
+
+  /* Opt-in hover lift for interactive tiles (KPI cards, nav shortcuts). */
+  .lift {
+    transition: transform 160ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 160ms cubic-bezier(0.4, 0, 0.2, 1), border-color 160ms ease;
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--elevation-md);
+  }
+}
+
+/* ---------------------------------------- signature: moving "signal bar" */
+/* A single accent bar the Sidebar positions/animates to the active item. */
+.signal-bar {
+  position: absolute;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--sidebar-primary);
+  transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1), height 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, height;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

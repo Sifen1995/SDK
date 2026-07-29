@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
-import type { Campaign, CampaignPreview } from '../types';
-import { ActiveBadge, ModerationBadge, ValidationBadge } from './StatusBadge';
+import { Card, CardContent, Button, StatusPill } from '@skykin/ui';
+import { cn } from '@skykin/ui'; // adjust path if this file's utils import differs from KpiCard's
+import type { Campaign } from '../types';
 import CampaignPreviewPanel from './CampaignPreviewPanel';
 import { formatDate, formatLabel } from '../lib/campaignUtils';
+import { useCampaignPreview } from '../lib/queries';
 
 export type ModerationAction = 'approve-only' | 'reject' | 'go-live' | 'approve-and-go-live';
 
@@ -14,101 +14,86 @@ interface CampaignModerationCardProps {
   onAction: (action: ModerationAction) => void;
 }
 
-export default function CampaignModerationCard({
-  campaign: c,
-  processing,
-  mode,
-  onAction,
-}: CampaignModerationCardProps) {
-  const [preview, setPreview] = useState<CampaignPreview | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(true);
+export default function CampaignModerationCard({ campaign: c, processing, mode, onAction }: CampaignModerationCardProps) {
+  const { data: preview, isPending, isError, error } = useCampaignPreview(c.id);
 
-  useEffect(() => {
-    let cancelled = false;
-    setPreviewLoading(true);
-    api.previewCampaign(c.id)
-      .then(p => { if (!cancelled) setPreview(p); })
-      .catch(() => { if (!cancelled) setPreview(null); })
-      .finally(() => { if (!cancelled) setPreviewLoading(false); });
-    return () => { cancelled = true; };
-  }, [c.id]);
+  // left-rail accent: quick-scan status signal, independent of the brand blob
+  const accent = c.isActive
+    ? 'bg-success'
+    : c.moderationStatus === 'rejected' || c.validationStatus === 'failed'
+      ? 'bg-destructive'
+      : 'bg-primary';
 
   return (
-    <div className="moderation-card">
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <h3 className="font-bold text-lg text-primary">{c.name}</h3>
-            <ModerationBadge status={c.moderationStatus} />
-            <ValidationBadge status={c.validationStatus} />
-            {c.isActive && <ActiveBadge active />}
+    <Card
+      className={cn(
+        'relative overflow-hidden p-0',
+        'shadow-[0_2px_4px_rgba(8,38,62,0.08),0_16px_36px_-12px_rgba(8,38,62,0.22),inset_0_1px_0_0_rgba(255,255,255,0.7)]',
+        'border border-primary/40',
+      )}
+    >
+      {/* status accent rail */}
+      <span aria-hidden className={cn('absolute inset-y-0 left-0 w-1', accent)} />
+
+      {/* signature brand blob, same motif as KpiCard */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -right-12 -top-16 size-56 rounded-full bg-primary/10 blur-3xl"
+      />
+
+      <CardContent className="relative p-5 pl-6">
+        <div className="relative grid gap-6 lg:grid-cols-2">
+          {/* divider between info + preview, centered in the gap at lg */}
+          <span
+            aria-hidden
+            className="absolute inset-y-0 left-1/2 hidden w-px -translate-x-1/2 bg-border lg:block"
+          />
+
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <h3 className="font-display text-lg font-bold">{c.name}</h3>
+              <StatusPill status={c.moderationStatus} />
+              <StatusPill status={c.validationStatus} />
+              {c.isActive && <StatusPill status="active" />}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {formatLabel(c.channelCode || c.creativeFormat || 'channel')} · {formatLabel(c.targetIntent)}
+              {c.billingModel && ` · ${c.billingModel}`} · <span className="font-medium text-foreground">${c.totalBudgetCap} total</span>
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">Advertiser {c.advertiserId} · Submitted {formatDate(c.createdAt)}</p>
+
+            {c.moderationNotes && (
+              <p className="mt-3 rounded-lg border border-border bg-muted/50 p-3 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Moderator notes:</span> {c.moderationNotes}
+              </p>
+            )}
+            {c.validationNotes && c.validationStatus === 'failed' && (
+              <p className="mt-2 text-xs text-destructive">Validation: {c.validationNotes}</p>
+            )}
           </div>
 
-          <p className="text-sm text-muted">
-            {formatLabel(c.channelCode || c.creativeFormat || 'channel')} · {formatLabel(c.targetIntent)}
-            {c.billingModel && ` · ${c.billingModel}`}
-            {' · '}
-            <span className="font-medium text-primary">${c.totalBudgetCap} total</span>
-          </p>
-          <p className="text-xs text-faint mt-2">
-            Advertiser {c.advertiserId} · Submitted {formatDate(c.createdAt)}
-          </p>
-
-          {c.moderationNotes && (
-            <p className="text-xs text-muted mt-3 p-3 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border)]">
-              <span className="font-medium text-primary">Moderator notes:</span> {c.moderationNotes}
-            </p>
-          )}
-
-          {c.validationNotes && c.validationStatus === 'failed' && (
-            <p className="text-xs text-red-600 dark:text-red-400 mt-2">Validation: {c.validationNotes}</p>
-          )}
+          {/* recessed surface for the preview — drop this wrapper if CampaignPreviewPanel already renders its own border/surface */}
+          <div className="rounded-xl border border-border bg-muted/30 p-3 shadow-[inset_0_1px_3px_rgba(8,38,62,0.06)]">
+            <CampaignPreviewPanel preview={preview} loading={isPending} error={isError ? (error as Error)?.message : undefined} />
+          </div>
         </div>
 
-        <CampaignPreviewPanel preview={preview} loading={previewLoading} />
-      </div>
-
-      <div className="moderation-card-actions">
-        {mode === 'pending' && c.moderationStatus === 'pending' && (
-          <>
-            <button
-              type="button"
-              onClick={() => onAction('approve-and-go-live')}
-              disabled={processing}
-              className="btn-primary"
-            >
-              Approve &amp; Go Live
-            </button>
-            <button
-              type="button"
-              onClick={() => onAction('approve-only')}
-              disabled={processing}
-              className="btn-secondary"
-            >
-              Approve only
-            </button>
-            <button
-              type="button"
-              onClick={() => onAction('reject')}
-              disabled={processing}
-              className="btn-danger-outline"
-            >
-              Reject
-            </button>
-          </>
-        )}
-
-        {mode === 'ready' && (
-          <button
-            type="button"
-            onClick={() => onAction('go-live')}
-            disabled={processing}
-            className="btn-success"
-          >
-            {processing ? 'Activating…' : 'Go Live'}
-          </button>
-        )}
-      </div>
-    </div>
+        {/* full-bleed action strip — clipped to the card's actual radius via overflow-hidden above */}
+        <div className="-mx-5 -mb-5 mt-5 flex flex-wrap items-center gap-2 border-t border-primary/15 bg-muted/30 px-5 py-4">
+          {mode === 'pending' && c.moderationStatus === 'pending' && (
+            <>
+              <Button onClick={() => onAction('approve-and-go-live')} disabled={processing}>Approve &amp; go live</Button>
+              <Button variant="secondary" onClick={() => onAction('approve-only')} disabled={processing}>Approve only</Button>
+              <Button variant="outline" onClick={() => onAction('reject')} disabled={processing}>Reject</Button>
+            </>
+          )}
+          {mode === 'ready' && (
+            <Button onClick={() => onAction('go-live')} disabled={processing}>
+              {processing ? 'Activating…' : 'Go live'}
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,21 +1,21 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Button, Card, CardContent, Input, Label, InlineError, ThemeToggle, SkykinMark, cn } from '@skykin/ui';
 import { api } from '../lib/api';
-import { ROLE_META } from '../types';
-import type { PortalRole } from '../types';
-import ThemeToggle from '../components/ThemeToggle';
+import { ROLE_META, type PortalRole } from '../types';
+import { useTheme } from '../context/ThemeContext';
 
 type RegisterRole = 'advertiser' | 'read_only_analyst';
+const selectableRoles: RegisterRole[] = ['advertiser', 'read_only_analyst'];
+const steps = ['Register & subscribe to a plan', 'Build campaigns with channels & segments', 'Go live after operator approval'];
 
 export default function Register() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [companyName, setCompanyName] = useState('');
+  const [form, setForm] = useState({ name: '', email: '', password: '', companyName: '' });
   const [role, setRole] = useState<RegisterRole>('advertiser');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   async function handleSubmit(e: FormEvent) {
@@ -24,15 +24,9 @@ export default function Register() {
     setSuccess('');
     setLoading(true);
     try {
-      await api.register({
-        name,
-        email,
-        password,
-        company_name: companyName,
-        role,
-      });
-      setSuccess('Account created successfully. Redirecting to sign in…');
-      setTimeout(() => navigate('/login'), 1800);
+      await api.register({ name: form.name, email: form.email, password: form.password, company_name: form.companyName, role });
+      setSuccess('Account created. Redirecting to sign in…');
+      setTimeout(() => navigate('/login'), 1600);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
@@ -40,109 +34,87 @@ export default function Register() {
     }
   }
 
-  const selectableRoles: RegisterRole[] = ['advertiser', 'read_only_analyst'];
-
   return (
-    <div className="auth-page">
-      <div className="hidden lg:flex lg:w-[48%] auth-hero flex-col justify-between p-12">
-        <div className="auth-hero-content">
-          <div className="auth-logo-mark mb-8">Sk</div>
-          <h1 className="text-4xl font-bold leading-tight mb-4 text-white">Start advertising on Skykin</h1>
-          <p className="text-lg text-white/85 max-w-md leading-relaxed">
+    <div className="flex min-h-screen">
+      <div className="brand-hero hidden w-[48%] flex-col justify-between overflow-hidden p-12 text-white lg:flex">
+        <div className="pointer-events-none absolute inset-0 opacity-90" style={{ background: 'radial-gradient(circle at 15% 85%, rgb(255 255 255 / 0.12), transparent 48%)' }} />
+        <div className="relative">
+          <span className="mb-8 flex size-12 items-center justify-center rounded-xl bg-white/15"><SkykinMark className="size-7 text-white" /></span>
+          <h1 className="font-display text-4xl font-bold leading-tight">Start advertising on Skykin</h1>
+          <p className="mt-4 max-w-md text-lg leading-relaxed text-white/85">
             Create your advertiser account, pick a subscription plan, and launch campaigns that match real user intent signals.
           </p>
         </div>
-        <div className="auth-hero-content space-y-3">
-          <div className="auth-step">
-            <span className="auth-step-num">1</span>
-            <span>Register &amp; subscribe to a plan</span>
-          </div>
-          <div className="auth-step">
-            <span className="auth-step-num">2</span>
-            <span>Build campaigns with channels &amp; segments</span>
-          </div>
-          <div className="auth-step">
-            <span className="auth-step-num">3</span>
-            <span>Go live after operator approval</span>
-          </div>
+        <div className="relative space-y-3">
+          {steps.map((s, i) => (
+            <div key={s} className="flex items-center gap-3 text-sm text-white/90">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/15 text-xs font-bold">{i + 1}</span>
+              {s}
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-screen">
-        <div className="flex justify-end p-6">
-          <ThemeToggle variant="header" />
-        </div>
-
-        <div className="flex-1 flex items-center justify-center px-6 py-8">
+      <div className="flex flex-1 flex-col">
+        <div className="flex justify-end p-6"><ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} /></div>
+        <div className="flex flex-1 items-center justify-center px-6 py-8">
           <div className="w-full max-w-lg">
-            <div className="lg:hidden text-center mb-6">
-              <div className="auth-logo-mark mx-auto mb-4">Sk</div>
-              <h1 className="text-2xl font-bold text-primary">Create account</h1>
+            <div className="mb-6 text-center lg:hidden">
+              <span className="mx-auto mb-4 flex size-14 items-center justify-center brand-chip rounded-2xl"><SkykinMark className="size-8" /></span>
+              <h1 className="font-display text-2xl font-bold">Create account</h1>
             </div>
-
             <div className="mb-6 hidden lg:block">
-              <h2 className="text-2xl font-bold text-primary">Create advertiser account</h2>
-              <p className="text-muted mt-2">Join the Skykin ad network in minutes.</p>
+              <h2 className="font-display text-2xl font-bold">Create advertiser account</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Join the Skykin ad network in minutes.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="auth-card space-y-5">
-              {error && <div className="alert-error">{error}</div>}
-              {success && <div className="alert-success">{success}</div>}
+            <Card>
+              <CardContent className="p-6">
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  {error && <InlineError message={error} />}
+                  {success && (
+                    <div className="rounded-md border border-success/30 bg-success-surface px-3 py-2 text-sm text-success">{success}</div>
+                  )}
 
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-primary mb-1.5">Full name</label>
-                  <input required value={name} onChange={e => setName(e.target.value)} className="field-input" placeholder="Jane Doe" />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-primary mb-1.5">Company name</label>
-                  <input required value={companyName} onChange={e => setCompanyName(e.target.value)} className="field-input" placeholder="Acme Inc" />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-primary mb-1.5">Work email</label>
-                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="field-input" placeholder="jane@acme.com" />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-primary mb-1.5">Password</label>
-                  <input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} className="field-input" placeholder="Min. 8 characters" />
-                </div>
-              </div>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5"><Label htmlFor="name">Full name</Label><Input id="name" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Jane Doe" /></div>
+                    <div className="space-y-1.5"><Label htmlFor="company">Company name</Label><Input id="company" required value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} placeholder="Acme Inc" /></div>
+                    <div className="space-y-1.5"><Label htmlFor="email">Work email</Label><Input id="email" type="email" required value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="jane@acme.com" /></div>
+                    <div className="space-y-1.5"><Label htmlFor="password">Password</Label><Input id="password" type="password" required minLength={8} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min. 8 characters" /></div>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">Account role</label>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {selectableRoles.map(r => {
-                    const meta = ROLE_META[r as PortalRole];
-                    const selected = role === r;
-                    return (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setRole(r)}
-                        className={`role-card text-left ${selected ? 'role-card-selected' : ''}`}
-                      >
-                        <p className="font-semibold text-sm text-primary">{meta.label}</p>
-                        <p className="text-xs text-muted mt-1 leading-relaxed">{meta.description}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-faint mt-2">
-                  Operator admin accounts are provisioned by Skykin — not available for self-registration.
-                </p>
-              </div>
+                  <div>
+                    <Label className="mb-2 block">Account role</Label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {selectableRoles.map(r => {
+                        const meta = ROLE_META[r as PortalRole];
+                        const selected = role === r;
+                        return (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => setRole(r)}
+                            className={cn(
+                              'rounded-lg border p-3 text-left transition-colors',
+                              selected ? 'border-identity bg-identity/5 ring-1 ring-identity' : 'border-border hover:border-border',
+                            )}
+                          >
+                            <p className="text-sm font-semibold">{meta.label}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{meta.description}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">Operator admin accounts are provisioned by Skykin — not available for self-registration.</p>
+                  </div>
 
-              <button type="submit" disabled={loading} className="btn-primary w-full py-3">
-                {loading ? 'Creating account…' : 'Create account'}
-              </button>
-
-              <p className="text-center text-sm text-muted">
-                Already registered?{' '}
-                <Link to="/login" className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">
-                  Sign in
-                </Link>
-              </p>
-            </form>
+                  <Button type="submit" disabled={loading} className="w-full">{loading ? 'Creating account…' : 'Create account'}</Button>
+                  <p className="text-center text-sm text-muted-foreground">
+                    Already registered? <Link to="/login" className="font-semibold text-identity hover:underline">Sign in</Link>
+                  </p>
+                </form>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

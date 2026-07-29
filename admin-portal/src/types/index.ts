@@ -42,6 +42,18 @@ export interface BillingRate {
   is_active: boolean;
 }
 
+export interface Plan {
+  id: string;
+  name: string;
+  monthly_fee_etb: number;
+  max_active_campaigns: number;
+  max_daily_budget_etb: number;
+  included_impressions: number;
+  sms_plus_enabled: boolean;
+  audiencemart_enabled: boolean;
+  cpc_discount_pct?: number;
+}
+
 export interface Campaign {
   id: string;
   advertiserId: string;

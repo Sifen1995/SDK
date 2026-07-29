@@ -75,6 +75,14 @@ export const api = {
     });
   },
 
+  // SDK end-users with their latest predicted intent (paginated) — previously
+  // unsurfaced endpoint; also exposes the page/per_page params.
+  listSdkUsers(page = 1, perPage = 20) {
+    return request<import('../types/sdkUsers').SdkUsersResponse>(
+      `/admin/sdk-users?page=${page}&per_page=${perPage}`,
+    );
+  },
+
   listCampaigns(offset: number = 0, limit: number = 10) {
     const query = new URLSearchParams();
     if (offset > 0) query.set('offset', offset.toString());
@@ -132,8 +140,7 @@ export const api = {
 
   listSegments() {
     return request<{ segments: import('../types').AudienceSegment[] }>('/admin/audience/segments')
-      .then(res => res.segments ?? [])
-      .catch(() => []);
+      .then(res => res.segments ?? []);
   },
 
   // Analytics Endpoints
@@ -156,9 +163,9 @@ export const api = {
     return request<import('../types/analytics').CampaignDetail>(`/admin/analytics/campaigns/${id}`);
   },
 
-  // Segment Candidates
+  // Segment Candidates — backend serves this under /admin (was 404ing without it)
   listSegmentCandidates(status: string = 'pending') {
-    return request<import('../types').SegmentCandidate[]>(`/audience/segment-candidates?status=${status}`);
+    return request<import('../types').SegmentCandidate[]>(`/admin/audience/segment-candidates?status=${status}`);
   },
   approveSegmentCandidate(id: string, data: import('../types').ApproveSegmentCandidateRequest) {
     return request<import('../types').AudienceSegment>(`/admin/audience/segment-candidates/${id}/approve`, {
@@ -174,11 +181,26 @@ export const api = {
   },
 
   // Plans & Billing
+  listPlans() {
+    return request<{ plans: import('../types').Plan[]; count?: number }>('/plans').then(res => res.plans ?? []);
+  },
   createPlan(data: import('../types').CreatePlanRequest) {
     return request<Record<string, unknown>>('/admin/plans', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  },
+  updatePlan(id: string, data: Partial<import('../types').CreatePlanRequest>) {
+    return request<Record<string, unknown>>(`/admin/plans/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  suspendPlan(id: string) {
+    return request<{ message?: string }>(`/admin/plans/${id}/suspend`, { method: 'POST' });
+  },
+  suspendSegment(id: string) {
+    return request<{ message?: string }>(`/admin/audience/segments/${id}/suspend`, { method: 'POST' });
   },
   listBillingRates(planId: string) {
     return request<{ rates: import('../types').BillingRate[]; count: number }>(`/admin/plans/${planId}/billing-rates`);
@@ -195,6 +217,31 @@ export const api = {
     return request<import('../types').AudienceSegment>('/admin/audience/segments', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+
+  // Roles & Permissions (RBAC) — previously unsurfaced
+  listPermissions() {
+    return request<import('../types/rbac').Permission[]>('/admin/permissions');
+  },
+  listRoles() {
+    return request<import('../types/rbac').Role[]>('/admin/roles');
+  },
+  createRole(data: import('../types/rbac').CreateRoleRequest) {
+    return request<import('../types/rbac').Role>('/admin/roles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  assignPermission(roleId: string, permissionId: string) {
+    return request<{ message: string }>(`/admin/roles/${roleId}/permissions`, {
+      method: 'POST',
+      body: JSON.stringify({ permission_id: permissionId }),
+    });
+  },
+  revokePermission(roleId: string, permissionId: string) {
+    return request<{ message: string }>(`/admin/roles/${roleId}/permissions/${permissionId}`, {
+      method: 'DELETE',
     });
   },
 

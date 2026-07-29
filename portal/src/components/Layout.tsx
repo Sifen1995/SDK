@@ -1,40 +1,80 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { AppShell, SkykinMark, ThemeToggle, Avatar, AvatarFallback, Button, type NavGroup } from '@skykin/ui';
+import { LayoutGrid, PlusCircle, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+
+function initials(name?: string, email?: string) {
+  const src = name || email || '';
+  if (!src) return 'DV';
+  return src.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || 'DV';
+}
+
+const groups: NavGroup[] = [
+  {
+    label: 'Developer',
+    items: [
+      { label: 'Applications', to: '/', end: true, icon: LayoutGrid },
+      { label: 'New Application', to: '/applications/new', icon: PlusCircle },
+    ],
+  },
+];
 
 export default function Layout() {
   const { developer, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+
+  // Auth screens own the full viewport — render them without the app shell.
+  if (!developer) return <Outlet />;
 
   function handleLogout() {
     logout();
     navigate('/login');
   }
 
+  const firstName = developer.name?.trim().split(/\s+/)[0] || 'developer';
+
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      <nav className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="text-xl font-bold tracking-tight text-white">
-            Skykin<span className="text-indigo-400">Portal</span>
-          </Link>
-
-          {developer && (
-            <div className="flex items-center gap-6">
-              <span className="text-sm text-gray-400">{developer.email}</span>
-              <button
-                onClick={handleLogout}
-                className="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer"
-              >
-                Sign out
-              </button>
-            </div>
-          )}
+    <AppShell
+      brand={{ name: 'Skykin', sub: 'Developer', mark: <SkykinMark className="h-10 w-auto text-identity drop-shadow-md" /> }}
+      groups={groups}
+      title={
+        <div>
+          <h1 className="font-display text-base font-semibold text-foreground">Hey {firstName}, welcome back</h1>
+          <p className="hidden text-[11px] text-muted-foreground sm:block">Manage your applications and SDK credentials</p>
         </div>
-      </nav>
-
-      <main className="max-w-6xl mx-auto px-6 py-10">
-        <Outlet />
-      </main>
-    </div>
+      }
+      topbarRight={
+        <div className="flex items-center gap-4">
+          <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
+          <div className="flex items-center gap-3 rounded-full border border-border bg-card p-1 pr-4 shadow-sm hover:bg-accent/50 transition-colors">
+            <Avatar className="size-8">
+              <AvatarFallback className="text-xs">{initials(developer.name, developer.email)}</AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium">{developer.name || 'Developer'}</span>
+          </div>
+        </div>
+      }
+      sidebarFooter={
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+            <Avatar className="size-8">
+              <AvatarFallback className="text-[10px]">{initials(developer.name, developer.email)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-sidebar-foreground">{developer.name}</p>
+              <p className="truncate text-[10px] text-sidebar-muted">{developer.email}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sidebar-muted" onClick={handleLogout}>
+            <LogOut className="size-4" />
+            Sign out
+          </Button>
+        </div>
+      }
+    >
+      <Outlet />
+    </AppShell>
   );
 }
