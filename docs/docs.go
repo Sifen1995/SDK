@@ -2842,6 +2842,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "daily_budget_cap": {
+                    "description": "Financial \u0026 Operational Controls. Billing is standardized to CPC and is\nintentionally not accepted from the portal.",
                     "type": "number"
                 },
                 "destination_url": {

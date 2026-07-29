@@ -1,96 +1,93 @@
 import { useState, type FormEvent } from 'react';
-import { api } from '../lib/api';
+import {
+  Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label,
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem, InlineError,
+} from '@skykin/ui';
+import { CheckCircle2 } from 'lucide-react';
+import type { PortalRole } from '../types';
+import { useCreateUser } from '../lib/queries';
 
 export default function AdminUsers() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'operator_admin' | 'advertiser' | 'read_only_analyst'>('operator_admin');
-  const [companyName, setCompanyName] = useState('');
-  
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const create = useCreateUser();
+  const [form, setForm] = useState({ name: '', email: '', password: '', companyName: '', role: 'operator_admin' as PortalRole });
+  const [done, setDone] = useState<string | null>(null);
 
-  async function handleSubmit(e: FormEvent) {
+  function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm(f => ({ ...f, [key]: value }));
+  }
+
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setMessage(null);
-    setLoading(true);
-
-    try {
-      await api.createUser({
-        name,
-        email,
-        password,
-        role,
-        company_name: companyName || undefined,
-      });
-      setMessage({ type: 'success', text: `User ${email} created successfully.` });
-      setName('');
-      setEmail('');
-      setPassword('');
-      setCompanyName('');
-    } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to create user' });
-    } finally {
-      setLoading(false);
-    }
+    setDone(null);
+    create.mutate(
+      { name: form.name, email: form.email, password: form.password, role: form.role, company_name: form.companyName || undefined },
+      {
+        onSuccess: () => {
+          setDone(`User ${form.email} created successfully.`);
+          setForm({ name: '', email: '', password: '', companyName: '', role: form.role });
+        },
+      },
+    );
   }
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-xl font-bold text-primary mb-1">User Management</h1>
-      <p className="text-sm text-muted mb-6">Create new portal users, including operator admins and managed advertisers.</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Create portal user</CardTitle>
+          <CardDescription>Add operator admins or managed advertiser accounts.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {done && (
+              <div className="flex items-center gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2 text-sm text-success">
+                <CheckCircle2 className="size-4" /> {done}
+              </div>
+            )}
+            {create.isError && <InlineError message={(create.error as Error).message} />}
 
-      <form onSubmit={handleSubmit} className="card p-6 sm:p-8 space-y-6 bg-white dark:bg-[#1c1b22]">
-        {message && (
-          <div className={`p-4 rounded-lg border text-sm ${
-            message.type === 'success' 
-              ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800' 
-              : 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800'
-          }`}>
-            {message.text}
-          </div>
-        )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="name">Full name</Label>
+                <Input id="name" required value={form.name} onChange={e => set('name', e.target.value)} placeholder="Jane Doe" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email address</Label>
+                <Input id="email" type="email" required value={form.email} onChange={e => set('email', e.target.value)} placeholder="jane@skykin.io" />
+              </div>
+            </div>
 
-        <div className="grid sm:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1.5">Full Name</label>
-            <input required value={name} onChange={e => setName(e.target.value)} className="field-input" placeholder="Jane Doe" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1.5">Email Address</label>
-            <input required type="email" value={email} onChange={e => setEmail(e.target.value)} className="field-input" placeholder="jane@skykin.com" />
-          </div>
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="role">Role</Label>
+              <Select value={form.role} onValueChange={v => set('role', v as PortalRole)}>
+                <SelectTrigger id="role"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="operator_admin">Operator Admin (full access)</SelectItem>
+                  <SelectItem value="advertiser">Advertiser</SelectItem>
+                  <SelectItem value="read_only_analyst">Read-only Analyst</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-primary mb-1.5">Role</label>
-          <select value={role} onChange={e => setRole(e.target.value as any)} className="field-input">
-            <option value="operator_admin">Operator Admin (Full Access)</option>
-            <option value="advertiser">Advertiser</option>
-            <option value="read_only_analyst">Read-Only Analyst</option>
-          </select>
-        </div>
+            {form.role !== 'operator_admin' && (
+              <div className="space-y-1.5">
+                <Label htmlFor="company">Company name</Label>
+                <Input id="company" required value={form.companyName} onChange={e => set('companyName', e.target.value)} placeholder="Acme Corp" />
+              </div>
+            )}
 
-        {role !== 'operator_admin' && (
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1.5">Company Name</label>
-            <input required value={companyName} onChange={e => setCompanyName(e.target.value)} className="field-input" placeholder="Acme Corp" />
-          </div>
-        )}
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Temporary password</Label>
+              <Input id="password" type="password" required minLength={8} value={form.password} onChange={e => set('password', e.target.value)} />
+              <p className="text-xs text-muted-foreground">At least 8 characters. The user should change it after signing in.</p>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-primary mb-1.5">Temporary Password</label>
-          <input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="field-input" minLength={8} />
-          <p className="text-xs text-muted mt-1">Must be at least 8 characters. The user should change this after logging in.</p>
-        </div>
-
-        <div className="pt-4 border-t border-[var(--border)]">
-          <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? 'Creating...' : 'Create User'}
-          </button>
-        </div>
-      </form>
+            <div className="border-t border-border pt-4">
+              <Button type="submit" disabled={create.isPending}>{create.isPending ? 'Creating…' : 'Create user'}</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

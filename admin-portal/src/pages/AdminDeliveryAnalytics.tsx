@@ -1,164 +1,122 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api } from '../lib/api';
-import type { DeliveryAnalytics } from '../types/analytics';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { useMemo } from 'react';
+import { useQueryState, parseAsString } from 'nuqs';
 import {
-  axisStroke,
-  axisTick,
-  categoryAxisStroke,
-  CHART_ACCENT,
-  CHART_GRID,
-  chartTooltipProps,
-} from '../lib/chartTheme';
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar,
+} from 'recharts';
+import { Search } from 'lucide-react';
+import {
+  Card, CardHeader, CardTitle, CardContent, KpiCard, Input, LoadingState, ErrorState,
+  chartAxis, chartGrid, chartTooltip, chartColor,
+} from '@skykin/ui';
 import { fmtNum } from '../lib/format';
-import FilterBar, { FilterSearch } from '../components/FilterBar';
-
-function normalizeDelivery(raw: DeliveryAnalytics): DeliveryAnalytics {
-  return {
-    total_deliveries: raw.total_deliveries ?? 0,
-    last_30_days: raw.last_30_days ?? [],
-    top_campaigns: raw.top_campaigns ?? [],
-    funnel_platform: raw.funnel_platform ?? [],
-  };
-}
+import { useDelivery } from '../lib/queries';
 
 export default function AdminDeliveryAnalytics() {
-  const [data, setData] = useState<DeliveryAnalytics | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
+  const { data, isPending, isError, error, refetch } = useDelivery();
+  const [q, setQ] = useQueryState('q', parseAsString.withDefault(''));
 
-  useEffect(() => {
-    api.analyticsDelivery()
-      .then(res => setData(normalizeDelivery(res)))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
-
+  const topCampaigns = data?.top_campaigns ?? [];
   const filteredTop = useMemo(() => {
-    if (!data) return [];
-    const q = search.trim().toLowerCase();
-    const list = data.top_campaigns;
-    if (!q) return list;
-    return list.filter(
+    const term = q.trim().toLowerCase();
+    if (!term) return topCampaigns;
+    return topCampaigns.filter(
       c =>
-        c.name.toLowerCase().includes(q) ||
-        c.company_name.toLowerCase().includes(q) ||
-        c.target_intent.toLowerCase().includes(q),
+        c.name.toLowerCase().includes(term) ||
+        c.company_name.toLowerCase().includes(term) ||
+        c.target_intent.toLowerCase().includes(term),
     );
-  }, [data, search]);
+  }, [topCampaigns, q]);
 
-  if (loading) return <div className="text-muted">Loading delivery analytics...</div>;
-  if (error) return <div className="alert-error">{error}</div>;
-  if (!data) return <div className="text-muted">No delivery data available.</div>;
+  if (isPending) return <LoadingState label="Loading delivery analytics…" />;
+  if (isError) return <ErrorState message={(error as Error)?.message} onRetry={() => refetch()} />;
+
+  const last30 = data.last_30_days ?? [];
+  const funnel = data.funnel_platform ?? [];
 
   return (
-    <div>
-      <h1 className="text-xl font-bold text-primary mb-1">Delivery Analytics</h1>
-      <p className="text-sm text-muted mb-5">Delivery volume trends and funnel conversion.</p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="card-static p-5 border-t-4 border-t-brand-500">
-          <p className="text-sm text-muted mb-1">Total Deliveries</p>
-          <p className="text-2xl font-bold text-primary">{fmtNum(data.total_deliveries)}</p>
-        </div>
-        <div className="card-static p-5 border-t-4 border-t-blue-500">
-          <p className="text-sm text-muted mb-1">30-Day Data Points</p>
-          <p className="text-2xl font-bold text-primary">{data.last_30_days.length}</p>
-        </div>
-        <div className="card-static p-5 border-t-4 border-t-green-500">
-          <p className="text-sm text-muted mb-1">Funnel Stages</p>
-          <p className="text-2xl font-bold text-primary">{data.funnel_platform.length}</p>
-        </div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard label="Total deliveries" value={fmtNum(data.total_deliveries)} />
+        <KpiCard label="30-day data points" value={fmtNum(last30.length)} />
+        <KpiCard label="Funnel stages" value={fmtNum(funnel.length)} />
       </div>
 
-      <div className="card-static p-6 mb-8">
-        <h3 className="font-semibold text-primary mb-6">30-Day Dispatch Volume</h3>
-        <div className="h-72">
-          {data.last_30_days.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-muted">No delivery data in the last 30 days.</div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.last_30_days} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="deliveryGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={CHART_ACCENT} stopOpacity={0.35} />
-                    <stop offset="95%" stopColor={CHART_ACCENT} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID} />
-                <XAxis dataKey="day" stroke={axisStroke} tick={axisTick} tickMargin={10} minTickGap={30} />
-                <YAxis
-                  stroke={axisStroke}
-                  tick={axisTick}
-                  tickFormatter={val => (val >= 1000 ? `${(val / 1000).toFixed(1)}k` : String(val))}
-                />
-                <Tooltip {...chartTooltipProps} />
-                <Area
-                  type="monotone"
-                  dataKey="count"
-                  stroke={CHART_ACCENT}
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#deliveryGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="card-static p-6">
-          <h3 className="font-semibold text-primary mb-6">Platform Funnel</h3>
-          <div className="h-64">
-            {data.funnel_platform.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-muted">No funnel data yet.</div>
+      <Card>
+        <CardHeader><CardTitle>30-day dispatch volume</CardTitle></CardHeader>
+        <CardContent>
+          <div className="h-72">
+            {last30.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No delivery data in the last 30 days.</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.funnel_platform} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART_GRID} />
-                  <XAxis type="number" stroke={axisStroke} tick={axisTick} />
-                  <YAxis dataKey="status" type="category" stroke={categoryAxisStroke} tick={{ ...axisTick, fontWeight: 500 }} width={90} />
-                  <Tooltip {...chartTooltipProps} />
-                  <Bar dataKey="count" fill={CHART_ACCENT} radius={[0, 4, 4, 0]} barSize={32} />
-                </BarChart>
+                <AreaChart data={last30} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="deliveryGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid {...chartGrid} />
+                  <XAxis dataKey="day" {...chartAxis} tickMargin={10} minTickGap={30} />
+                  <YAxis {...chartAxis} tickFormatter={v => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))} />
+                  <Tooltip {...chartTooltip} />
+                  <Area type="monotone" dataKey="count" name="Deliveries" stroke="var(--chart-1)" strokeWidth={2.5} fill="url(#deliveryGradient)" />
+                </AreaChart>
               </ResponsiveContainer>
             )}
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        <div className="card-static p-6">
-          <h3 className="font-semibold text-primary mb-4">Top Campaigns by Delivery</h3>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle>Platform funnel</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-64">
+              {funnel.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No funnel data yet.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={funnel} layout="vertical" margin={{ top: 0, right: 24, left: 24, bottom: 0 }}>
+                    <CartesianGrid {...chartGrid} horizontal={false} vertical />
+                    <XAxis type="number" {...chartAxis} />
+                    <YAxis dataKey="status" type="category" {...chartAxis} width={96} />
+                    <Tooltip {...chartTooltip} />
+                    <Bar dataKey="count" name="Count" fill={chartColor(0)} radius={[0, 6, 6, 0]} barSize={30} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-          <FilterBar resultCount={filteredTop.length} totalCount={data.top_campaigns.length}>
-            <FilterSearch value={search} onChange={setSearch} placeholder="Filter campaigns…" />
-          </FilterBar>
-
-          <div className="space-y-3">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <CardTitle>Top campaigns by delivery</CardTitle>
+            <div className="relative w-44">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input value={q} onChange={e => setQ(e.target.value || null)} placeholder="Filter…" className="h-8 pl-8 text-xs" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2.5">
             {filteredTop.length === 0 ? (
-              <p className="text-muted text-sm">No campaigns match your filter.</p>
+              <p className="py-6 text-center text-sm text-muted-foreground">No campaigns match your filter.</p>
             ) : (
               filteredTop.slice(0, 8).map(c => (
-                <div
-                  key={c.campaign_id}
-                  className="flex justify-between items-center p-3 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border)]"
-                >
-                  <div>
-                    <p className="font-medium text-sm text-primary">{c.name}</p>
-                    <p className="text-xs text-muted">
-                      {c.company_name} &bull; {c.target_intent}
-                    </p>
+                <div key={c.campaign_id} className="flex items-center justify-between rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{c.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{c.company_name} · {c.target_intent}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-brand-500 dark:text-brand-300">{fmtNum(c.delivery_count)}</p>
-                    <p className="text-xs text-muted">deliveries</p>
+                  <div className="shrink-0 text-right">
+                    <p className="font-display font-bold tabular-nums">{fmtNum(c.delivery_count)}</p>
+                    <p className="text-xs text-muted-foreground">deliveries</p>
                   </div>
                 </div>
               ))
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

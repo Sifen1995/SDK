@@ -75,6 +75,7 @@ export interface Campaign {
   imageUrl: string;
   destinationUrl: string;
   canvasJson: Record<string, unknown>;
+  billingModel: string;
   dailyBudgetCap: number;
   totalBudgetCap: number;
   budgetSpent: number;
@@ -98,6 +99,7 @@ export interface CreateCampaignRequest {
   image_url?: string;
   destination_url: string;
   canvas_json?: Record<string, unknown>;
+  billing_model: string;
   daily_budget_cap: number;
   total_budget_cap: number;
   frequency_cap_per_day: number;
@@ -133,6 +135,14 @@ export interface CreateUserRequest {
   company_name?: string;
   role: PortalRole;
 }
+
+export const BILLING_MODELS = [
+  { value: 'CPC', label: 'CPC', description: 'Cost per click' },
+  { value: 'CPM', label: 'CPM', description: 'Cost per 1,000 impressions' },
+  { value: 'CPI', label: 'CPI', description: 'Cost per install' },
+  { value: 'CPA', label: 'CPA', description: 'Cost per action' },
+  { value: 'REV_SHARE', label: 'Rev share', description: 'Revenue share model' },
+] as const;
 
 export const TARGET_INTENTS = [
   { value: 'crypto_interest', label: 'Crypto interest' },

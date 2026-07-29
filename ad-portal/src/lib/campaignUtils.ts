@@ -30,6 +30,7 @@ export function normalizeCampaign(raw: Record<string, unknown>): Campaign {
     imageUrl: String(raw.ImageURL ?? raw.image_url ?? raw.imageUrl ?? ''),
     destinationUrl: String(raw.DestinationURL ?? raw.destination_url ?? raw.destinationUrl ?? ''),
     canvasJson,
+    billingModel: String(raw.BillingModel ?? raw.billing_model ?? raw.billingModel ?? 'CPC'),
     dailyBudgetCap: Number(raw.DailyBudgetCap ?? raw.daily_budget_cap ?? raw.dailyBudgetCap ?? 0),
     totalBudgetCap: Number(raw.TotalBudgetCap ?? raw.total_budget_cap ?? raw.totalBudgetCap ?? 0),
     budgetSpent: Number(raw.BudgetSpent ?? raw.budget_spent ?? raw.budgetSpent ?? 0),

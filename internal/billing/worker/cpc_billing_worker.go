@@ -26,9 +26,10 @@ type CPCWorker struct {
 }
 
 type ClickQueuePayload struct {
-	CampaignID string    `json:"campaign_id"`
-	ClickedAt  time.Time `json:"clicked_at"`
-	EventType  string    `json:"event_type"`
+	CampaignID   string    `json:"campaign_id"`
+	ClickedAt    time.Time `json:"clicked_at"`
+	EventType    string    `json:"event_type"`
+	BillingModel string    `json:"billing_model"`
 }
 
 func NewCPCWorker(rdb *redis.RedisClient, db *gorm.DB, logger *slog.Logger) *CPCWorker {
@@ -81,25 +82,28 @@ func (w *CPCWorker) processCPCClick(ctx context.Context, payload ClickQueuePaylo
 			return fmt.Errorf("no active subscription for advertiser: %s", campaign.AdvertiserID)
 		}
 
-		// 3. Fetch billing rates to find CPC rate
+		// 3. Fetch the rate for the model supplied by the tracking endpoint.
 		rateRepo := billingInfra.NewBillingRateRepository(tx)
 		rates, err := rateRepo.ListByPlanID(ctx, sub.PlanID)
 		if err != nil {
 			return fmt.Errorf("fetch billing rates: %w", err)
 		}
 
-		// Find CPC rate
-		var cpcRate billingdomain.BillingRate
+		model := strings.ToUpper(strings.TrimSpace(payload.BillingModel))
+		if model == "" {
+			return fmt.Errorf("billing_model is required")
+		}
+		var billingRate billingdomain.BillingRate
 		found := false
 		for _, r := range rates {
-			if r.IsActive && strings.EqualFold(r.EventType, "click") && strings.EqualFold(r.Model, "CPC") {
-				cpcRate = r
+			if r.IsActive && strings.EqualFold(r.EventType, "click") && strings.EqualFold(r.Model, model) {
+				billingRate = r
 				found = true
 				break
 			}
 		}
 		if !found {
-			return fmt.Errorf("no active CPC rate found for plan: %s", sub.PlanID)
+			return fmt.Errorf("no active %s click rate found for plan: %s", model, sub.PlanID)
 		}
 
 		// 4. Create and persist DeliveryLog
@@ -123,10 +127,10 @@ func (w *CPCWorker) processCPCClick(ctx context.Context, payload ClickQueuePaylo
 			CampaignID:       payload.CampaignID,
 			SubscriptionID:   sub.ID,
 			EventType:        "click",
-			BillingModel:     "CPC",
-			RateApplied:      cpcRate.RateETB,
+			BillingModel:     model,
+			RateApplied:      billingRate.RateETB,
 			TransactionValue: 0,
-			ChargeETB:        cpcRate.RateETB,
+			ChargeETB:        clickCharge(model, billingRate.RateETB),
 			IsBilled:         false,
 			OccurredAt:       payload.ClickedAt,
 			CreatedAt:        time.Now().UTC(),
@@ -138,4 +142,11 @@ func (w *CPCWorker) processCPCClick(ctx context.Context, payload ClickQueuePaylo
 
 		return nil
 	})
+}
+
+func clickCharge(model string, rateETB float64) float64 {
+	if strings.EqualFold(model, "CPM") {
+		return rateETB / 1000
+	}
+	return rateETB
 }

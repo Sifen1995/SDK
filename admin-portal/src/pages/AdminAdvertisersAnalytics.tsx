@@ -1,193 +1,154 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api } from '../lib/api';
-import type { AdvertiserSummary } from '../types/analytics';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { useMemo } from 'react';
+import { useQueryStates, parseAsString, parseAsInteger } from 'nuqs';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { Download, Search } from 'lucide-react';
 import {
-  axisStroke,
-  axisTick,
-  categoryAxisStroke,
-  CHART_ACCENT,
-  CHART_GRID,
-  CHART_PALETTE,
-  chartLegendProps,
-  chartTooltipProps,
-} from '../lib/chartTheme';
+  Card, CardHeader, CardTitle, CardContent, Button, Input, Badge,
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+  DataTable, type ColumnDef, StatusPill, LoadingState, ErrorState, exportToCsv,
+  chartAxis, chartGrid, chartTooltip, chartColor,
+} from '@skykin/ui';
+import type { AdvertiserSummary } from '../types/analytics';
 import { fmtEtb, fmtNum } from '../lib/format';
-import FilterBar, { FilterSearch, FilterSelect } from '../components/FilterBar';
-import OffsetPagination, { paginateSlice, PAGE_SIZE } from '../components/Pagination';
+import { useAdvertisers } from '../lib/queries';
+
+const PAGE_SIZE = 8;
+
+const columns: ColumnDef<AdvertiserSummary>[] = [
+  {
+    accessorKey: 'company_name',
+    header: 'Company',
+    cell: ({ row }) => (
+      <div>
+        <p className="font-medium">{row.original.company_name}</p>
+        <p className="mt-0.5 font-mono text-xs text-muted-foreground">{row.original.advertiser_id}</p>
+      </div>
+    ),
+  },
+  { accessorKey: 'plan_name', header: 'Plan', cell: ({ getValue }) => <Badge variant="identity">{(getValue() as string) || 'N/A'}</Badge> },
+  { accessorKey: 'subscription_status', header: 'Status', cell: ({ getValue }) => <StatusPill status={(getValue() as string) || 'none'} /> },
+  { accessorKey: 'campaign_count', header: 'Campaigns', meta: { className: 'text-right' }, cell: ({ getValue }) => <span className="tabular-nums">{fmtNum(getValue() as number)}</span> },
+  { accessorKey: 'active_campaigns', header: 'Active', meta: { className: 'text-right' }, cell: ({ getValue }) => <span className="tabular-nums">{fmtNum(getValue() as number)}</span> },
+  { accessorKey: 'total_deliveries', header: 'Deliveries', meta: { className: 'text-right' }, cell: ({ getValue }) => <span className="tabular-nums">{fmtNum(getValue() as number)}</span> },
+  { accessorKey: 'segment_spend_etb', header: 'Segment spend', meta: { className: 'text-right' }, cell: ({ getValue }) => <span className="tabular-nums text-success">{fmtEtb(getValue() as number)}</span> },
+];
 
 export default function AdminAdvertisersAnalytics() {
-  const [data, setData] = useState<AdvertiserSummary[]>([]);
-  const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [tablePage, setTablePage] = useState(1);
-
-  useEffect(() => {
-    api.analyticsAdvertisers()
-      .then(res => {
-        setData(res.advertisers ?? []);
-        setCount(res.count ?? res.advertisers?.length ?? 0);
-      })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return data.filter(adv => {
-      if (statusFilter !== 'all' && (adv.subscription_status || 'none') !== statusFilter) return false;
-      if (!q) return true;
-      return adv.company_name.toLowerCase().includes(q) || adv.advertiser_id.toLowerCase().includes(q);
-    });
-  }, [data, search, statusFilter]);
-
-  useEffect(() => {
-    setTablePage(1);
-  }, [search, statusFilter]);
-
-  const tableRows = useMemo(
-    () => paginateSlice(filtered, tablePage, PAGE_SIZE),
-    [filtered, tablePage],
-  );
+  const { data, isPending, isError, error, refetch } = useAdvertisers();
+  const [filters, setFilters] = useQueryStates({
+    q: parseAsString.withDefault(''),
+    status: parseAsString.withDefault('all'),
+    page: parseAsInteger.withDefault(1),
+  });
+  const rows = data ?? [];
 
   const statusOptions = useMemo(() => {
-    const statuses = [...new Set(data.map(a => a.subscription_status || 'none'))];
-    return [{ value: 'all', label: 'All subscriptions' }, ...statuses.map(s => ({ value: s, label: s }))];
-  }, [data]);
+    const s = [...new Set(rows.map(a => a.subscription_status || 'none'))];
+    return [{ value: 'all', label: 'All subscriptions' }, ...s.map(v => ({ value: v, label: v }))];
+  }, [rows]);
 
-  if (loading) return <div className="text-muted">Loading advertisers...</div>;
-  if (error) return <div className="alert-error">{error}</div>;
+  const filtered = useMemo(() => {
+    const q = filters.q.trim().toLowerCase();
+    return rows.filter(a => {
+      if (filters.status !== 'all' && (a.subscription_status || 'none') !== filters.status) return false;
+      if (!q) return true;
+      return a.company_name.toLowerCase().includes(q) || a.advertiser_id.toLowerCase().includes(q);
+    });
+  }, [rows, filters]);
 
-  const statusDist = filtered.reduce(
-    (acc, curr) => {
-      const status = curr.subscription_status || 'none';
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const page = Math.min(filters.page, totalPages);
+  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  if (isPending) return <LoadingState label="Loading advertisers…" />;
+  if (isError) return <ErrorState message={(error as Error)?.message} onRetry={() => refetch()} />;
+
+  const statusDist = filtered.reduce((acc, a) => {
+    const k = a.subscription_status || 'none';
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
   const pieData = Object.entries(statusDist).map(([name, value]) => ({ name, value }));
   const topSpenders = [...filtered].sort((a, b) => (b.segment_spend_etb ?? 0) - (a.segment_spend_etb ?? 0)).slice(0, 5);
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-primary mb-1">Advertisers</h1>
-        <p className="text-muted">Operational summary across {count} registered advertisers.</p>
-      </div>
-
-      <FilterBar resultCount={filtered.length} totalCount={data.length}>
-        <FilterSearch value={search} onChange={setSearch} placeholder="Search company or ID…" />
-        <FilterSelect value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
-      </FilterBar>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="card-static p-6">
-          <h3 className="font-semibold text-primary mb-6">Subscription Status</h3>
-          <div className="h-64">
-            {pieData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-muted">No data available</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5}>
-                    {pieData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_PALETTE[index % CHART_PALETTE.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip {...chartTooltipProps} />
-                  <Legend {...chartLegendProps} />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-
-        <div className="card-static p-6">
-          <h3 className="font-semibold text-primary mb-6">Top Spenders</h3>
-          <div className="h-64">
-            {topSpenders.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-muted">No spenders</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topSpenders} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART_GRID} />
-                  <XAxis
-                    type="number"
-                    stroke={axisStroke}
-                    tick={axisTick}
-                    tickFormatter={val => `ETB ${val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}`}
-                  />
-                  <YAxis dataKey="company_name" type="category" stroke={categoryAxisStroke} tick={{ ...axisTick, fontWeight: 500 }} width={100} />
-                  <Tooltip
-                    {...chartTooltipProps}
-                    formatter={value => [fmtEtb(Number(value ?? 0)), 'Spend']}
-                  />
-                  <Bar dataKey="segment_spend_etb" fill={CHART_ACCENT} radius={[0, 4, 4, 0]} barSize={24} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="card-static overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--bg-subtle)] text-xs uppercase tracking-wider text-muted">
-                <th className="p-4 font-medium">Company</th>
-                <th className="p-4 font-medium">Plan</th>
-                <th className="p-4 font-medium">Status</th>
-                <th className="p-4 font-medium text-right">Campaigns</th>
-                <th className="p-4 font-medium text-right">Active</th>
-                <th className="p-4 font-medium text-right">Total Deliveries</th>
-                <th className="p-4 font-medium text-right">Segment Spend</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {tableRows.map(adv => (
-                <tr key={adv.advertiser_id} className="hover:bg-[var(--bg-subtle)] transition">
-                  <td className="p-4">
-                    <p className="font-medium text-primary">{adv.company_name}</p>
-                    <p className="text-xs font-mono text-muted mt-1">{adv.advertiser_id}</p>
-                  </td>
-                  <td className="p-4">
-                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-                      {adv.plan_name || 'N/A'}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span
-                      className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${
-                        adv.subscription_status === 'active'
-                          ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
-                          : 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
-                      }`}
-                    >
-                      {adv.subscription_status || 'none'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right text-primary font-medium">{adv.campaign_count}</td>
-                  <td className="p-4 text-right text-primary font-medium">{adv.active_campaigns}</td>
-                  <td className="p-4 text-right text-primary font-medium">{fmtNum(adv.total_deliveries)}</td>
-                  <td className="p-4 text-right text-green-600 dark:text-green-400 font-medium">{fmtEtb(adv.segment_spend_etb)}</td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted">
-                    No advertisers match your filters.
-                  </td>
-                </tr>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle>Subscription status</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-56">
+              {pieData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No data</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={56} outerRadius={78} paddingAngle={4} stroke="none">
+                      {pieData.map((_, i) => <Cell key={i} fill={chartColor(i)} />)}
+                    </Pie>
+                    <Tooltip {...chartTooltip} />
+                  </PieChart>
+                </ResponsiveContainer>
               )}
-            </tbody>
-          </table>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Top spenders</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-56">
+              {topSpenders.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No spenders</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topSpenders} layout="vertical" margin={{ top: 0, right: 24, left: 24, bottom: 0 }}>
+                    <CartesianGrid {...chartGrid} horizontal={false} vertical />
+                    <XAxis type="number" {...chartAxis} tickFormatter={v => `ETB ${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`} />
+                    <YAxis dataKey="company_name" type="category" {...chartAxis} width={110} />
+                    <Tooltip {...chartTooltip} formatter={(v) => [fmtEtb(Number(v ?? 0)), 'Spend']} />
+                    <Bar dataKey="segment_spend_etb" name="Spend" fill={chartColor(0)} radius={[0, 6, 6, 0]} barSize={22} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-56 flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={filters.q} onChange={e => setFilters({ q: e.target.value || '', page: 1 })} placeholder="Search company or ID…" className="pl-9" />
+          </div>
+          <Select value={filters.status} onValueChange={v => setFilters({ status: v, page: 1 })}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            onClick={() => exportToCsv(filtered as unknown as Record<string, unknown>[], 'advertisers')}
+          >
+            <Download className="size-4" /> Export CSV
+          </Button>
         </div>
-        <OffsetPagination page={tablePage} totalItems={filtered.length} onPageChange={setTablePage} />
+
+        <DataTable
+          columns={columns}
+          data={pageRows}
+          emptyState={<span className="text-sm text-muted-foreground">No advertisers match your filters.</span>}
+        />
+
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>{filtered.length} advertiser{filtered.length === 1 ? '' : 's'}</span>
+          <div className="flex items-center gap-2">
+            <span className="tabular-nums">Page {page} / {totalPages}</span>
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setFilters({ page: page - 1 })}>Previous</Button>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setFilters({ page: page + 1 })}>Next</Button>
+          </div>
+        </div>
       </div>
     </div>
   );
