@@ -36,7 +36,8 @@ func Register(
 	authService := advertiserApp.NewAuthService(adRepo, cfg)
 	authHandler := adportalHTTP.NewAuthHandler(authService)
 
-	billingMod := billingRoutes.Wire(db, bus)
+	campaignQuota := bootstrap.NewCampaignQuotaReader(db)
+	billingMod := billingRoutes.Wire(db, bus, campaignQuota)
 	audienceMod := audienceRoutes.Wire(db, billingMod.SubRepo)
 
 	bootstrap.RegisterAdminEventConsumers(db, bus, slog.Default())
@@ -46,7 +47,7 @@ func Register(
 	campaignMod := campaignRoutes.Wire(db, billingMod.SubEnforcer, audienceMod.Purchases, billingMod.ChannelRepo, bus)
 	adminMod := adminRoutes.Wire(
 		db, cfg,
-		jobs, bus,
+		jobs,
 		billingMod.PlanService,
 		billingMod.BillingAdmin,
 		audienceMod.Segments,

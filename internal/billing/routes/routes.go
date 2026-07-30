@@ -4,7 +4,7 @@ import (
 	billingHTTP "skykin-platform/internal/billing/interfaces/http"
 	billingApp "skykin-platform/internal/billing/application"
 	billingInfra "skykin-platform/internal/billing/infrastructure"
-	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	billingdomain "skykin-platform/internal/billing/domain"
 	"skykin-platform/internal/platform/messaging"
 
 	"github.com/gin-gonic/gin"
@@ -13,23 +13,23 @@ import (
 
 // Module wires billing dependencies for the ad portal.
 type Module struct {
-	Handler     *billingHTTP.Handler
-	SubEnforcer *billingApp.SubscriptionEnforcer
-	SubRepo     *billingInfra.SubscriptionRepository
-	ChannelRepo *billingInfra.ChannelRepository
-	RateRepo    *billingInfra.BillingRateRepository
-	PlanService *billingApp.PlanService
+	Handler      *billingHTTP.Handler
+	SubEnforcer  *billingApp.SubscriptionEnforcer
+	SubRepo      *billingInfra.SubscriptionRepository
+	ChannelRepo  *billingInfra.ChannelRepository
+	RateRepo     *billingInfra.BillingRateRepository
+	PlanService  *billingApp.PlanService
 	BillingAdmin *billingApp.BillingAdminService
 }
 
-// Wire constructs the billing module.
-func Wire(db *gorm.DB, bus *messaging.Bus) *Module {
+// Wire constructs the billing module. Campaign quota reads are provided by the
+// composition root so billing never imports campaign infrastructure.
+func Wire(db *gorm.DB, bus *messaging.Bus, campaignQuota billingdomain.CampaignQuotaReader) *Module {
 	subRepo := billingInfra.NewSubscriptionRepository(db)
 	rateRepo := billingInfra.NewBillingRateRepository(db)
 	channelRepo := billingInfra.NewChannelRepository(db)
-	campaignRepo := campaignInfra.NewRepository(db)
 
-	subEnforcer := billingApp.NewSubscriptionEnforcer(subRepo, channelRepo, campaignRepo)
+	subEnforcer := billingApp.NewSubscriptionEnforcer(subRepo, channelRepo, campaignQuota)
 	subscriptionSvc := billingApp.NewSubscriptionService(subRepo, channelRepo)
 	planSvc := billingApp.NewPlanService(subRepo, bus)
 	billingAdmin := billingApp.NewBillingAdminService(subRepo, rateRepo)

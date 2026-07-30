@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"skykin-platform/configs"
-	analyticsdomain "skykin-platform/internal/analytics/domain"
 	intentdomain "skykin-platform/internal/intents/domain"
 	"skykin-platform/internal/intents/infrastructure/persistence"
 
@@ -44,18 +43,18 @@ func (r *intentRepository) CreateBatch(ctx context.Context, intents []*intentdom
 	return r.db.WithContext(ctx).CreateInBatches(rows, 100).Error
 }
 
-func (r *intentRepository) FindUsersWithIntent(
+func (r *intentRepository) FindPseudonymousIDsWithIntent(
 	ctx context.Context,
 	intentName string,
 	minConfidence float64,
 	since time.Time,
 ) ([]string, error) {
-	return r.findDistinctUsersWithFilter(ctx, func(q *gorm.DB) *gorm.DB {
+	return r.findDistinctPseudonymousIDsWithFilter(ctx, func(q *gorm.DB) *gorm.DB {
 		return q.Where("intent_name = ? AND confidence >= ? AND created_at >= ?", intentName, minConfidence, since)
 	})
 }
 
-func (r *intentRepository) FindUsersWithAnyIntent(
+func (r *intentRepository) FindPseudonymousIDsWithAnyIntent(
 	ctx context.Context,
 	intentNames []string,
 	minConfidence float64,
@@ -64,27 +63,27 @@ func (r *intentRepository) FindUsersWithAnyIntent(
 	if len(intentNames) == 0 {
 		return nil, nil
 	}
-	return r.findDistinctUsersWithFilter(ctx, func(q *gorm.DB) *gorm.DB {
+	return r.findDistinctPseudonymousIDsWithFilter(ctx, func(q *gorm.DB) *gorm.DB {
 		return q.Where("intent_name IN ? AND confidence >= ? AND created_at >= ?", intentNames, minConfidence, since)
 	})
 }
 
-func (r *intentRepository) findDistinctUsersWithFilter(
+func (r *intentRepository) findDistinctPseudonymousIDsWithFilter(
 	ctx context.Context,
 	apply func(*gorm.DB) *gorm.DB,
 ) ([]string, error) {
 	filtered := apply(r.db.WithContext(ctx).Model(&persistence.IntentRow{}))
 	sub := filtered.
-		Select("user_id, MAX(created_at) AS created_at").
-		Group("user_id")
+		Select("pseudonymous_id, MAX(created_at) AS created_at").
+		Group("pseudonymous_id")
 
 	var rows []struct {
-		UserID string
+		PseudonymousID string
 	}
 	err := r.db.WithContext(ctx).
 		Table("intents").
-		Select("intents.user_id").
-		Joins("INNER JOIN (?) AS latest ON intents.user_id = latest.user_id AND intents.created_at = latest.created_at", sub).
+		Select("intents.pseudonymous_id").
+		Joins("INNER JOIN (?) AS latest ON intents.pseudonymous_id = latest.pseudonymous_id AND intents.created_at = latest.created_at", sub).
 		Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -92,31 +91,31 @@ func (r *intentRepository) findDistinctUsersWithFilter(
 
 	out := make([]string, 0, len(rows))
 	for _, row := range rows {
-		if row.UserID != "" {
-			out = append(out, row.UserID)
+		if row.PseudonymousID != "" {
+			out = append(out, row.PseudonymousID)
 		}
 	}
 	return out, nil
 }
 
-func (r *intentRepository) FindLatestByUserIDs(
+func (r *intentRepository) FindLatestByPseudonymousIDs(
 	ctx context.Context,
-	userIDs []string,
+	pseudonymousIDs []string,
 ) (map[string]*intentdomain.Intent, error) {
-	if len(userIDs) == 0 {
+	if len(pseudonymousIDs) == 0 {
 		return map[string]*intentdomain.Intent{}, nil
 	}
 
 	sub := r.db.WithContext(ctx).
 		Model(&persistence.IntentRow{}).
-		Select("user_id, MAX(created_at) AS created_at").
-		Where("user_id IN ?", userIDs).
-		Group("user_id")
+		Select("pseudonymous_id, MAX(created_at) AS created_at").
+		Where("pseudonymous_id IN ?", pseudonymousIDs).
+		Group("pseudonymous_id")
 
 	var rows []persistence.IntentRow
 	err := r.db.WithContext(ctx).
 		Table("intents").
-		Joins("INNER JOIN (?) AS latest ON intents.user_id = latest.user_id AND intents.created_at = latest.created_at", sub).
+		Joins("INNER JOIN (?) AS latest ON intents.pseudonymous_id = latest.pseudonymous_id AND intents.created_at = latest.created_at", sub).
 		Find(&rows).Error
 	if err != nil {
 		return nil, err
@@ -125,58 +124,38 @@ func (r *intentRepository) FindLatestByUserIDs(
 	result := make(map[string]*intentdomain.Intent, len(rows))
 	for i := range rows {
 		d := rows[i].ToDomain()
-		result[d.UserID] = d
+		result[d.PseudonymousID] = d
 	}
 	return result, nil
 }
 
-// ConsistencyReader exposes sustained-intent queries for segment classification.
-type ConsistencyReader struct {
-	inner *intentRepository
-}
-
-func NewConsistencyReader(db *gorm.DB, cfg *configs.Config) *ConsistencyReader {
-	return &ConsistencyReader{inner: &intentRepository{db: db, config: cfg}}
-}
-
-func (r *ConsistencyReader) FindConsistentUsers(
+func (r *intentRepository) FindConsistentSignals(
 	ctx context.Context,
 	intentName string,
 	minConf float64,
 	lookbackDays int,
 	minDays int,
 	maxAgeDays int,
-) ([]*analyticsdomain.ConsistentUser, error) {
-	return r.inner.findConsistentUsers(ctx, intentName, minConf, lookbackDays, minDays, maxAgeDays)
-}
-
-func (r *intentRepository) findConsistentUsers(
-	ctx context.Context,
-	intentName string,
-	minConf float64,
-	lookbackDays int,
-	minDays int,
-	maxAgeDays int,
-) ([]*analyticsdomain.ConsistentUser, error) {
+) ([]*intentdomain.ConsistentSignal, error) {
 	lookbackSince := time.Now().AddDate(0, 0, -lookbackDays)
 	maxAgeSince := time.Now().AddDate(0, 0, -maxAgeDays)
 
 	type row struct {
-		UserID        string
-		DaysActive    int
-		AvgConfidence float64
-		LastSeenAt    time.Time
+		PseudonymousID string
+		DaysActive     int
+		AvgConfidence  float64
+		LastSeenAt     time.Time
 	}
 	var rows []row
 	err := r.db.WithContext(ctx).
 		Model(&persistence.IntentRow{}).
 		Select(`
-			user_id,
+			pseudonymous_id,
 			COUNT(DISTINCT DATE(created_at)) AS days_active,
 			ROUND(AVG(confidence)::numeric, 3) AS avg_confidence,
 			MAX(created_at) AS last_seen_at`).
 		Where("intent_name = ? AND confidence >= ? AND created_at >= ?", intentName, minConf, lookbackSince).
-		Group("user_id").
+		Group("pseudonymous_id").
 		Having("COUNT(DISTINCT DATE(created_at)) >= ? AND MAX(created_at) >= ?", minDays, maxAgeSince).
 		Order("days_active DESC, avg_confidence DESC").
 		Scan(&rows).Error
@@ -184,13 +163,13 @@ func (r *intentRepository) findConsistentUsers(
 		return nil, err
 	}
 
-	out := make([]*analyticsdomain.ConsistentUser, 0, len(rows))
+	out := make([]*intentdomain.ConsistentSignal, 0, len(rows))
 	for i := range rows {
-		out = append(out, &analyticsdomain.ConsistentUser{
-			UserID:     rows[i].UserID,
-			Confidence: rows[i].AvgConfidence,
-			DaysActive: rows[i].DaysActive,
-			LastSeenAt: rows[i].LastSeenAt,
+		out = append(out, &intentdomain.ConsistentSignal{
+			PseudonymousID: rows[i].PseudonymousID,
+			Confidence:     rows[i].AvgConfidence,
+			DaysActive:     rows[i].DaysActive,
+			LastSeenAt:     rows[i].LastSeenAt,
 		})
 	}
 	return out, nil

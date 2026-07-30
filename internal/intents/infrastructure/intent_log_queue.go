@@ -13,11 +13,14 @@ const IntentLogQueueKey = "queue:intent_logs"
 
 // IntentLogEntry is the JSON payload written to the Redis intent log queue.
 type IntentLogEntry struct {
-	UserID       string    `json:"user_id"`
-	IntentName   string    `json:"intent_name"`
-	Confidence   float64   `json:"confidence"`
-	ModelVersion string    `json:"model_version,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
+	PseudonymousID string    `json:"pseudonymous_id"`
+	IntentName     string    `json:"intent_name"`
+	Confidence     float64   `json:"confidence"`
+	ModelVersion   string    `json:"model_version,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+
+	// LegacyUserID drains entries enqueued before the column rename.
+	LegacyUserID string `json:"user_id,omitempty"`
 }
 
 // IntentLogQueue enqueues intent profiles for asynchronous Postgres persistence.
@@ -34,11 +37,11 @@ func (q *IntentLogQueue) Enqueue(ctx context.Context, profile *intentdomain.Inte
 		return nil
 	}
 	entry := IntentLogEntry{
-		UserID:       profile.PseudonymousID,
-		IntentName:   profile.IntentName,
-		Confidence:   profile.Confidence,
-		ModelVersion: profile.ModelVersion,
-		CreatedAt:    profile.RecordedAt,
+		PseudonymousID: profile.PseudonymousID,
+		IntentName:     profile.IntentName,
+		Confidence:     profile.Confidence,
+		ModelVersion:   profile.ModelVersion,
+		CreatedAt:      profile.RecordedAt,
 	}
 	if entry.CreatedAt.IsZero() {
 		entry.CreatedAt = time.Now().UTC()
@@ -51,10 +54,14 @@ func (q *IntentLogQueue) Enqueue(ctx context.Context, profile *intentdomain.Inte
 }
 
 func (e IntentLogEntry) toIntent() *intentdomain.Intent {
+	pseudonymousID := e.PseudonymousID
+	if pseudonymousID == "" {
+		pseudonymousID = e.LegacyUserID
+	}
 	return &intentdomain.Intent{
-		UserID:     e.UserID,
-		IntentName: e.IntentName,
-		Confidence: e.Confidence,
-		CreatedAt:  e.CreatedAt,
+		PseudonymousID: pseudonymousID,
+		IntentName:     e.IntentName,
+		Confidence:     e.Confidence,
+		CreatedAt:      e.CreatedAt,
 	}
 }

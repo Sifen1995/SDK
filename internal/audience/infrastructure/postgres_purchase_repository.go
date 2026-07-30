@@ -33,8 +33,20 @@ func (r *PurchaseRepository) GetValidForCampaign(ctx context.Context, campaignID
 }
 
 func (r *PurchaseRepository) CreatePurchase(ctx context.Context, purchase *audiencedomain.SegmentPurchase) error {
+	return r.CreatePurchaseTx(ctx, r.db, purchase)
+}
+
+func (r *PurchaseRepository) CreatePurchaseTx(
+	ctx context.Context,
+	tx any,
+	purchase *audiencedomain.SegmentPurchase,
+) error {
+	db, ok := tx.(*gorm.DB)
+	if !ok || db == nil {
+		return gorm.ErrInvalidTransaction
+	}
 	row := persistence.SegmentPurchaseRowFromDomain(purchase)
-	if err := r.db.WithContext(ctx).Create(row).Error; err != nil {
+	if err := db.WithContext(ctx).Create(row).Error; err != nil {
 		return err
 	}
 	purchase.ID = row.ID

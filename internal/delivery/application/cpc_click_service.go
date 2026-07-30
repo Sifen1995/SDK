@@ -5,7 +5,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -18,11 +17,6 @@ type CPCClickService struct {
 	rdb       *redis.RedisClient
 }
 
-type AnonymousClickEvent struct {
-	CampaignID string    `json:"campaign_id"`
-	ClickedAt  time.Time `json:"clicked_at"`
-	EventType  string    `json:"event_type"` // "CLICK"
-}
 
 func NewCPCClickService(secretKey string, rdb *redis.RedisClient) *CPCClickService {
 	return &CPCClickService{
@@ -36,18 +30,14 @@ func (s *CPCClickService) ProcessClick(ctx context.Context, campaignID, token st
 		return fmt.Errorf("invalid token signature or expired timestamp")
 	}
 
-	event := AnonymousClickEvent{
-		CampaignID: campaignID,
-		ClickedAt:  time.Now().UTC(),
-		EventType:  "CLICK",
-	}
-
-	data, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-
-	return s.rdb.RPush(ctx, "queue:cpc_billing_events", string(data))
+	_, err := s.rdb.XAdd(ctx, BillingEventsStream, billingEventsStreamMax, map[string]interface{}{
+		"campaign_id":       campaignID,
+		"event_type":        "click",
+		"transaction_value": "0.0000",
+		"occurred_at":       time.Now().UTC().Format(time.RFC3339Nano),
+		"source":            "anonymous",
+	})
+	return err
 }
 
 func (s *CPCClickService) validateToken(campaignID, token string) bool {

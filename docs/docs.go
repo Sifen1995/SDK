@@ -275,7 +275,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Marks the candidate approved and asynchronously provisions the audience segment and memberships.",
+                "description": "Publishes the audience segment and its memberships in a single transaction and returns the published segment id. Fails with 409 when the candidate has already been reviewed.",
                 "consumes": [
                     "application/json"
                 ],
@@ -305,17 +305,26 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "202": {
-                        "description": "Accepted",
+                    "201": {
+                        "description": "Created",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/internal_admin_interfaces_http.ApproveSegmentCandidateResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -369,6 +378,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -2303,16 +2318,19 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "expires_at": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-06-02T12:00:00Z"
                 },
                 "refresh_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                 },
                 "token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                 },
                 "user": {
-                    "$ref": "#/definitions/skykin-platform_internal_ad_portal_application.UserInfo"
+                    "$ref": "#/definitions/internal_ad_portal_interfaces_http.LoginUserInfo"
                 }
             }
         },
@@ -2360,6 +2378,19 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_ad_portal_interfaces_http.LoginUserInfo": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "role": {
+                    "type": "string",
+                    "example": "advertiser"
                 }
             }
         },
@@ -2434,19 +2465,24 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-06-01T12:00:00Z"
                 },
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "advertiser@test.com"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Jane Doe"
                 },
                 "role": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "advertiser"
                 }
             }
         },
@@ -2482,6 +2518,27 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "Coffee Lovers"
+                }
+            }
+        },
+        "internal_admin_interfaces_http.ApproveSegmentCandidateResponse": {
+            "type": "object",
+            "properties": {
+                "candidate_id": {
+                    "type": "string",
+                    "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                },
+                "member_count": {
+                    "type": "integer",
+                    "example": 1240
+                },
+                "message": {
+                    "type": "string",
+                    "example": "segment published from candidate"
+                },
+                "segment_id": {
+                    "type": "string",
+                    "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
                 }
             }
         },
@@ -2943,6 +3000,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "IN_APP_BANNER"
                 },
+                "click_token": {
+                    "type": "string",
+                    "example": "a1b2c3d4....2026-07-30-08"
+                },
                 "destination_url": {
                     "type": "string",
                     "example": "https://shop.example.com"
@@ -2989,12 +3050,10 @@ const docTemplate = `{
             ],
             "properties": {
                 "campaign_id": {
-                    "description": "CampaignID of the served creative",
                     "type": "string",
                     "example": "c1a2b3c4-d5e6-7890-abcd-ef1234567890"
                 },
                 "event_type": {
-                    "description": "EventType for anonymous bill track (impression)",
                     "type": "string",
                     "example": "impression"
                 }
@@ -3008,32 +3067,26 @@ const docTemplate = `{
             ],
             "properties": {
                 "campaign_id": {
-                    "description": "CampaignID of the served creative",
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
                 },
                 "event_type": {
-                    "description": "EventType: impression | click | install | signup | purchase",
                     "type": "string",
                     "example": "impression"
                 },
                 "install_token": {
-                    "description": "InstallToken is optional and only required for install events.",
                     "type": "string",
                     "example": "signed-install-token"
                 },
                 "occurred_at": {
-                    "description": "OccurredAt RFC3339 timestamp; defaults to server UTC now when omitted",
                     "type": "string",
                     "example": "2026-07-18T12:00:00Z"
                 },
                 "pseudonymous_id": {
-                    "description": "PseudonymousID from consent; required for impression/click Redis dedup",
                     "type": "string",
                     "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
                 },
                 "transaction_value": {
-                    "description": "TransactionValue used for REV_SHARE / purchase events",
                     "type": "number",
                     "minimum": 0,
                     "example": 0
@@ -3236,17 +3289,6 @@ const docTemplate = `{
                 }
             }
         },
-        "skykin-platform_internal_ad_portal_application.UserInfo": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
-                }
-            }
-        },
         "skykin-platform_internal_admin_application.GetUsersResult": {
             "type": "object",
             "properties": {
@@ -3298,6 +3340,17 @@ const docTemplate = `{
                 }
             }
         },
+        "skykin-platform_internal_analytics_application.IntentScanFailure": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "intent_name": {
+                    "type": "string"
+                }
+            }
+        },
         "skykin-platform_internal_analytics_application.RunReport": {
             "type": "object",
             "properties": {
@@ -3307,6 +3360,12 @@ const docTemplate = `{
                 "candidates_updated": {
                     "type": "integer"
                 },
+                "intents_failed": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skykin-platform_internal_analytics_application.IntentScanFailure"
+                    }
+                },
                 "intents_skipped": {
                     "type": "array",
                     "items": {
@@ -3315,6 +3374,9 @@ const docTemplate = `{
                 },
                 "message": {
                     "type": "string"
+                },
+                "partial": {
+                    "type": "boolean"
                 },
                 "segments_enriched": {
                     "type": "integer"
@@ -3579,6 +3641,10 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "price_etb": {
+                    "description": "PriceETB carries the same value under the field name the portals read.",
+                    "type": "number"
                 },
                 "purchasable": {
                     "type": "boolean"

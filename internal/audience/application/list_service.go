@@ -23,8 +23,10 @@ type SegmentDTO struct {
 	ApproximateSize  int      `json:"approximate_size"`
 	EstimatedCPM     float64  `json:"estimated_cpm"`
 	EstimatedPrice   float64  `json:"estimated_price_etb"` // MVP: estimated_cpm × impression bundle / 1000
-	Purchasable      bool     `json:"purchasable"`
-	IsActive         bool     `json:"is_active"`
+	// PriceETB carries the same value under the field name the portals read.
+	PriceETB    float64 `json:"price_etb"`
+	Purchasable bool    `json:"purchasable"`
+	IsActive    bool    `json:"is_active"`
 }
 
 // ListSegmentsResult is returned by segment list endpoints.
@@ -216,6 +218,7 @@ func toSegmentDTO(seg *audiencedomain.AudienceSegment, purchasable bool) Segment
 		ApproximateSize:  seg.ApproximateSize,
 		EstimatedCPM:     seg.EstimatedCPM,
 		EstimatedPrice:   price,
+		PriceETB:         price,
 		Purchasable:      purchasable,
 		IsActive:         seg.IsActive,
 	}

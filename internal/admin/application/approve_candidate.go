@@ -6,54 +6,68 @@ import (
 	"log/slog"
 	"strings"
 
-	adminEvents "skykin-platform/internal/admin/events"
-	"skykin-platform/internal/platform/messaging"
-
 	"github.com/google/uuid"
 )
 
-// ApproveCandidateUseCase publishes a candidate approval for async audience processing.
-type ApproveCandidateUseCase struct {
-	bus    *messaging.Bus
-	logger *slog.Logger
+// ErrCandidateNotPending means the candidate was already approved or rejected.
+var ErrCandidateNotPending = errors.New("candidate is not pending")
+
+// ApprovedSegment is the admin-facing result of publishing a candidate.
+type ApprovedSegment struct {
+	SegmentID   string
+	MemberCount int
 }
 
-func NewApproveCandidateUseCase(bus *messaging.Bus, logger *slog.Logger) *ApproveCandidateUseCase {
+// SegmentPublisher provisions the audience segment for an approved candidate.
+// The audience module implements it and must commit the segment row, its
+// memberships and the candidate status change together.
+type SegmentPublisher interface {
+	PublishFromCandidate(
+		ctx context.Context,
+		candidateID, adminID uuid.UUID,
+		name, description string,
+		estimatedCPM float64,
+	) (ApprovedSegment, error)
+}
+
+// ApproveCandidateUseCase validates operator input and publishes the segment.
+type ApproveCandidateUseCase struct {
+	publisher SegmentPublisher
+	logger    *slog.Logger
+}
+
+func NewApproveCandidateUseCase(publisher SegmentPublisher, logger *slog.Logger) *ApproveCandidateUseCase {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &ApproveCandidateUseCase{bus: bus, logger: logger}
+	return &ApproveCandidateUseCase{publisher: publisher, logger: logger}
 }
 
 func (uc *ApproveCandidateUseCase) Execute(
 	ctx context.Context,
-	candidateID uuid.UUID,
-	adminID uuid.UUID,
+	candidateID, adminID uuid.UUID,
 	name, description string,
 	estimatedCPM float64,
-) error {
-	if uc.bus == nil {
-		return errors.New("event bus not configured")
+) (ApprovedSegment, error) {
+	if uc.publisher == nil {
+		return ApprovedSegment{}, errors.New("segment publisher not configured")
 	}
 	if strings.TrimSpace(name) == "" {
-		return errors.New("name is required")
+		return ApprovedSegment{}, errors.New("name is required")
 	}
 	if estimatedCPM <= 0 {
-		return errors.New("estimated_cpm must be > 0")
+		return ApprovedSegment{}, errors.New("estimated_cpm must be > 0")
 	}
 
-	uc.bus.Publish(messaging.Event{
-		Name: adminEvents.TopicCandidateApproved,
-		Ctx:  ctx,
-		Payload: adminEvents.CandidateApprovedEvent{
-			CandidateID:  candidateID,
-			AdminID:      adminID,
-			Name:         name,
-			Description:  description,
-			EstimatedCPM: estimatedCPM,
-		},
-	})
+	segment, err := uc.publisher.PublishFromCandidate(ctx, candidateID, adminID, name, description, estimatedCPM)
+	if err != nil {
+		return ApprovedSegment{}, err
+	}
 
-	uc.logger.Info("candidate approval requested", "candidate_id", candidateID)
-	return nil
+	uc.logger.Info("segment candidate approved",
+		"candidate_id", candidateID,
+		"segment_id", segment.SegmentID,
+		"member_count", segment.MemberCount,
+	)
+	return segment, nil
 }

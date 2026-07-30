@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
-// AnonymousUserID is a fixed sentinel UUID for non-consented delivery log rows
-// (campaign_delivery_logs.user_id is NOT NULL).
-const AnonymousUserID = "00000000-0000-0000-0000-000000000000"
+// AnonymousPseudonymousID is a fixed sentinel UUID for non-consented delivery log
+// rows (campaign_delivery_logs.pseudonymous_id is NOT NULL).
+const AnonymousPseudonymousID = "00000000-0000-0000-0000-000000000000"
 
 // Delivery lifecycle statuses written to campaign_delivery_logs.
 const (
@@ -21,7 +21,7 @@ const (
 type DeliveryLog struct {
 	ID             string
 	CampaignID     string
-	UserID         string
+	PseudonymousID string
 	SessionID      string
 	DeliveryStatus string
 	LoggedAt       time.Time

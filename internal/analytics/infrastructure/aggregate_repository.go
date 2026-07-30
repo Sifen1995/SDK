@@ -6,21 +6,14 @@ import (
 	"strings"
 	"time"
 
-	intentdomain "skykin-platform/internal/intents/domain"
-	"skykin-platform/internal/intents/infrastructure/persistence"
+	analyticsdomain "skykin-platform/internal/analytics/domain"
+	"skykin-platform/internal/analytics/infrastructure/persistence"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-// AggregateUpsertItem is one intent counter delta applied to a date bucket.
-type AggregateUpsertItem struct {
-	IntentName     string
-	Count          int
-	DaysConsistent float64
-}
-
-// AggregateRepository upserts daily intent aggregate counters.
+// AggregateRepository upserts daily intent aggregate counters for analytics.
 type AggregateRepository struct {
 	db *gorm.DB
 }
@@ -29,11 +22,13 @@ func NewAggregateRepository(db *gorm.DB) *AggregateRepository {
 	return &AggregateRepository{db: db}
 }
 
+var _ analyticsdomain.AggregateRepository = (*AggregateRepository)(nil)
+
 // UpsertBatch applies ON CONFLICT (intent_name, date_bucket) for each intent item.
 func (r *AggregateRepository) UpsertBatch(
 	ctx context.Context,
 	dateBucket time.Time,
-	items []AggregateUpsertItem,
+	items []analyticsdomain.AggregateUpsertItem,
 ) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("aggregate repository is not configured")
@@ -60,8 +55,6 @@ func (r *AggregateRepository) UpsertBatch(
 				SignalCount:   item.Count,
 				WeightedCount: item.DaysConsistent,
 			}
-			// Use columns (not ON CONSTRAINT): GORM uniqueIndex creates a unique INDEX,
-			// which Postgres rejects for ON CONFLICT ON CONSTRAINT.
 			err := tx.Clauses(clause.OnConflict{
 				Columns: []clause.Column{{Name: "intent_name"}, {Name: "date_bucket"}},
 				DoUpdates: clause.Assignments(map[string]any{
@@ -75,39 +68,4 @@ func (r *AggregateRepository) UpsertBatch(
 		}
 		return nil
 	})
-}
-
-// Ingest increments signal_count by Count (default 1) and weighted_count by days_consistent.
-func (r *AggregateRepository) Ingest(
-	ctx context.Context,
-	signal *intentdomain.IntentAggregateSignal,
-) (*intentdomain.IntentAggregateCount, error) {
-	if signal == nil {
-		return nil, fmt.Errorf("aggregate signal is required")
-	}
-	count := signal.Count
-	if count < 1 {
-		count = 1
-	}
-	if err := r.UpsertBatch(ctx, signal.DateBucket, []AggregateUpsertItem{{
-		IntentName:     signal.IntentName,
-		Count:          count,
-		DaysConsistent: signal.DaysConsistent,
-	}}); err != nil {
-		return nil, err
-	}
-
-	bucket := signal.DateBucket
-	if bucket.IsZero() {
-		bucket = time.Now().UTC()
-	}
-	bucket = time.Date(bucket.Year(), bucket.Month(), bucket.Day(), 0, 0, 0, 0, time.UTC)
-
-	var out persistence.IntentAggregateCountRow
-	if err := r.db.WithContext(ctx).
-		Where("intent_name = ? AND date_bucket = ?", strings.TrimSpace(signal.IntentName), bucket).
-		First(&out).Error; err != nil {
-		return nil, err
-	}
-	return out.ToDomain(), nil
 }

@@ -4,18 +4,18 @@ import "time"
 
 // Reward is a granted incentive tied to an intent prediction.
 type Reward struct {
-	ID         string
-	UserID     string
-	IntentID   string
-	RuleID     string
-	RewardType string
-	Amount     float64
-	Currency   string
-	Status     string
-	Message    string
-	CreatedAt  time.Time
-	SentAt     *time.Time
-	ClaimedAt  *time.Time
+	ID             string
+	PseudonymousID string
+	IntentID       string
+	RuleID         string
+	RewardType     string
+	Amount         float64
+	Currency       string
+	Status         string
+	Message        string
+	CreatedAt      time.Time
+	SentAt         *time.Time
+	ClaimedAt      *time.Time
 }
 
 // RewardRule maps an intent name to a reward template.

@@ -4,7 +4,7 @@ import (
 	audienceApp "skykin-platform/internal/audience/application"
 	audienceHTTP "skykin-platform/internal/audience/interfaces/http"
 	audienceInfra "skykin-platform/internal/audience/infrastructure"
-	billingInfra "skykin-platform/internal/billing/infrastructure"
+	billingdomain "skykin-platform/internal/billing/domain"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -18,12 +18,13 @@ type Module struct {
 }
 
 // Wire constructs the audience module.
-func Wire(db *gorm.DB, subRepo *billingInfra.SubscriptionRepository) *Module {
+func Wire(db *gorm.DB, subRepo billingdomain.SubscriptionRepository) *Module {
 	segmentRepo := audienceInfra.NewSegmentRepository(db)
+	purchaseRepo := audienceInfra.NewPurchaseRepository(db)
 	segments := audienceApp.NewListService(segmentRepo, subRepo)
 	return &Module{
 		Segments:  segments,
-		Purchases: audienceApp.NewPurchaseService(segmentRepo),
+		Purchases: audienceApp.NewPurchaseService(segmentRepo, purchaseRepo),
 		Handler:   audienceHTTP.NewHandler(segments, nil),
 	}
 }

@@ -53,3 +53,23 @@ func (r *PseudonymousMappingRepository) FindByUserID(
 	}
 	return row.ToDomain(), nil
 }
+
+func (r *PseudonymousMappingRepository) FindPseudonymousIDsByUserIDs(
+	ctx context.Context,
+	userIDs []int64,
+) (map[int64]string, error) {
+	if len(userIDs) == 0 {
+		return map[int64]string{}, nil
+	}
+	var rows []persistence.PseudonymousMappingRow
+	if err := r.db.WithContext(ctx).
+		Where("user_id IN ?", userIDs).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make(map[int64]string, len(rows))
+	for i := range rows {
+		out[rows[i].UserID] = rows[i].PseudonymousID.String()
+	}
+	return out, nil
+}

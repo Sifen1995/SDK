@@ -8,9 +8,9 @@ import (
 
 // RewardRow is the GORM persistence model for rewards.
 type RewardRow struct {
-	ID         string     `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID     string     `gorm:"type:uuid;not null;index"`
-	IntentID   string     `gorm:"type:uuid;not null"`
+	ID             string `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	PseudonymousID string `gorm:"column:pseudonymous_id;type:uuid;not null;index"`
+	IntentID       string `gorm:"type:uuid;not null"`
 	RuleID     string     `gorm:"type:uuid;not null"`
 	RewardType string     `gorm:"type:varchar(50);not null"`
 	Amount     float64    `gorm:"type:numeric(10,2);not null"`
@@ -29,9 +29,9 @@ func (row *RewardRow) ToDomain() *domain.Reward {
 		return nil
 	}
 	return &domain.Reward{
-		ID:         row.ID,
-		UserID:     row.UserID,
-		IntentID:   row.IntentID,
+		ID:             row.ID,
+		PseudonymousID: row.PseudonymousID,
+		IntentID:       row.IntentID,
 		RuleID:     row.RuleID,
 		RewardType: row.RewardType,
 		Amount:     row.Amount,
@@ -49,9 +49,9 @@ func RewardRowFromDomain(r *domain.Reward) *RewardRow {
 		return nil
 	}
 	return &RewardRow{
-		ID:         r.ID,
-		UserID:     r.UserID,
-		IntentID:   r.IntentID,
+		ID:             r.ID,
+		PseudonymousID: r.PseudonymousID,
+		IntentID:       r.IntentID,
 		RuleID:     r.RuleID,
 		RewardType: r.RewardType,
 		Amount:     r.Amount,

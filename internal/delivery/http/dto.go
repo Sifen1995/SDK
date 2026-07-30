@@ -12,6 +12,7 @@ type AnonymousCampaignDTO struct {
 	DestinationURL     string         `json:"destination_url" example:"https://shop.example.com"`
 	CanvasJSON         map[string]any `json:"canvas_json"`
 	FrequencyCapPerDay int            `json:"frequency_cap_per_day" example:"3"`
+	ClickToken         string         `json:"click_token" example:"a1b2c3d4....2026-07-30-08"`
 	PlanName           string         `json:"plan_name,omitempty" example:"Growth"`
 	PlanMonthlyFeeETB  float64        `json:"plan_monthly_fee_etb,omitempty" example:"15000"`
 }

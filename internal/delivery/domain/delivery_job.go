@@ -2,10 +2,10 @@ package domain
 
 import "time"
 
-// DeliveryJob tracks async campaign delivery work for a user.
+// DeliveryJob tracks async campaign delivery work for one pseudonymous identity.
 type DeliveryJob struct {
-	ID         string
-	UserID     string
-	CampaignID string
-	CreatedAt  time.Time
+	ID             string
+	PseudonymousID string
+	CampaignID     string
+	CreatedAt      time.Time
 }

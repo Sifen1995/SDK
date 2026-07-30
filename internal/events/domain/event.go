@@ -48,10 +48,10 @@ func (t EventType) IsValid() bool {
 
 // Event is the core domain entity for behavioral ingestion.
 type Event struct {
-	ID            string
-	EventID       string
-	UserID        string
-	ApplicationID string
+	ID             string
+	EventID        string
+	PseudonymousID string
+	ApplicationID  string
 	SessionID     string
 	EventType     EventType
 	Domain        string

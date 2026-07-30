@@ -30,7 +30,7 @@ func NewModule(db *gorm.DB, cfg *configs.Config, bus *messaging.Bus) *Module {
 	}
 
 	repo := eventsInfra.NewPostgresRepository(db)
-	userResolver := bootstrap.NewPseudonymousUserResolver(db)
+	consentGate := bootstrap.NewPseudonymousConsentGate(db)
 	redisClient := eventsInfra.NewRedisClientFromAddr(cfg.RedisAddr)
 	dedup := eventsInfra.NewRedisDedupStore(redisClient)
 	publisher := eventsInfra.NewBusEventPublisher(bus)
@@ -41,7 +41,7 @@ func NewModule(db *gorm.DB, cfg *configs.Config, bus *messaging.Bus) *Module {
 		}
 	}
 
-	ingest := application.NewIngestEventsUseCase(repo, userResolver, dedup, redisQueueClient, publisher, slog.Default())
+	ingest := application.NewIngestEventsUseCase(repo, consentGate, dedup, redisQueueClient, publisher, slog.Default())
 	handler := NewHandler(ingest)
 
 	return &Module{Handler: handler, Bus: bus}

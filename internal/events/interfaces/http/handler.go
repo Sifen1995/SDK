@@ -36,7 +36,7 @@ func (h *Handler) PostEvents(c *gin.Context) {
 
 	cmd := application.IngestCommand{
 		ApplicationID:  appID.(string),
-		ExternalUserID: req.UserID,
+		PseudonymousID: req.SubjectID(),
 		Events:         toApplicationInputs(req.Events),
 	}
 

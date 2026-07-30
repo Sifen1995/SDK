@@ -2,8 +2,6 @@ package application
 
 import (
 	"context"
-
-	"skykin-platform/internal/users/domain"
 )
 
 // DedupStore prevents duplicate event ingestion within a TTL window.
@@ -16,7 +14,8 @@ type EventPublisher interface {
 	Publish(ctx context.Context, topic string, payload any)
 }
 
-// UserResolver resolves Flutter pseudonymous IDs to internal users (via consent mapping).
-type UserResolver interface {
-	FindOrCreate(ctx context.Context, pseudonymousID string) (*domain.User, error)
+// ConsentGate verifies a pseudonymous id belongs to a consented user. Events are
+// stored against the pseudonymous id only; the internal user id never leaves consent.
+type ConsentGate interface {
+	EnsureConsented(ctx context.Context, pseudonymousID string) error
 }

@@ -10,19 +10,18 @@ import (
 	campaigndomain "skykin-platform/internal/campaigns/domain"
 	campaignvalidation "skykin-platform/internal/campaigns/validation"
 	billingdomain "skykin-platform/internal/billing/domain"
-	"skykin-platform/internal/campaigns/infrastructure"
 	"skykin-platform/internal/platform/messaging"
 )
 
 // ModerationService handles operator review, approval, and activation of campaigns.
 type ModerationService struct {
-	repo     *infrastructure.Repository
+	repo     campaigndomain.CampaignRepository
 	channels billingdomain.ChannelRepository
 	bus      *messaging.Bus
 }
 
 func NewModerationService(
-	repo *infrastructure.Repository,
+	repo campaigndomain.CampaignRepository,
 	channels billingdomain.ChannelRepository,
 	bus *messaging.Bus,
 ) *ModerationService {

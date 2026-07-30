@@ -11,15 +11,13 @@ import (
 	billingapp "skykin-platform/internal/billing/application"
 	billingdomain "skykin-platform/internal/billing/domain"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
-	campaignEvents "skykin-platform/internal/campaigns/events"
-	"skykin-platform/internal/campaigns/infrastructure"
 	campaignvalidation "skykin-platform/internal/campaigns/validation"
 	"skykin-platform/internal/platform/messaging"
 )
 
 // CampaignService orchestrates campaign CRUD with subscription and audience checks.
 type CampaignService struct {
-	repo          *infrastructure.Repository
+	repo          campaigndomain.CampaignRepository
 	subscriptions *billingapp.SubscriptionEnforcer
 	audience      *audienceapp.PurchaseService
 	channels      billingdomain.ChannelRepository
@@ -27,7 +25,7 @@ type CampaignService struct {
 }
 
 func NewCampaignService(
-	repo *infrastructure.Repository,
+	repo campaigndomain.CampaignRepository,
 	subscriptions *billingapp.SubscriptionEnforcer,
 	audience *audienceapp.PurchaseService,
 	channels billingdomain.ChannelRepository,
@@ -112,25 +110,16 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 	c.ValidationStatus = vr.Status
 	c.ValidationNotes = vr.Notes
 
-	// 5. Persist campaign; segment purchase is recorded asynchronously by audience consumer.
-	if err := s.repo.Create(ctx, c); err != nil {
+	// 5. Persist the campaign and its segment entitlement together. A campaign that
+	// targets a segment is never visible without the purchase row that authorises it.
+	err = s.repo.Transaction(ctx, func(tx any) error {
+		if err := s.repo.CreateTx(ctx, tx, c); err != nil {
+			return err
+		}
+		return s.audience.ConfirmPurchaseTx(ctx, tx, purchaseQuote, c.ID)
+	})
+	if err != nil {
 		return nil, err
-	}
-
-	if s.bus != nil && purchaseQuote != nil {
-		s.bus.Publish(messaging.Event{
-			Name: campaignEvents.TopicCampaignCreated,
-			Ctx:  ctx,
-			Payload: campaignEvents.CampaignCreatedEvent{
-				CampaignID:   c.ID,
-				AdvertiserID: purchaseQuote.AdvertiserID,
-				SegmentID:    purchaseQuote.SegmentID,
-				AmountPaid:   purchaseQuote.AmountPaid,
-				ValidFrom:    purchaseQuote.ValidFrom,
-				ValidUntil:   purchaseQuote.ValidUntil,
-				HasPurchase:  true,
-			},
-		})
 	}
 
 	return c, nil

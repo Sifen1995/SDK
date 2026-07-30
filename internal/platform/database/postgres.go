@@ -13,6 +13,7 @@ import (
 	billingpersistence "skykin-platform/internal/billing/infrastructure/persistence"
 	campaignpersistence "skykin-platform/internal/campaigns/infrastructure/persistence"
 	deliverypersistence "skykin-platform/internal/delivery/infrastructure/persistence"
+	analyticspersistence "skykin-platform/internal/analytics/infrastructure/persistence"
 	eventpersistence "skykin-platform/internal/events/infrastructure/persistence"
 	intentpersistence "skykin-platform/internal/intents/infrastructure/persistence"
 	rewardpersistence "skykin-platform/internal/rewards/infrastructure/persistence"
@@ -28,6 +29,9 @@ var permissionsMigrationSQL string
 
 //go:embed migrations/20260712153000_users_consent_identity.sql
 var usersConsentIdentitySQL string
+
+//go:embed migrations/20260729120000_pseudonymous_identity.sql
+var pseudonymousIdentitySQL string
 
 func ConnectDB(cfg *configs.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
@@ -68,11 +72,16 @@ func Migrate(db *gorm.DB) error {
 		return fmt.Errorf("users/consent identity migration: %w", err)
 	}
 
+	// Must run before AutoMigrate so GORM sees pseudonymous_id and does not re-add user_id.
+	if err := db.Exec(pseudonymousIdentitySQL).Error; err != nil {
+		return fmt.Errorf("pseudonymous identity migration: %w", err)
+	}
+
 	if err := db.AutoMigrate(
 		&userpersistence.UserRow{},
 		&eventpersistence.EventRecord{},
 		&intentpersistence.IntentRow{},
-		&intentpersistence.IntentAggregateCountRow{},
+		&analyticspersistence.IntentAggregateCountRow{},
 		&rewardpersistence.RewardRuleRow{},
 		&rewardpersistence.RewardRow{},
 		&authpersistence.DeveloperRow{},
@@ -82,8 +91,8 @@ func Migrate(db *gorm.DB) error {
 		&adportalpersistence.AdvertiserRow{},
 		&adportalpersistence.PortalUserRow{},
 		&campaignpersistence.CampaignRow{},
-		&campaignpersistence.DeliveryLogRow{},
 		&deliverypersistence.DeliveryJobRow{},
+		&deliverypersistence.DeliveryLogRow{},
 		&billingpersistence.ChannelRow{},
 		&billingpersistence.SubscriptionPlanRow{},
 		&billingpersistence.AdvertiserSubscriptionRow{},
@@ -100,8 +109,9 @@ func Migrate(db *gorm.DB) error {
 	}
 
 	alignAdPortalSchema(db)
-	alignSegmentClassificationSchema(db)
-	alignIntentsUserIDColumn(db)
+	if err := alignSegmentClassificationSchema(db); err != nil {
+		return err
+	}
 	ensureIntentAggregateCountsTable(db)
 	if err := applyPermissionsMigration(db); err != nil {
 		return fmt.Errorf("permissions migration: %w", err)
@@ -207,24 +217,6 @@ func seedAudienceSegments(db *gorm.DB) {
 		db.Where("name = ?", seg.name).FirstOrCreate(&row)
 	}
 	log.Println("audience segments seeded")
-}
-
-// alignIntentsUserIDColumn widens intents.user_id from uuid to varchar so it can
-// store bigint user ids as decimal strings.
-func alignIntentsUserIDColumn(db *gorm.DB) {
-	var dataType string
-	_ = db.Raw(`
-		SELECT data_type FROM information_schema.columns
-		WHERE table_schema = 'public' AND table_name = 'intents' AND column_name = 'user_id'
-	`).Scan(&dataType).Error
-	if dataType == "" || dataType == "character varying" || dataType == "text" {
-		return
-	}
-	if err := db.Exec(`ALTER TABLE intents ALTER COLUMN user_id TYPE VARCHAR(64) USING user_id::text`).Error; err != nil {
-		log.Printf("align intents.user_id (non-fatal): %v", err)
-		return
-	}
-	log.Println("intents.user_id aligned to varchar")
 }
 
 // ensureIntentAggregateCountsTable guarantees the anonymous aggregate rollup table + unique constraint.

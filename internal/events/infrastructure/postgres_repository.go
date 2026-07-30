@@ -38,44 +38,28 @@ func (r *PostgresEventRepository) SaveBatch(ctx context.Context, events []domain
 			sessionID = &e.SessionID
 		}
 		records[i] = persistence.EventRecord{
-			EventID:       e.EventID,
-			UserID:        e.UserID,
-			ApplicationID: appID,
-			SessionID:     sessionID,
-			EventType:     string(e.EventType),
-			Domain:        e.Domain,
-			ScreenName:    e.ScreenName,
-			Metadata:      meta,
-			DeviceType:    e.DeviceType,
-			Platform:      e.Platform,
-			AppVersion:    e.AppVersion,
-			CreatedAt:     e.CreatedAt,
+			EventID:        e.EventID,
+			PseudonymousID: e.PseudonymousID,
+			ApplicationID:  appID,
+			SessionID:      sessionID,
+			EventType:      string(e.EventType),
+			Domain:         e.Domain,
+			ScreenName:     e.ScreenName,
+			Metadata:       meta,
+			DeviceType:     e.DeviceType,
+			Platform:       e.Platform,
+			AppVersion:     e.AppVersion,
+			CreatedAt:      e.CreatedAt,
 		}
 	}
 
 	return r.db.WithContext(ctx).Create(&records).Error
 }
 
-func (r *PostgresEventRepository) FindByUser(ctx context.Context, externalUserID string, limit int) ([]domain.Event, error) {
+func (r *PostgresEventRepository) FindByPseudonymousID(ctx context.Context, pseudonymousID string, limit int) ([]domain.Event, error) {
 	var records []persistence.EventRecord
 	err := r.db.WithContext(ctx).
-		Table("events").
-		Select("events.*").
-		Joins("JOIN users u ON u.id = events.user_id").
-		Where("u.external_user_id = ?", externalUserID).
-		Order("events.created_at desc").
-		Limit(limit).
-		Find(&records).Error
-	if err != nil {
-		return nil, err
-	}
-	return toDomainEvents(records)
-}
-
-func (r *PostgresEventRepository) FindByUserInternalID(ctx context.Context, internalUserID string, limit int) ([]domain.Event, error) {
-	var records []persistence.EventRecord
-	err := r.db.WithContext(ctx).
-		Where("user_id = ?", internalUserID).
+		Where("pseudonymous_id = ?", pseudonymousID).
 		Order("created_at desc").
 		Limit(limit).
 		Find(&records).Error
@@ -116,19 +100,19 @@ func toDomainEvents(records []persistence.EventRecord) ([]domain.Event, error) {
 			sessionID = *rec.SessionID
 		}
 		out[i] = domain.Event{
-			ID:            rec.ID,
-			EventID:       rec.EventID,
-			UserID:        rec.UserID,
-			ApplicationID: appID,
-			EventType:     domain.EventType(rec.EventType),
-			Domain:        rec.Domain,
-			SessionID:     sessionID,
-			ScreenName:    rec.ScreenName,
-			Metadata:      meta,
-			DeviceType:    rec.DeviceType,
-			Platform:      rec.Platform,
-			AppVersion:    rec.AppVersion,
-			CreatedAt:     rec.CreatedAt,
+			ID:             rec.ID,
+			EventID:        rec.EventID,
+			PseudonymousID: rec.PseudonymousID,
+			ApplicationID:  appID,
+			EventType:      domain.EventType(rec.EventType),
+			Domain:         rec.Domain,
+			SessionID:      sessionID,
+			ScreenName:     rec.ScreenName,
+			Metadata:       meta,
+			DeviceType:     rec.DeviceType,
+			Platform:       rec.Platform,
+			AppVersion:     rec.AppVersion,
+			CreatedAt:      rec.CreatedAt,
 		}
 	}
 	return out, nil

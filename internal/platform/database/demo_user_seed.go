@@ -3,7 +3,6 @@ package database
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"fmt"
 	"log"
 	"time"
 
@@ -47,6 +46,7 @@ func seedFashionCohort(db *gorm.DB) {
 		}
 		if err := db.Create(&mapping).Error; err != nil {
 			log.Printf("demo fashion mapping seed (non-fatal): %v", err)
+			continue
 		}
 		consent := consentpersistence.ConsentRow{
 			UserID:       user.ID,
@@ -58,15 +58,15 @@ func seedFashionCohort(db *gorm.DB) {
 		if err := db.Create(&consent).Error; err != nil {
 			log.Printf("demo fashion consent seed (non-fatal): %v", err)
 		}
-		seedFashionIntentsForUser(db, fmt.Sprintf("%d", user.ID), now, i)
+		seedFashionIntentsForUser(db, mapping.PseudonymousID.String(), now, i)
 	}
 	log.Printf("demo fashion cohort seeded: %d users (bigint ids + pseudonymous mappings)", demoFashionCohortSize)
 }
 
-func seedFashionIntentsForUser(db *gorm.DB, userID string, now time.Time, offset int) {
+func seedFashionIntentsForUser(db *gorm.DB, pseudonymousID string, now time.Time, offset int) {
 	var existing int64
 	db.Model(&intentpersistence.IntentRow{}).
-		Where("user_id = ? AND intent_name = ?", userID, "fashion_interest").
+		Where("pseudonymous_id = ? AND intent_name = ?", pseudonymousID, "fashion_interest").
 		Count(&existing)
 	if existing >= 6 {
 		return
@@ -76,7 +76,7 @@ func seedFashionIntentsForUser(db *gorm.DB, userID string, now time.Time, offset
 	for day := 1; day <= 6; day++ {
 		createdAt := now.AddDate(0, 0, -(day + offset%3)).Truncate(24 * time.Hour).Add(time.Duration(9+day) * time.Hour)
 		if err := db.Create(&intentpersistence.IntentRow{
-			UserID: userID, IntentName: "fashion_interest",
+			PseudonymousID: pseudonymousID, IntentName: "fashion_interest",
 			Confidence: confidence, CreatedAt: createdAt,
 		}).Error; err != nil {
 			log.Printf("demo fashion intent seed (non-fatal): %v", err)

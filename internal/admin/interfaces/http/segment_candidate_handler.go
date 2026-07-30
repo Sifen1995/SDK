@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 
 	adminApp "skykin-platform/internal/admin/application"
@@ -51,15 +52,17 @@ func NewSegmentCandidateHandler(approve *adminApp.ApproveCandidateUseCase, rejec
 
 // ApproveSegmentCandidate godoc
 // @Summary      Approve segment candidate and publish segment
-// @Description  Marks the candidate approved and asynchronously provisions the audience segment and memberships.
+// @Description  Publishes the audience segment and its memberships in a single transaction and returns the published segment id. Fails with 409 when the candidate has already been reviewed.
 // @Tags         Ad Portal - Admin
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id    path  string  true  "Candidate ID"
 // @Param        body  body  ApproveSegmentCandidateRequest  true  "Segment details"
-// @Success      202  {object}  map[string]string
+// @Success      201  {object}  ApproveSegmentCandidateResponse
 // @Failure      400  {object}  platformHTTP.APIError
+// @Failure      409  {object}  platformHTTP.APIError
+// @Failure      500  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/audience/segment-candidates/{id}/approve [post]
 func (h *SegmentCandidateHandler) ApproveSegmentCandidate(c *gin.Context) {
 	var req ApproveSegmentCandidateRequest
@@ -77,13 +80,20 @@ func (h *SegmentCandidateHandler) ApproveSegmentCandidate(c *gin.Context) {
 		platformHTTP.Error(c, http.StatusBadRequest, "invalid admin id", nil)
 		return
 	}
-	if err := h.approve.Execute(c.Request.Context(), candidateID, adminID, req.Name, req.Description, req.EstimatedCPM); err != nil {
+	segment, err := h.approve.Execute(c.Request.Context(), candidateID, adminID, req.Name, req.Description, req.EstimatedCPM)
+	if err != nil {
+		if errors.Is(err, adminApp.ErrCandidateNotPending) {
+			platformHTTP.Error(c, http.StatusConflict, "candidate already reviewed", err.Error())
+			return
+		}
 		platformHTTP.Error(c, http.StatusBadRequest, "approve failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusAccepted, gin.H{
-		"message":      "candidate approved; segment provisioning started",
-		"candidate_id": candidateID.String(),
+	c.JSON(http.StatusCreated, ApproveSegmentCandidateResponse{
+		Message:     "segment published from candidate",
+		CandidateID: candidateID.String(),
+		SegmentID:   segment.SegmentID,
+		MemberCount: segment.MemberCount,
 	})
 }
 
@@ -97,6 +107,7 @@ func (h *SegmentCandidateHandler) ApproveSegmentCandidate(c *gin.Context) {
 // @Param        body  body  RejectSegmentCandidateRequest  false  "Notes"
 // @Success      200  {object}  map[string]string
 // @Failure      400  {object}  platformHTTP.APIError
+// @Failure      409  {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/audience/segment-candidates/{id}/reject [post]
 func (h *SegmentCandidateHandler) RejectSegmentCandidate(c *gin.Context) {
 	var req RejectSegmentCandidateRequest
@@ -112,6 +123,10 @@ func (h *SegmentCandidateHandler) RejectSegmentCandidate(c *gin.Context) {
 		return
 	}
 	if err := h.reject.Execute(c.Request.Context(), candidateID, adminID, req.Notes); err != nil {
+		if errors.Is(err, adminApp.ErrCandidateNotPending) {
+			platformHTTP.Error(c, http.StatusConflict, "candidate already reviewed", err.Error())
+			return
+		}
 		platformHTTP.Error(c, http.StatusBadRequest, "reject failed", err.Error())
 		return
 	}

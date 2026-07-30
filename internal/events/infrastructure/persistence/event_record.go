@@ -8,9 +8,9 @@ import (
 
 // EventRecord is the GORM persistence model for the events table.
 type EventRecord struct {
-	ID            string         `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	EventID       string         `gorm:"type:uuid;not null;uniqueIndex"`
-	UserID        string         `gorm:"type:uuid;not null;index"`
+	ID             string         `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	EventID        string         `gorm:"type:uuid;not null;uniqueIndex"`
+	PseudonymousID string         `gorm:"column:pseudonymous_id;type:uuid;not null;index"`
 	ApplicationID *string        `gorm:"type:uuid;index"`
 	SessionID     *string        `gorm:"type:uuid;index"`
 	EventType     string         `gorm:"type:varchar(100);not null;index"`

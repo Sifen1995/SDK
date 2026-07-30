@@ -2,10 +2,20 @@ package http
 
 import "time"
 
-// IngestEventsRequest is the SDK batch ingestion payload.
+// IngestEventsRequest is the SDK batch ingestion payload. Events are keyed by the
+// consent-issued pseudonymous id; user_id is accepted as the legacy alias.
 type IngestEventsRequest struct {
-	UserID string       `json:"user_id" binding:"required" example:"user_abc_123"`
-	Events []EventInput `json:"events" binding:"required,min=1,dive"`
+	PseudonymousID string       `json:"pseudonymous_id" example:"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"`
+	UserID         string       `json:"user_id" example:"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"`
+	Events         []EventInput `json:"events" binding:"required,min=1,dive"`
+}
+
+// SubjectID returns the pseudonymous id regardless of which alias the client sent.
+func (r IngestEventsRequest) SubjectID() string {
+	if r.PseudonymousID != "" {
+		return r.PseudonymousID
+	}
+	return r.UserID
 }
 
 // EventInput is a single SDK event in a batch.

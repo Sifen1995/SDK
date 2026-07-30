@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"skykin-platform/internal/analytics/domain"
-	intentsInfra "skykin-platform/internal/intents/infrastructure"
 	platformredis "skykin-platform/internal/platform/redis"
 
 	"gorm.io/gorm"
@@ -20,14 +19,14 @@ func StartAnalyticsAggregateWorker(db *gorm.DB, rdb *platformredis.RedisClient, 
 	if logger == nil {
 		logger = slog.Default()
 	}
-	repo := intentsInfra.NewAggregateRepository(db)
+	repo := NewAggregateRepository(db)
 	go runAnalyticsAggregateWorker(context.Background(), rdb, repo, logger)
 }
 
 func runAnalyticsAggregateWorker(
 	ctx context.Context,
 	rdb *platformredis.RedisClient,
-	repo *intentsInfra.AggregateRepository,
+	repo domain.AggregateRepository,
 	logger *slog.Logger,
 ) {
 	for {
@@ -63,16 +62,16 @@ func runAnalyticsAggregateWorker(
 
 func applyAggregateReport(
 	ctx context.Context,
-	repo *intentsInfra.AggregateRepository,
+	repo domain.AggregateRepository,
 	report *domain.AggregateReport,
 ) error {
-	return repo.UpsertBatch(ctx, report.DateBucket, toIntentSignals(report))
+	return repo.UpsertBatch(ctx, report.DateBucket, toAggregateItems(report))
 }
 
-func toIntentSignals(report *domain.AggregateReport) []intentsInfra.AggregateUpsertItem {
-	items := make([]intentsInfra.AggregateUpsertItem, len(report.Intents))
+func toAggregateItems(report *domain.AggregateReport) []domain.AggregateUpsertItem {
+	items := make([]domain.AggregateUpsertItem, len(report.Intents))
 	for i, item := range report.Intents {
-		items[i] = intentsInfra.AggregateUpsertItem{
+		items[i] = domain.AggregateUpsertItem{
 			IntentName:     item.IntentName,
 			Count:          item.Count,
 			DaysConsistent: item.DaysConsistent,

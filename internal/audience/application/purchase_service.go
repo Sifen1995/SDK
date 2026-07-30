@@ -7,10 +7,7 @@ import (
 	"time"
 
 	audiencedomain "skykin-platform/internal/audience/domain"
-	"skykin-platform/internal/audience/infrastructure/persistence"
 	billingdomain "skykin-platform/internal/billing/domain"
-
-	"gorm.io/gorm"
 )
 
 // defaultPurchaseDays is the MVP entitlement window for a segment on one campaign.
@@ -30,15 +27,23 @@ type PurchaseQuote struct {
 
 // PurchaseService validates segments and records purchases in segment_purchases.
 type PurchaseService struct {
-	segments audiencedomain.SegmentRepository
+	segments  audiencedomain.SegmentRepository
+	purchases audiencedomain.PurchaseRepository
 }
 
-func NewPurchaseService(segments audiencedomain.SegmentRepository) *PurchaseService {
-	return &PurchaseService{segments: segments}
+func NewPurchaseService(
+	segments audiencedomain.SegmentRepository,
+	purchases audiencedomain.PurchaseRepository,
+) *PurchaseService {
+	return &PurchaseService{segments: segments, purchases: purchases}
 }
 
 // PreparePurchase validates the segment is available and the plan allows Audiencemart.
-func (s *PurchaseService) PreparePurchase(ctx context.Context, advertiserID, segmentID string, plan billingdomain.SubscriptionPlan) (*PurchaseQuote, error) {
+func (s *PurchaseService) PreparePurchase(
+	ctx context.Context,
+	advertiserID, segmentID string,
+	plan billingdomain.SubscriptionPlan,
+) (*PurchaseQuote, error) {
 	if !plan.AudiencemartEnabled {
 		return nil, fmt.Errorf("plan %q does not include Audiencemart", plan.Name)
 	}
@@ -80,7 +85,6 @@ func (s *PurchaseService) prepareFromSegment(
 		return nil, errors.New("audience segment has expired")
 	}
 
-	// MVP pricing: estimated_cpm × fixed impression bundle / 1000
 	amount := seg.EstimatedCPM * float64(impressionBundle) / 1000.0
 	validUntil := now.AddDate(0, 0, defaultPurchaseDays)
 
@@ -94,9 +98,17 @@ func (s *PurchaseService) prepareFromSegment(
 }
 
 // ConfirmPurchaseTx writes the entitlement row inside the campaign create transaction.
-func (s *PurchaseService) ConfirmPurchaseTx(ctx context.Context, tx *gorm.DB, quote *PurchaseQuote, campaignID string) error {
+func (s *PurchaseService) ConfirmPurchaseTx(
+	ctx context.Context,
+	tx any,
+	quote *PurchaseQuote,
+	campaignID string,
+) error {
 	if quote == nil {
 		return nil
+	}
+	if s.purchases == nil {
+		return errors.New("purchase repository not configured")
 	}
 	purchase := &audiencedomain.SegmentPurchase{
 		AdvertiserID: quote.AdvertiserID,
@@ -106,6 +118,5 @@ func (s *PurchaseService) ConfirmPurchaseTx(ctx context.Context, tx *gorm.DB, qu
 		ValidFrom:    quote.ValidFrom,
 		ValidUntil:   quote.ValidUntil,
 	}
-	row := persistence.SegmentPurchaseRowFromDomain(purchase)
-	return tx.WithContext(ctx).Create(row).Error
+	return s.purchases.CreatePurchaseTx(ctx, tx, purchase)
 }

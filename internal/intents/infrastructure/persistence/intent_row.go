@@ -8,11 +8,11 @@ import (
 
 // IntentRow is the GORM persistence model for intents.
 type IntentRow struct {
-	ID         string    `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID     string    `gorm:"type:varchar(64);not null;index"`
-	IntentName string    `gorm:"type:varchar(100);not null;index"`
-	Confidence float64   `gorm:"type:numeric(4,3);not null"`
-	CreatedAt  time.Time `gorm:"not null;default:now()"`
+	ID             string    `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	PseudonymousID string    `gorm:"column:pseudonymous_id;type:uuid;not null;index"`
+	IntentName     string    `gorm:"type:varchar(100);not null;index"`
+	Confidence     float64   `gorm:"type:numeric(4,3);not null"`
+	CreatedAt      time.Time `gorm:"not null;default:now()"`
 }
 
 func (IntentRow) TableName() string { return "intents" }
@@ -22,11 +22,11 @@ func (row *IntentRow) ToDomain() *domain.Intent {
 		return nil
 	}
 	return &domain.Intent{
-		ID:         row.ID,
-		UserID:     row.UserID,
-		IntentName: row.IntentName,
-		Confidence: row.Confidence,
-		CreatedAt:  row.CreatedAt,
+		ID:             row.ID,
+		PseudonymousID: row.PseudonymousID,
+		IntentName:     row.IntentName,
+		Confidence:     row.Confidence,
+		CreatedAt:      row.CreatedAt,
 	}
 }
 
@@ -35,10 +35,10 @@ func IntentRowFromDomain(i *domain.Intent) *IntentRow {
 		return nil
 	}
 	return &IntentRow{
-		ID:         i.ID,
-		UserID:     i.UserID,
-		IntentName: i.IntentName,
-		Confidence: i.Confidence,
-		CreatedAt:  i.CreatedAt,
+		ID:             i.ID,
+		PseudonymousID: i.PseudonymousID,
+		IntentName:     i.IntentName,
+		Confidence:     i.Confidence,
+		CreatedAt:      i.CreatedAt,
 	}
 }

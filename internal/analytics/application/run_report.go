@@ -20,12 +20,21 @@ type FindingProcessResult struct {
 	CandidateID string `json:"candidate_id,omitempty"`
 }
 
-// RunReport summarizes a full intent consistency scan.
+// IntentScanFailure records one intent class that could not be scanned.
+type IntentScanFailure struct {
+	IntentName string `json:"intent_name"`
+	Error      string `json:"error"`
+}
+
+// RunReport summarizes a full intent consistency scan. Failures are reported
+// alongside successes so a partially broken scan is never presented as a clean run.
 type RunReport struct {
-	CandidatesCreated int      `json:"candidates_created"`
-	CandidatesUpdated int      `json:"candidates_updated"`
-	SegmentsEnriched  int      `json:"segments_enriched"`
-	UsersAdded        int      `json:"users_added_to_segments"`
-	IntentsSkipped    []string `json:"intents_skipped"`
-	Message           string   `json:"message"`
+	CandidatesCreated int                 `json:"candidates_created"`
+	CandidatesUpdated int                 `json:"candidates_updated"`
+	SegmentsEnriched  int                 `json:"segments_enriched"`
+	UsersAdded        int                 `json:"users_added_to_segments"`
+	IntentsSkipped    []string            `json:"intents_skipped"`
+	IntentsFailed     []IntentScanFailure `json:"intents_failed"`
+	Partial           bool                `json:"partial"`
+	Message           string              `json:"message"`
 }

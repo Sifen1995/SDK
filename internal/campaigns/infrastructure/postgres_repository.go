@@ -74,12 +74,16 @@ func (r *Repository) Create(ctx context.Context, c *campaigndomain.Campaign) err
 }
 
 // CreateTx inserts a campaign inside an existing database transaction.
-func (r *Repository) CreateTx(ctx context.Context, tx *gorm.DB, c *campaigndomain.Campaign) error {
+func (r *Repository) CreateTx(ctx context.Context, tx any, c *campaigndomain.Campaign) error {
+	db, ok := tx.(*gorm.DB)
+	if !ok || db == nil {
+		return gorm.ErrInvalidTransaction
+	}
 	row, err := persistence.CampaignRowFromDomain(c)
 	if err != nil {
 		return err
 	}
-	if err := tx.WithContext(ctx).Create(row).Error; err != nil {
+	if err := db.WithContext(ctx).Create(row).Error; err != nil {
 		return err
 	}
 	c.ID = row.ID
@@ -89,8 +93,10 @@ func (r *Repository) CreateTx(ctx context.Context, tx *gorm.DB, c *campaigndomai
 }
 
 // Transaction runs fn inside a single database transaction.
-func (r *Repository) Transaction(ctx context.Context, fn func(tx *gorm.DB) error) error {
-	return r.db.WithContext(ctx).Transaction(fn)
+func (r *Repository) Transaction(ctx context.Context, fn func(tx any) error) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return fn(tx)
+	})
 }
 
 // CountActiveByAdvertiser counts is_active campaigns for subscription quota enforcement.
@@ -211,30 +217,6 @@ func (r *Repository) ListActiveMaster(ctx context.Context) ([]campaigndomain.Cam
 // ListActiveByIntent returns approved active campaigns matching a target intent.
 func (r *Repository) ListActiveByIntent(ctx context.Context, intentName string) ([]campaigndomain.Campaign, error) {
 	return r.ListEligibleForDelivery(ctx, intentName, "")
-}
-
-func (r *Repository) LogDelivery(ctx context.Context, log *campaigndomain.DeliveryLog) error {
-	row := persistence.DeliveryLogRowFromDomain(log)
-	return r.db.WithContext(ctx).Create(row).Error
-}
-
-// CampaignAdContent builds the SDK ad payload from a campaign.
-func CampaignAdContent(c *campaigndomain.Campaign, channelCode string, _ ...*PlayLinkBuilder) (map[string]any, error) {
-	canvas := c.CanvasJSON
-	if canvas == nil {
-		canvas = map[string]any{}
-	}
-	content := map[string]any{
-		"title":     c.Title,
-		"body_text": c.BodyText,
-		"image_url": c.ImageURL,
-		// Preserve the advertiser's destination exactly as submitted. In
-		// particular, never convert it into a Play Store URL at delivery time.
-		"destination_url": c.DestinationURL,
-		"channel_code":    channelCode,
-		"canvas_json":     canvas,
-	}
-	return content, nil
 }
 
 func toEligibleDomainCampaigns(rows []eligibleCampaignScan) ([]campaigndomain.Campaign, error) {

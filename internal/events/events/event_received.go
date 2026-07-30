@@ -9,28 +9,27 @@ const (
 
 // EventReceived is published after SDK events are accepted into the platform.
 type EventReceived struct {
-	EventID       string
-	UserID        string
-	ApplicationID string
-	EventType     string
-	Domain        string
-	SessionID     string
+	EventID        string
+	PseudonymousID string
+	ApplicationID  string
+	EventType      string
+	Domain         string
+	SessionID      string
 }
 
 // EventStored is published after events are persisted.
 type EventStored struct {
-	EventID       string
-	UserID        string
-	ApplicationID string
-	EventType     string
-	Domain        string
-	SessionID     string
+	EventID        string
+	PseudonymousID string
+	ApplicationID  string
+	EventType      string
+	Domain         string
+	SessionID      string
 }
 
 // IntentEvaluationRequested signals downstream intent workflows.
 type IntentEvaluationRequested struct {
-	UserID         string // SDK external user id
-	InternalUserID string // users.id UUID for ML feature queries
+	PseudonymousID string
 	ApplicationID  string
 	SessionID      string
 	EventCount     int

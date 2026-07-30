@@ -22,4 +22,6 @@ type SegmentRepository interface {
 type PurchaseRepository interface {
 	GetValidForCampaign(ctx context.Context, campaignID string, now time.Time) (*SegmentPurchase, error)
 	CreatePurchase(ctx context.Context, purchase *SegmentPurchase) error
+	// CreatePurchaseTx writes the purchase inside an outer unit-of-work transaction.
+	CreatePurchaseTx(ctx context.Context, tx any, purchase *SegmentPurchase) error
 }

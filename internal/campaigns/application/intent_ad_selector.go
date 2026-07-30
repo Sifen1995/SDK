@@ -4,20 +4,24 @@ import (
 	"context"
 	"fmt"
 
-	"skykin-platform/internal/campaigns/infrastructure"
+	campaigndomain "skykin-platform/internal/campaigns/domain"
 	intentsApp "skykin-platform/internal/intents/application"
 )
 
+// EligibleCampaignSelector picks the best campaign for an intent/channel.
+type EligibleCampaignSelector interface {
+	SelectBestCampaign(ctx context.Context, intentName, channelCode, pseudonymousID string) (*campaigndomain.Campaign, error)
+}
+
 // IntentAdSelector implements intents/application.AdSelector using the cached plan-tier ranker.
 type IntentAdSelector struct {
-	campaigns   *infrastructure.CachedCampaignRepository
-	linkBuilder *infrastructure.PlayLinkBuilder
+	campaigns EligibleCampaignSelector
 }
 
 var _ intentsApp.AdSelector = (*IntentAdSelector)(nil)
 
-func NewIntentAdSelector(campaigns *infrastructure.CachedCampaignRepository, linkBuilder *infrastructure.PlayLinkBuilder) *IntentAdSelector {
-	return &IntentAdSelector{campaigns: campaigns, linkBuilder: linkBuilder}
+func NewIntentAdSelector(campaigns EligibleCampaignSelector) *IntentAdSelector {
+	return &IntentAdSelector{campaigns: campaigns}
 }
 
 // SelectAd finds the highest-plan-tier eligible campaign for an intent and channel.
@@ -44,7 +48,7 @@ func (s *IntentAdSelector) SelectAd(
 		if err != nil {
 			continue
 		}
-		content, err := infrastructure.CampaignAdContent(campaign, code, s.linkBuilder)
+		content, err := CampaignAdContent(campaign, code)
 		if err != nil {
 			continue
 		}

@@ -2,7 +2,7 @@ package infrastructure
 
 import (
 	"context"
-	"sync"
+	"strings"
 	"time"
 
 	"skykin-platform/internal/audience/domain"
@@ -27,10 +27,14 @@ type candidateRow struct {
 	PublishedSegmentID *uuid.UUID
 }
 
-// CandidateRepository persists segment candidates and holds user lists in memory.
+const candidateSelectColumns = `
+	id, intent_name, user_count, avg_confidence, avg_days_active,
+	min_days_active, lookback_days, status, scanned_at,
+	reviewed_by, reviewed_at, review_notes, published_segment_id`
+
+// CandidateRepository persists segment candidates and their captured member lists.
 type CandidateRepository struct {
-	db    *gorm.DB
-	users sync.Map
+	db *gorm.DB
 }
 
 func NewCandidateRepository(db *gorm.DB) *CandidateRepository {
@@ -39,34 +43,85 @@ func NewCandidateRepository(db *gorm.DB) *CandidateRepository {
 
 var _ domain.CandidateRepository = (*CandidateRepository)(nil)
 
-func (r *CandidateRepository) Save(ctx context.Context, c *domain.SegmentCandidate, users []*domain.UserInCandidate) error {
-	notes := c.ReviewNotes
-	var notesPtr *string
-	if notes != "" {
-		notesPtr = &notes
-	}
-	err := r.db.WithContext(ctx).Exec(`
-		INSERT INTO segment_candidates (
-			id, intent_name, user_count, avg_confidence, avg_days_active,
-			min_days_active, lookback_days, status, scanned_at,
-			reviewed_by, reviewed_at, review_notes, published_segment_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, c.ID, c.IntentName, c.UserCount, c.AvgConfidence, c.AvgDaysActive,
-		c.MinDaysActive, c.LookbackDays, string(c.Status), c.ScannedAt,
-		c.ReviewedBy, c.ReviewedAt, notesPtr, c.PublishedSegmentID).Error
+// UpsertPending relies on the partial unique index on (intent_name) WHERE status =
+// 'pending', so two concurrent scans of the same intent can never both insert.
+func (r *CandidateRepository) UpsertPending(
+	ctx context.Context,
+	c *domain.SegmentCandidate,
+	users []*domain.UserInCandidate,
+) (domain.UpsertOutcome, error) {
+	var outcome domain.UpsertOutcome
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var result struct {
+			ID        uuid.UUID
+			ScannedAt time.Time
+		}
+		err := tx.Raw(`
+			INSERT INTO segment_candidates (
+				id, intent_name, user_count, avg_confidence, avg_days_active,
+				min_days_active, lookback_days, status, scanned_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+			ON CONFLICT (intent_name) WHERE status = 'pending'
+			DO UPDATE SET
+				user_count      = EXCLUDED.user_count,
+				avg_confidence  = EXCLUDED.avg_confidence,
+				avg_days_active = EXCLUDED.avg_days_active,
+				min_days_active = EXCLUDED.min_days_active,
+				lookback_days   = EXCLUDED.lookback_days,
+				scanned_at      = EXCLUDED.scanned_at
+			RETURNING id, scanned_at
+		`, c.ID, c.IntentName, c.UserCount, c.AvgConfidence, c.AvgDaysActive,
+			c.MinDaysActive, c.LookbackDays, c.ScannedAt).Scan(&result).Error
+		if err != nil {
+			return err
+		}
+		outcome = domain.UpsertOutcome{CandidateID: result.ID, Created: result.ID == c.ID}
+		return replaceCandidateUsers(ctx, tx, result.ID, users)
+	})
 	if err != nil {
+		return domain.UpsertOutcome{}, err
+	}
+	return outcome, nil
+}
+
+func replaceCandidateUsers(
+	ctx context.Context,
+	tx *gorm.DB,
+	candidateID uuid.UUID,
+	users []*domain.UserInCandidate,
+) error {
+	if err := tx.WithContext(ctx).
+		Exec(`DELETE FROM segment_candidate_users WHERE candidate_id = ?`, candidateID).Error; err != nil {
 		return err
 	}
-	r.users.Store(c.ID.String(), users)
-	return nil
+	if len(users) == 0 {
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString(`INSERT INTO segment_candidate_users (candidate_id, pseudonymous_id, confidence, days_active, last_seen_at) VALUES `)
+	args := make([]interface{}, 0, len(users)*5)
+	for i, u := range users {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString("(?, ?, ?, ?, ?)")
+		lastSeen := u.LastSeenAt
+		if lastSeen.IsZero() {
+			lastSeen = time.Now().UTC()
+		}
+		args = append(args, candidateID, u.PseudonymousID, u.Confidence, u.DaysActive, lastSeen)
+	}
+	b.WriteString(` ON CONFLICT (candidate_id, pseudonymous_id) DO UPDATE SET
+		confidence = EXCLUDED.confidence,
+		days_active = EXCLUDED.days_active,
+		last_seen_at = EXCLUDED.last_seen_at`)
+	return tx.WithContext(ctx).Exec(b.String(), args...).Error
 }
 
 func (r *CandidateRepository) FindByStatus(ctx context.Context, status domain.CandidateStatus) ([]*domain.SegmentCandidate, error) {
 	var rows []candidateRow
 	err := r.db.WithContext(ctx).Raw(`
-		SELECT id, intent_name, user_count, avg_confidence, avg_days_active,
-		       min_days_active, lookback_days, status, scanned_at,
-		       reviewed_by, reviewed_at, review_notes, published_segment_id
+		SELECT`+candidateSelectColumns+`
 		FROM segment_candidates
 		WHERE status = ?
 		ORDER BY user_count DESC
@@ -80,9 +135,7 @@ func (r *CandidateRepository) FindByStatus(ctx context.Context, status domain.Ca
 func (r *CandidateRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.SegmentCandidate, error) {
 	var row candidateRow
 	err := r.db.WithContext(ctx).Raw(`
-		SELECT id, intent_name, user_count, avg_confidence, avg_days_active,
-		       min_days_active, lookback_days, status, scanned_at,
-		       reviewed_by, reviewed_at, review_notes, published_segment_id
+		SELECT`+candidateSelectColumns+`
 		FROM segment_candidates
 		WHERE id = ?
 	`, id).Scan(&row).Error
@@ -95,17 +148,14 @@ func (r *CandidateRepository) FindByID(ctx context.Context, id uuid.UUID) (*doma
 	return mapCandidateRow(&row), nil
 }
 
-func (r *CandidateRepository) FindPendingByIntentName(ctx context.Context, intentName string) (*domain.SegmentCandidate, error) {
+func (r *CandidateRepository) LockPending(ctx context.Context, id uuid.UUID) (*domain.SegmentCandidate, error) {
 	var row candidateRow
 	err := r.db.WithContext(ctx).Raw(`
-		SELECT id, intent_name, user_count, avg_confidence, avg_days_active,
-		       min_days_active, lookback_days, status, scanned_at,
-		       reviewed_by, reviewed_at, review_notes, published_segment_id
+		SELECT`+candidateSelectColumns+`
 		FROM segment_candidates
-		WHERE intent_name = ? AND status = 'pending'
-		ORDER BY scanned_at DESC
-		LIMIT 1
-	`, intentName).Scan(&row).Error
+		WHERE id = ? AND status = 'pending'
+		FOR UPDATE
+	`, id).Scan(&row).Error
 	if err != nil {
 		return nil, err
 	}
@@ -115,34 +165,32 @@ func (r *CandidateRepository) FindPendingByIntentName(ctx context.Context, inten
 	return mapCandidateRow(&row), nil
 }
 
-func (r *CandidateRepository) UpdateFromFinding(
-	ctx context.Context,
-	id uuid.UUID,
-	c *domain.SegmentCandidate,
-	users []*domain.UserInCandidate,
-) error {
-	err := r.db.WithContext(ctx).Exec(`
-		UPDATE segment_candidates
-		SET user_count = ?, avg_confidence = ?, avg_days_active = ?,
-		    min_days_active = ?, lookback_days = ?, scanned_at = ?
-		WHERE id = ? AND status = 'pending'
-	`, c.UserCount, c.AvgConfidence, c.AvgDaysActive,
-		c.MinDaysActive, c.LookbackDays, c.ScannedAt, id).Error
-	if err != nil {
-		return err
-	}
-	r.users.Store(id.String(), users)
-	return nil
-}
-
 func (r *CandidateRepository) GetUsers(ctx context.Context, candidateID uuid.UUID) ([]*domain.UserInCandidate, error) {
-	_ = ctx
-	val, ok := r.users.Load(candidateID.String())
-	if !ok {
-		return []*domain.UserInCandidate{}, nil
+	var rows []struct {
+		PseudonymousID string
+		Confidence     float64
+		DaysActive     int
+		LastSeenAt     time.Time
 	}
-	users, _ := val.([]*domain.UserInCandidate)
-	return users, nil
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT pseudonymous_id, confidence, days_active, last_seen_at
+		FROM segment_candidate_users
+		WHERE candidate_id = ?
+		ORDER BY confidence DESC
+	`, candidateID).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*domain.UserInCandidate, 0, len(rows))
+	for i := range rows {
+		out = append(out, &domain.UserInCandidate{
+			PseudonymousID: rows[i].PseudonymousID,
+			Confidence:     rows[i].Confidence,
+			DaysActive:     rows[i].DaysActive,
+			LastSeenAt:     rows[i].LastSeenAt,
+		})
+	}
+	return out, nil
 }
 
 func (r *CandidateRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status domain.CandidateStatus, reviewedBy uuid.UUID, notes string) error {

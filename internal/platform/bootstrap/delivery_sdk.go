@@ -1,10 +1,15 @@
 package bootstrap
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"skykin-platform/configs"
+	billingApp "skykin-platform/internal/billing/application"
+	billingInfra "skykin-platform/internal/billing/infrastructure"
 	billingWorker "skykin-platform/internal/billing/worker"
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
@@ -50,8 +55,8 @@ func NewDeliverySDKSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger)
 	out := &DeliverySDKHandlers{
 		Campaigns: deliveryHTTP.NewCampaignHandler(anonSvc),
 	}
-	out.Telemetry = deliveryHTTP.NewTelemetryHandler(platformRDB)
 	if platformRDB != nil {
+		out.Telemetry = deliveryHTTP.NewTelemetryHandler(deliveryApp.NewTelemetryIngestService(platformRDB))
 		if strings.TrimSpace(secretKey) != "" {
 			cpcService := deliveryApp.NewCPCClickService(secretKey, platformRDB)
 			out.CPC = deliveryHTTP.NewCPCClickHandler(cpcService)
@@ -78,7 +83,14 @@ func StartBillingStreamWorker(db *gorm.DB, cfg *configs.Config, logger *slog.Log
 		logger.Warn("billing stream worker: redis unavailable", "error", err)
 		return
 	}
-	billingWorker.StartBillingConsumer(db, rdb, logger)
+	campaignReader := &campaignBillingReader{repo: campaignInfra.NewRepository(db)}
+	subscriptions := billingInfra.NewSubscriptionRepository(db)
+	rates := billingInfra.NewBillingRateRepository(db)
+	events := billingInfra.NewBillingEventRepository(db)
+	spend := &redisDailySpendTracker{rdb: rdb}
+	marker := &budgetExhaustionMarker{flags: campaignInfra.NewRedisCampaignRepository(rdb)}
+	processor := billingApp.NewEventProcessor(campaignReader, subscriptions, rates, events, spend, marker)
+	billingWorker.StartBillingConsumer(processor, rdb, logger)
 }
 
 // StartDeliveryLogStreamWorker launches the delivery-module consumer for campaign_delivery_logs.
@@ -96,4 +108,58 @@ func StartDeliveryLogStreamWorker(db *gorm.DB, cfg *configs.Config, logger *slog
 		return
 	}
 	deliveryWorker.StartDeliveryLogConsumer(db, rdb, logger)
+}
+
+type campaignBillingReader struct {
+	repo *campaignInfra.Repository
+}
+
+func (r *campaignBillingReader) GetCampaignBillingInfo(
+	ctx context.Context,
+	campaignID string,
+) (*billingApp.CampaignBillingInfo, error) {
+	campaign, err := r.repo.Get(ctx, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	if campaign == nil {
+		return nil, fmt.Errorf("campaign not found: %s", campaignID)
+	}
+	return &billingApp.CampaignBillingInfo{
+		ID:               campaign.ID,
+		AdvertiserID:     campaign.AdvertiserID,
+		DailyBudgetCap:   campaign.DailyBudgetCap,
+		TotalBudgetCap:   campaign.TotalBudgetCap,
+		CurrentBudgetUse: campaign.BudgetSpent,
+	}, nil
+}
+
+type redisDailySpendTracker struct {
+	rdb *platformredis.RedisClient
+}
+
+func (t *redisDailySpendTracker) Add(
+	ctx context.Context,
+	campaignID string,
+	amount float64,
+	ttl time.Duration,
+) (float64, error) {
+	today := time.Now().UTC().Format("2006-01-02")
+	key := fmt.Sprintf("budget:spent:%s:%s", campaignID, today)
+	spent, err := t.rdb.IncrByFloat(ctx, key, amount)
+	if err != nil {
+		return 0, err
+	}
+	if ttl > 0 {
+		_ = t.rdb.Expire(ctx, key, ttl)
+	}
+	return spent, nil
+}
+
+type budgetExhaustionMarker struct {
+	flags *campaignInfra.RedisCampaignRepository
+}
+
+func (m *budgetExhaustionMarker) MarkExhausted(ctx context.Context, campaignID string) error {
+	return m.flags.SetBudgetExhausted(ctx, campaignID, 0)
 }

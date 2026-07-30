@@ -19,4 +19,6 @@ type PseudonymousMappingRepository interface {
 	Create(ctx context.Context, mapping *PseudonymousMapping) error
 	FindByPseudonymousID(ctx context.Context, pseudonymousID uuid.UUID) (*PseudonymousMapping, error)
 	FindByUserID(ctx context.Context, userID int64) (*PseudonymousMapping, error)
+	// FindPseudonymousIDsByUserIDs resolves a batch of internal user ids for operator reads.
+	FindPseudonymousIDsByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error)
 }

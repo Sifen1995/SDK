@@ -27,10 +27,10 @@ func (r *ProfileRepository) Save(ctx context.Context, profile *intentdomain.Inte
 		return nil
 	}
 	intent := &intentdomain.Intent{
-		UserID:     profile.PseudonymousID,
-		IntentName: profile.IntentName,
-		Confidence: profile.Confidence,
-		CreatedAt:  profile.RecordedAt,
+		PseudonymousID: profile.PseudonymousID,
+		IntentName:     profile.IntentName,
+		Confidence:     profile.Confidence,
+		CreatedAt:      profile.RecordedAt,
 	}
 	_, err := r.intents.Create(ctx, intent)
 	return err

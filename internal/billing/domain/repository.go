@@ -33,6 +33,11 @@ type BillingRateRepository interface {
 	CreateBatch(ctx context.Context, rates []BillingRate) error
 }
 
+// BillingEventRepository persists calculated billing events.
+type BillingEventRepository interface {
+	CreateBatch(ctx context.Context, events []BillingEvent) error
+}
+
 // ChannelRepository loads delivery channels for entitlement checks.
 type ChannelRepository interface {
 	GetByID(ctx context.Context, id string) (*Channel, error)

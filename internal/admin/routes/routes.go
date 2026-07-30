@@ -11,7 +11,6 @@ import (
 	campaignApp "skykin-platform/internal/campaigns/application"
 	"skykin-platform/configs"
 	"skykin-platform/internal/platform/bootstrap"
-	"skykin-platform/internal/platform/messaging"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -31,14 +30,14 @@ func Wire(
 	db *gorm.DB,
 	cfg *configs.Config,
 	jobs *bootstrap.IntentConsistencyJobs,
-	bus *messaging.Bus,
 	plans *billingApp.PlanService,
 	billingAdmin *billingApp.BillingAdminService,
 	segments *audienceApp.ListService,
 	moderation *campaignApp.ModerationService,
 ) *Module {
-	approveCandidate := adminApp.NewApproveCandidateUseCase(bus, slog.Default())
-	rejectCandidate := adminApp.NewRejectCandidateUseCase(bus, slog.Default())
+	review := bootstrap.NewSegmentReviewPorts(db, slog.Default())
+	approveCandidate := adminApp.NewApproveCandidateUseCase(review.Publisher, slog.Default())
+	rejectCandidate := adminApp.NewRejectCandidateUseCase(review.Rejecter, slog.Default())
 	getUsers := bootstrap.NewGetUsersWithIntentsUseCase(db, cfg, slog.Default())
 
 	return &Module{

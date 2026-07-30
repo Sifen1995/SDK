@@ -43,6 +43,10 @@ func (uc *AnalyzeIntentConsistencyUseCase) Run(ctx context.Context) (*RunReport,
 		outcome, err := uc.scanIntent(ctx, intentClass)
 		if err != nil {
 			uc.logger.Error("intent scan failed", "intent", intentClass, "error", err)
+			report.IntentsFailed = append(report.IntentsFailed, IntentScanFailure{
+				IntentName: intentClass,
+				Error:      err.Error(),
+			})
 			continue
 		}
 		if outcome == nil {
@@ -50,6 +54,12 @@ func (uc *AnalyzeIntentConsistencyUseCase) Run(ctx context.Context) (*RunReport,
 		}
 		aggregateReport(report, *outcome)
 	}
+	// Every intent class failed: the scan produced no usable result at all.
+	if len(report.IntentsFailed) == len(uc.config.IntentClasses) && len(uc.config.IntentClasses) > 0 {
+		return nil, fmt.Errorf("intent consistency scan failed for all %d intent classes: %s",
+			len(report.IntentsFailed), report.IntentsFailed[0].Error)
+	}
+	report.Partial = len(report.IntentsFailed) > 0
 	report.Message = buildRunMessage(report)
 	return report, nil
 }
@@ -113,9 +123,13 @@ func aggregateReport(report *RunReport, outcome FindingProcessResult) {
 }
 
 func buildRunMessage(report *RunReport) string {
-	if report.CandidatesCreated == 0 && report.CandidatesUpdated == 0 {
-		return "Scan complete. No new segment candidates."
+	prefix := "Scan complete."
+	if report.Partial {
+		prefix = fmt.Sprintf("Scan incomplete: %d intent class(es) failed.", len(report.IntentsFailed))
 	}
-	return fmt.Sprintf("Scan complete. %d new candidate(s), %d updated.",
-		report.CandidatesCreated, report.CandidatesUpdated)
+	if report.CandidatesCreated == 0 && report.CandidatesUpdated == 0 {
+		return prefix + " No new segment candidates."
+	}
+	return fmt.Sprintf("%s %d new candidate(s), %d updated.",
+		prefix, report.CandidatesCreated, report.CandidatesUpdated)
 }

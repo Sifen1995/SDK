@@ -11,17 +11,19 @@ import (
 	analyticsdomain "skykin-platform/internal/analytics/domain"
 	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
 	audienceApp "skykin-platform/internal/audience/application"
+	audiencedomain "skykin-platform/internal/audience/domain"
 	audienceInfra "skykin-platform/internal/audience/infrastructure"
+	intentdomain "skykin-platform/internal/intents/domain"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
 	platformredis "skykin-platform/internal/platform/redis"
 
 	"gorm.io/gorm"
 )
 
-// IntentConsistencyJobs holds the analysis use case and shared audience candidate repo.
+// IntentConsistencyJobs holds the analysis use case and candidate listing port.
 type IntentConsistencyJobs struct {
 	AnalyzeUC     *analyticsApp.AnalyzeIntentConsistencyUseCase
-	CandidateRepo *audienceInfra.CandidateRepository
+	CandidateRepo audiencedomain.CandidateRepository
 }
 
 // SetupIntentConsistency wires analysis and synchronous finding processing in audience.
@@ -29,21 +31,49 @@ func SetupIntentConsistency(db *gorm.DB, cfg *configs.Config, logger *slog.Logge
 	if logger == nil {
 		logger = slog.Default()
 	}
-	candidateRepo := audienceInfra.NewCandidateRepository(db)
-	segmentRepo := audienceInfra.NewSegmentRepository(db)
-	membershipRepo := audienceInfra.NewMembershipRepository(db)
-	intentRepo := intentsInfra.NewConsistencyReader(db, cfg)
 
-	processUC := audienceApp.NewProcessIntentFindingUseCase(
-		segmentRepo, membershipRepo, candidateRepo, logger,
-	)
+	processUC := audienceApp.NewProcessIntentFindingUseCase(audienceInfra.NewUnitOfWork(db), logger)
 	processor := audienceApp.NewFindingProcessorAdapter(processUC)
-
 	analyzeUC := analyticsApp.NewAnalyzeIntentConsistencyUseCase(
-		intentRepo, analyticsdomain.DefaultConfig(), processor, logger,
+		&intentConsistencyReader{repo: intentsInfra.NewIntentRepository(db, cfg)},
+		analyticsdomain.DefaultConfig(),
+		processor,
+		logger,
 	)
 
-	return &IntentConsistencyJobs{AnalyzeUC: analyzeUC, CandidateRepo: candidateRepo}
+	return &IntentConsistencyJobs{
+		AnalyzeUC:     analyzeUC,
+		CandidateRepo: audienceInfra.NewCandidateRepository(db),
+	}
+}
+
+type intentConsistencyReader struct {
+	repo intentdomain.IntentRepository
+}
+
+func (r *intentConsistencyReader) FindConsistentUsers(
+	ctx context.Context,
+	intentName string,
+	minConf float64,
+	lookbackDays, minDays, maxAgeDays int,
+) ([]*analyticsdomain.ConsistentUser, error) {
+	signals, err := r.repo.FindConsistentSignals(ctx, intentName, minConf, lookbackDays, minDays, maxAgeDays)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*analyticsdomain.ConsistentUser, 0, len(signals))
+	for _, signal := range signals {
+		if signal == nil {
+			continue
+		}
+		out = append(out, &analyticsdomain.ConsistentUser{
+			PseudonymousID: signal.PseudonymousID,
+			Confidence:     signal.Confidence,
+			DaysActive:     signal.DaysActive,
+			LastSeenAt:     signal.LastSeenAt,
+		})
+	}
+	return out, nil
 }
 
 // StartIntentConsistencyJobs runs analysis on a 24h ticker (plus once after startup delay).

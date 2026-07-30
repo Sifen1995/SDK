@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -31,24 +32,15 @@ type FindingOutcome struct {
 
 // ProcessIntentFindingUseCase deduplicates findings against existing segments and pending candidates.
 type ProcessIntentFindingUseCase struct {
-	segments   domain.SegmentRepository
-	membership domain.MembershipRepository
-	candidates domain.CandidateRepository
-	logger     *slog.Logger
+	uow    domain.UnitOfWork
+	logger *slog.Logger
 }
 
-func NewProcessIntentFindingUseCase(
-	segments domain.SegmentRepository,
-	membership domain.MembershipRepository,
-	candidates domain.CandidateRepository,
-	logger *slog.Logger,
-) *ProcessIntentFindingUseCase {
+func NewProcessIntentFindingUseCase(uow domain.UnitOfWork, logger *slog.Logger) *ProcessIntentFindingUseCase {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &ProcessIntentFindingUseCase{
-		segments: segments, membership: membership, candidates: candidates, logger: logger,
-	}
+	return &ProcessIntentFindingUseCase{uow: uow, logger: logger}
 }
 
 func (uc *ProcessIntentFindingUseCase) Execute(
@@ -58,56 +50,62 @@ func (uc *ProcessIntentFindingUseCase) Execute(
 	users := mapFindingUsers(finding)
 	now := time.Now().UTC()
 
-	if seg, err := uc.segments.FindActiveByIntentSignal(ctx, finding.IntentName, now); err == nil {
-		return uc.mergeIntoSegment(ctx, seg, finding.IntentName, users)
-	} else if err != gorm.ErrRecordNotFound {
+	var outcome FindingOutcome
+	err := uc.uow.Do(ctx, func(r domain.Repositories) error {
+		seg, err := r.Segments.FindActiveByIntentSignal(ctx, finding.IntentName, now)
+		switch {
+		case err == nil:
+			outcome, err = mergeIntoSegment(ctx, r, seg, finding.IntentName, users, uc.logger)
+			return err
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			outcome, err = upsertCandidate(ctx, r, finding, users, uc.logger)
+			return err
+		default:
+			return err
+		}
+	})
+	if err != nil {
 		return FindingOutcome{}, err
 	}
-
-	if pending, err := uc.candidates.FindPendingByIntentName(ctx, finding.IntentName); err == nil {
-		return uc.refreshPendingCandidate(ctx, pending.ID, finding, users)
-	} else if err != gorm.ErrRecordNotFound {
-		return FindingOutcome{}, err
-	}
-
-	return uc.createCandidate(ctx, finding, users)
+	return outcome, nil
 }
 
-func (uc *ProcessIntentFindingUseCase) mergeIntoSegment(
+func mergeIntoSegment(
 	ctx context.Context,
+	r domain.Repositories,
 	seg *domain.AudienceSegment,
 	intentName string,
 	users []*domain.UserInCandidate,
+	logger *slog.Logger,
 ) (FindingOutcome, error) {
 	segUUID, err := uuid.Parse(seg.ID)
 	if err != nil {
 		return FindingOutcome{}, fmt.Errorf("invalid segment id: %w", err)
 	}
 
-	existing, err := uc.membership.FindUsersInSegment(ctx, segUUID)
+	existing, err := r.Membership.FindPseudonymousIDsInSegment(ctx, segUUID)
 	if err != nil {
 		return FindingOutcome{}, err
 	}
-	memberSet := stringSet(existing)
-	newUsers := filterNewUsers(users, memberSet)
+	newUsers := filterNewUsers(users, stringSet(existing))
 	if len(newUsers) == 0 {
-		uc.logger.Info("no new users for existing segment", "intent", intentName, "segment_id", seg.ID)
+		logger.Info("no new members for existing segment", "intent", intentName, "segment_id", seg.ID)
 		return FindingOutcome{Action: outcomeSkippedNoNewUsers, IntentName: intentName, SegmentID: seg.ID}, nil
 	}
 
-	if err := uc.membership.BulkInsert(ctx, segUUID, newUsers); err != nil {
+	if err := r.Membership.BulkInsert(ctx, segUUID, newUsers); err != nil {
 		return FindingOutcome{}, err
 	}
-	count, err := uc.membership.CountMembers(ctx, segUUID)
+	count, err := r.Membership.CountMembers(ctx, segUUID)
 	if err != nil {
 		return FindingOutcome{}, err
 	}
 	seg.ApproximateSize = count
-	if err := uc.segments.Update(ctx, seg); err != nil {
+	if err := r.Segments.Update(ctx, seg); err != nil {
 		return FindingOutcome{}, err
 	}
 
-	uc.logger.Info("merged users into existing segment",
+	logger.Info("merged members into existing segment",
 		"intent", intentName, "segment_id", seg.ID, "users_added", len(newUsers))
 	return FindingOutcome{
 		Action: outcomeMergedSegment, IntentName: intentName,
@@ -115,36 +113,26 @@ func (uc *ProcessIntentFindingUseCase) mergeIntoSegment(
 	}, nil
 }
 
-func (uc *ProcessIntentFindingUseCase) refreshPendingCandidate(
+func upsertCandidate(
 	ctx context.Context,
-	id uuid.UUID,
+	r domain.Repositories,
 	finding analyticsdomain.IntentConsistencyFinding,
 	users []*domain.UserInCandidate,
+	logger *slog.Logger,
 ) (FindingOutcome, error) {
-	candidate := candidateFromFinding(finding)
-	if err := uc.candidates.UpdateFromFinding(ctx, id, candidate, users); err != nil {
+	result, err := r.Candidates.UpsertPending(ctx, candidateFromFinding(finding), users)
+	if err != nil {
 		return FindingOutcome{}, err
 	}
-	uc.logger.Info("refreshed pending segment candidate", "intent", finding.IntentName, "candidate_id", id)
-	return FindingOutcome{
-		Action: outcomeUpdatedCandidate, IntentName: finding.IntentName,
-		CandidateID: id.String(), UsersAdded: len(users),
-	}, nil
-}
-
-func (uc *ProcessIntentFindingUseCase) createCandidate(
-	ctx context.Context,
-	finding analyticsdomain.IntentConsistencyFinding,
-	users []*domain.UserInCandidate,
-) (FindingOutcome, error) {
-	candidate := candidateFromFinding(finding)
-	if err := uc.candidates.Save(ctx, candidate, users); err != nil {
-		return FindingOutcome{}, err
+	action := outcomeUpdatedCandidate
+	if result.Created {
+		action = outcomeCreatedCandidate
 	}
-	uc.logger.Info("created segment candidate", "intent", finding.IntentName, "candidate_id", finding.FindingID)
+	logger.Info("pending segment candidate upserted",
+		"intent", finding.IntentName, "candidate_id", result.CandidateID, "action", action)
 	return FindingOutcome{
-		Action: outcomeCreatedCandidate, IntentName: finding.IntentName,
-		CandidateID: finding.FindingID.String(), UsersAdded: len(users),
+		Action: action, IntentName: finding.IntentName,
+		CandidateID: result.CandidateID.String(), UsersAdded: len(users),
 	}, nil
 }
 
@@ -152,7 +140,7 @@ func mapFindingUsers(finding analyticsdomain.IntentConsistencyFinding) []*domain
 	users := make([]*domain.UserInCandidate, 0, len(finding.Users))
 	for _, u := range finding.Users {
 		users = append(users, &domain.UserInCandidate{
-			UserID: u.UserID, Confidence: u.Confidence,
+			PseudonymousID: u.PseudonymousID, Confidence: u.Confidence,
 			DaysActive: u.DaysActive, LastSeenAt: u.LastSeenAt,
 		})
 	}
@@ -180,7 +168,7 @@ func stringSet(ids []string) map[string]struct{} {
 func filterNewUsers(users []*domain.UserInCandidate, existing map[string]struct{}) []*domain.UserInCandidate {
 	out := make([]*domain.UserInCandidate, 0, len(users))
 	for _, u := range users {
-		if _, ok := existing[u.UserID]; !ok {
+		if _, ok := existing[u.PseudonymousID]; !ok {
 			out = append(out, u)
 		}
 	}

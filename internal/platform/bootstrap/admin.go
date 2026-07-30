@@ -3,11 +3,12 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
-	"strconv"
 	"time"
 
 	"skykin-platform/configs"
 	adminApp "skykin-platform/internal/admin/application"
+	consentdomain "skykin-platform/internal/consent/domain"
+	consentInfra "skykin-platform/internal/consent/infrastructure"
 	intentdomain "skykin-platform/internal/intents/domain"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
 	usersdomain "skykin-platform/internal/users/domain"
@@ -16,31 +17,41 @@ import (
 	"gorm.io/gorm"
 )
 
+// intentBatchFetcherAdapter bridges internal user ids to intent rows. Intents are
+// keyed by pseudonymous id, so the mapping table is the only way to join the two.
 type intentBatchFetcherAdapter struct {
-	repo intentdomain.IntentRepository
+	repo     intentdomain.IntentRepository
+	mappings consentdomain.PseudonymousMappingRepository
 }
 
 func (a *intentBatchFetcherAdapter) FindLatestByUserIDs(
 	ctx context.Context,
 	userIDs []int64,
 ) (map[int64]*adminApp.IntentSummary, error) {
-	ids := make([]string, len(userIDs))
-	for i, id := range userIDs {
-		ids[i] = strconv.FormatInt(id, 10)
+	pseudonymousByUser, err := a.mappings.FindPseudonymousIDsByUserIDs(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(pseudonymousByUser) == 0 {
+		return map[int64]*adminApp.IntentSummary{}, nil
 	}
 
-	raw, err := a.repo.FindLatestByUserIDs(ctx, ids)
+	ids := make([]string, 0, len(pseudonymousByUser))
+	for _, pseudonymousID := range pseudonymousByUser {
+		ids = append(ids, pseudonymousID)
+	}
+	raw, err := a.repo.FindLatestByPseudonymousIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[int64]*adminApp.IntentSummary, len(raw))
-	for sid, intent := range raw {
-		uid, err := strconv.ParseInt(sid, 10, 64)
-		if err != nil {
+	for userID, pseudonymousID := range pseudonymousByUser {
+		intent, ok := raw[pseudonymousID]
+		if !ok {
 			continue
 		}
-		result[uid] = &adminApp.IntentSummary{
+		result[userID] = &adminApp.IntentSummary{
 			IntentName:  intent.IntentName,
 			Confidence:  intent.Confidence,
 			PredictedAt: intent.CreatedAt.Format(time.RFC3339),
@@ -78,10 +89,11 @@ func (a *userListerAdapter) FindAll(
 func NewGetUsersWithIntentsUseCase(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *adminApp.GetUsersWithIntentsUseCase {
 	userRepo := usersInfra.NewUserRepository(db)
 	intentRepo := intentsInfra.NewIntentRepository(db, cfg)
+	mappingRepo := consentInfra.NewPseudonymousMappingRepository(db)
 
 	return adminApp.NewGetUsersWithIntentsUseCase(
 		&userListerAdapter{repo: userRepo},
-		&intentBatchFetcherAdapter{repo: intentRepo},
+		&intentBatchFetcherAdapter{repo: intentRepo, mappings: mappingRepo},
 		logger,
 	)
 }

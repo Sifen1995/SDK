@@ -3,13 +3,16 @@ definitions:
   internal_ad_portal_interfaces_http.AdPortalLoginResponse:
     properties:
       expires_at:
+        example: "2026-06-02T12:00:00Z"
         type: string
       refresh_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         type: string
       token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         type: string
       user:
-        $ref: '#/definitions/skykin-platform_internal_ad_portal_application.UserInfo'
+        $ref: '#/definitions/internal_ad_portal_interfaces_http.LoginUserInfo'
     type: object
   internal_ad_portal_interfaces_http.CreateUserRequest:
     properties:
@@ -43,6 +46,15 @@ definitions:
     required:
     - email
     - password
+    type: object
+  internal_ad_portal_interfaces_http.LoginUserInfo:
+    properties:
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      role:
+        example: advertiser
+        type: string
     type: object
   internal_ad_portal_interfaces_http.MeResponse:
     properties:
@@ -95,14 +107,19 @@ definitions:
   internal_ad_portal_interfaces_http.RegisterResponse:
     properties:
       created_at:
+        example: "2026-06-01T12:00:00Z"
         type: string
       email:
+        example: advertiser@test.com
         type: string
       id:
+        example: 550e8400-e29b-41d4-a716-446655440000
         type: string
       name:
+        example: Jane Doe
         type: string
       role:
+        example: advertiser
         type: string
     type: object
   internal_admin_interfaces_http.AdminPlanListResponse:
@@ -128,6 +145,21 @@ definitions:
     required:
     - estimated_cpm
     - name
+    type: object
+  internal_admin_interfaces_http.ApproveSegmentCandidateResponse:
+    properties:
+      candidate_id:
+        example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+        type: string
+      member_count:
+        example: 1240
+        type: integer
+      message:
+        example: segment published from candidate
+        type: string
+      segment_id:
+        example: 3f2504e0-4f89-11d3-9a0c-0305e82c3301
+        type: string
     type: object
   internal_admin_interfaces_http.BillingRateListResponse:
     properties:
@@ -457,6 +489,9 @@ definitions:
       channel_code:
         example: IN_APP_BANNER
         type: string
+      click_token:
+        example: a1b2c3d4....2026-07-30-08
+        type: string
       destination_url:
         example: https://shop.example.com
         type: string
@@ -488,11 +523,9 @@ definitions:
   internal_delivery_http.AnonymousTrackRequest:
     properties:
       campaign_id:
-        description: CampaignID of the served creative
         example: c1a2b3c4-d5e6-7890-abcd-ef1234567890
         type: string
       event_type:
-        description: EventType for anonymous bill track (impression)
         example: impression
         type: string
     required:
@@ -502,29 +535,21 @@ definitions:
   internal_delivery_http.TelemetryTrackRequest:
     properties:
       campaign_id:
-        description: CampaignID of the served creative
         example: 550e8400-e29b-41d4-a716-446655440000
         type: string
       event_type:
-        description: 'EventType: impression | click | install | signup | purchase'
         example: impression
         type: string
       install_token:
-        description: InstallToken is optional and only required for install events.
         example: signed-install-token
         type: string
       occurred_at:
-        description: OccurredAt RFC3339 timestamp; defaults to server UTC now when
-          omitted
         example: "2026-07-18T12:00:00Z"
         type: string
       pseudonymous_id:
-        description: PseudonymousID from consent; required for impression/click Redis
-          dedup
         example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
         type: string
       transaction_value:
-        description: TransactionValue used for REV_SHARE / purchase events
         example: 0
         minimum: 0
         type: number
@@ -672,13 +697,6 @@ definitions:
           $ref: '#/definitions/internal_permissions_interfaces_http.PermissionResponse'
         type: array
     type: object
-  skykin-platform_internal_ad_portal_application.UserInfo:
-    properties:
-      id:
-        type: string
-      role:
-        type: string
-    type: object
   skykin-platform_internal_admin_application.GetUsersResult:
     properties:
       page:
@@ -712,18 +730,31 @@ definitions:
       user_id:
         type: integer
     type: object
+  skykin-platform_internal_analytics_application.IntentScanFailure:
+    properties:
+      error:
+        type: string
+      intent_name:
+        type: string
+    type: object
   skykin-platform_internal_analytics_application.RunReport:
     properties:
       candidates_created:
         type: integer
       candidates_updated:
         type: integer
+      intents_failed:
+        items:
+          $ref: '#/definitions/skykin-platform_internal_analytics_application.IntentScanFailure'
+        type: array
       intents_skipped:
         items:
           type: string
         type: array
       message:
         type: string
+      partial:
+        type: boolean
       segments_enriched:
         type: integer
       users_added_to_segments:
@@ -897,6 +928,10 @@ definitions:
         type: boolean
       name:
         type: string
+      price_etb:
+        description: PriceETB carries the same value under the field name the portals
+          read.
+        type: number
       purchasable:
         type: boolean
       top_intent_signals:
@@ -1340,8 +1375,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Marks the candidate approved and asynchronously provisions the
-        audience segment and memberships.
+      description: Publishes the audience segment and its memberships in a single
+        transaction and returns the published segment id. Fails with 409 when the
+        candidate has already been reviewed.
       parameters:
       - description: Candidate ID
         in: path
@@ -1357,14 +1393,20 @@ paths:
       produces:
       - application/json
       responses:
-        "202":
-          description: Accepted
+        "201":
+          description: Created
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/internal_admin_interfaces_http.ApproveSegmentCandidateResponse'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
       security:
@@ -1398,6 +1440,10 @@ paths:
             type: object
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
       security:

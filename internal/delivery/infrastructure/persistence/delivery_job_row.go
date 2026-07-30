@@ -8,10 +8,10 @@ import (
 
 // DeliveryJobRow is the GORM persistence model for delivery_jobs.
 type DeliveryJobRow struct {
-	ID         string    `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID     string    `gorm:"type:uuid;not null;index"`
-	CampaignID string    `gorm:"type:uuid;not null;index"`
-	CreatedAt  time.Time `gorm:"not null;default:now()"`
+	ID             string    `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	PseudonymousID string    `gorm:"column:pseudonymous_id;type:uuid;not null;index"`
+	CampaignID     string    `gorm:"type:uuid;not null;index"`
+	CreatedAt      time.Time `gorm:"not null;default:now()"`
 }
 
 func (DeliveryJobRow) TableName() string { return "delivery_jobs" }
@@ -21,10 +21,10 @@ func (row *DeliveryJobRow) ToDomain() *domain.DeliveryJob {
 		return nil
 	}
 	return &domain.DeliveryJob{
-		ID:         row.ID,
-		UserID:     row.UserID,
-		CampaignID: row.CampaignID,
-		CreatedAt:  row.CreatedAt,
+		ID:             row.ID,
+		PseudonymousID: row.PseudonymousID,
+		CampaignID:     row.CampaignID,
+		CreatedAt:      row.CreatedAt,
 	}
 }
 
@@ -33,9 +33,9 @@ func DeliveryJobRowFromDomain(job *domain.DeliveryJob) *DeliveryJobRow {
 		return nil
 	}
 	return &DeliveryJobRow{
-		ID:         job.ID,
-		UserID:     job.UserID,
-		CampaignID: job.CampaignID,
-		CreatedAt:  job.CreatedAt,
+		ID:             job.ID,
+		PseudonymousID: job.PseudonymousID,
+		CampaignID:     job.CampaignID,
+		CreatedAt:      job.CreatedAt,
 	}
 }

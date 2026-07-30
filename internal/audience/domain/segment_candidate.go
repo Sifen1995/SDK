@@ -10,9 +10,10 @@ import (
 type CandidateStatus string
 
 const (
-	CandidateStatusPending  CandidateStatus = "pending"
-	CandidateStatusApproved CandidateStatus = "approved"
-	CandidateStatusRejected CandidateStatus = "rejected"
+	CandidateStatusPending    CandidateStatus = "pending"
+	CandidateStatusApproved   CandidateStatus = "approved"
+	CandidateStatusRejected   CandidateStatus = "rejected"
+	CandidateStatusSuperseded CandidateStatus = "superseded"
 )
 
 type SegmentCandidate struct {
@@ -31,19 +32,28 @@ type SegmentCandidate struct {
 	PublishedSegmentID *uuid.UUID
 }
 
+// UserInCandidate is one pseudonymous member captured by a candidate scan.
 type UserInCandidate struct {
-	UserID     string
-	Confidence float64
-	DaysActive int
-	LastSeenAt time.Time
+	PseudonymousID string
+	Confidence     float64
+	DaysActive     int
+	LastSeenAt     time.Time
+}
+
+// UpsertOutcome reports whether a scan created a new pending candidate or refreshed one.
+type UpsertOutcome struct {
+	CandidateID uuid.UUID
+	Created     bool
 }
 
 type CandidateRepository interface {
-	Save(ctx context.Context, c *SegmentCandidate, users []*UserInCandidate) error
+	// UpsertPending atomically creates or refreshes the single pending candidate for
+	// an intent and replaces its captured member list.
+	UpsertPending(ctx context.Context, c *SegmentCandidate, users []*UserInCandidate) (UpsertOutcome, error)
 	FindByStatus(ctx context.Context, status CandidateStatus) ([]*SegmentCandidate, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*SegmentCandidate, error)
-	FindPendingByIntentName(ctx context.Context, intentName string) (*SegmentCandidate, error)
-	UpdateFromFinding(ctx context.Context, id uuid.UUID, c *SegmentCandidate, users []*UserInCandidate) error
+	// LockPending selects a pending candidate FOR UPDATE so concurrent reviews serialise.
+	LockPending(ctx context.Context, id uuid.UUID) (*SegmentCandidate, error)
 	GetUsers(ctx context.Context, candidateID uuid.UUID) ([]*UserInCandidate, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status CandidateStatus, reviewedBy uuid.UUID, notes string) error
 	LinkToSegment(ctx context.Context, candidateID, segmentID uuid.UUID) error
@@ -51,6 +61,18 @@ type CandidateRepository interface {
 
 type MembershipRepository interface {
 	BulkInsert(ctx context.Context, segmentID uuid.UUID, users []*UserInCandidate) error
-	FindUsersInSegment(ctx context.Context, segmentID uuid.UUID) ([]string, error)
+	FindPseudonymousIDsInSegment(ctx context.Context, segmentID uuid.UUID) ([]string, error)
 	CountMembers(ctx context.Context, segmentID uuid.UUID) (int, error)
+}
+
+// Repositories is the transaction-scoped repository set handed to a UnitOfWork.
+type Repositories struct {
+	Segments   SegmentRepository
+	Membership MembershipRepository
+	Candidates CandidateRepository
+}
+
+// UnitOfWork runs audience writes that must commit or roll back together.
+type UnitOfWork interface {
+	Do(ctx context.Context, fn func(r Repositories) error) error
 }

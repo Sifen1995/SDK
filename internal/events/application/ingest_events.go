@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"skykin-platform/internal/events/domain"
-	eventvalidation "skykin-platform/internal/events/validation"
 	internalevents "skykin-platform/internal/events/events"
+	eventvalidation "skykin-platform/internal/events/validation"
 	platformredis "skykin-platform/internal/platform/redis"
 )
 
@@ -34,7 +34,7 @@ type EventInput struct {
 // IngestCommand carries a batch ingestion request.
 type IngestCommand struct {
 	ApplicationID  string
-	ExternalUserID string
+	PseudonymousID string
 	Events         []EventInput
 }
 
@@ -46,15 +46,15 @@ type EventIngestResult struct {
 
 // IngestResult is returned to the HTTP layer.
 type IngestResult struct {
-	Accepted          bool                `json:"accepted"`
-	PredictionQueued  bool                `json:"prediction_queued"`
-	Results           []EventIngestResult `json:"results"`
+	Accepted         bool                `json:"accepted"`
+	PredictionQueued bool                `json:"prediction_queued"`
+	Results          []EventIngestResult `json:"results"`
 }
 
 // IngestEventsUseCase orchestrates validation, deduplication, persistence, and publishing.
 type IngestEventsUseCase struct {
 	repo      domain.EventRepository
-	users     UserResolver
+	consent   ConsentGate
 	dedup     DedupStore
 	publisher EventPublisher
 	logger    *slog.Logger
@@ -63,7 +63,7 @@ type IngestEventsUseCase struct {
 
 func NewIngestEventsUseCase(
 	repo domain.EventRepository,
-	users UserResolver,
+	consent ConsentGate,
 	dedup DedupStore,
 	redisClient *platformredis.RedisClient,
 	publisher EventPublisher,
@@ -74,7 +74,7 @@ func NewIngestEventsUseCase(
 	}
 	return &IngestEventsUseCase{
 		repo:      repo,
-		users:     users,
+		consent:   consent,
 		dedup:     dedup,
 		publisher: publisher,
 		logger:    logger,
@@ -83,18 +83,16 @@ func NewIngestEventsUseCase(
 }
 
 func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (*IngestResult, error) {
-	if cmd.ExternalUserID == "" {
-		return nil, fmt.Errorf("user_id is required")
+	if cmd.PseudonymousID == "" {
+		return nil, fmt.Errorf("pseudonymous_id is required")
 	}
 	if len(cmd.Events) == 0 {
 		return nil, fmt.Errorf("events batch cannot be empty")
 	}
 
-	user, err := uc.users.FindOrCreate(ctx, cmd.ExternalUserID)
-	if err != nil {
-		return nil, fmt.Errorf("resolve user: %w", err)
+	if err := uc.consent.EnsureConsented(ctx, cmd.PseudonymousID); err != nil {
+		return nil, err
 	}
-	_ = user
 
 	results := make([]EventIngestResult, 0, len(cmd.Events))
 	toStore := make([]domain.Event, 0, len(cmd.Events))
@@ -112,7 +110,7 @@ func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (
 			uc.logger.Warn("event validation failed",
 				"event_id", input.EventID,
 				"event_type", input.EventType,
-				"user_id", cmd.ExternalUserID,
+				"pseudonymous_id", cmd.PseudonymousID,
 				"status", statusInvalid,
 				"error", err,
 			)
@@ -128,7 +126,7 @@ func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (
 			uc.logger.Info("duplicate event skipped",
 				"event_id", input.EventID,
 				"event_type", input.EventType,
-				"user_id", cmd.ExternalUserID,
+				"pseudonymous_id", cmd.PseudonymousID,
 				"status", statusDuplicate,
 			)
 			results = append(results, EventIngestResult{EventID: input.EventID, Status: statusDuplicate})
@@ -141,18 +139,18 @@ func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (
 		}
 
 		event := domain.Event{
-			EventID:       input.EventID,
-			UserID:        cmd.ExternalUserID,
-			ApplicationID: cmd.ApplicationID,
-			EventType:     domain.EventType(input.EventType),
-			Domain:        input.Domain,
-			SessionID:     input.SessionID,
-			ScreenName:    input.ScreenName,
-			Metadata:      input.Metadata,
-			DeviceType:    input.DeviceType,
-			Platform:      input.Platform,
-			AppVersion:    input.AppVersion,
-			CreatedAt:     createdAt,
+			EventID:        input.EventID,
+			PseudonymousID: cmd.PseudonymousID,
+			ApplicationID:  cmd.ApplicationID,
+			EventType:      domain.EventType(input.EventType),
+			Domain:         input.Domain,
+			SessionID:      input.SessionID,
+			ScreenName:     input.ScreenName,
+			Metadata:       input.Metadata,
+			DeviceType:     input.DeviceType,
+			Platform:       input.Platform,
+			AppVersion:     input.AppVersion,
+			CreatedAt:      createdAt,
 		}
 		toStore = append(toStore, event)
 		results = append(results, EventIngestResult{EventID: input.EventID, Status: statusStored})
@@ -170,33 +168,33 @@ func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (
 		uc.logger.Info("event stored",
 			"event_id", ev.EventID,
 			"event_type", string(ev.EventType),
-			"user_id", cmd.ExternalUserID,
+			"pseudonymous_id", cmd.PseudonymousID,
 			"status", statusStored,
 		)
 
 		uc.publisher.Publish(ctx, internalevents.TopicEventStored, internalevents.EventStored{
-			EventID:       ev.EventID,
-			UserID:        cmd.ExternalUserID,
-			ApplicationID: ev.ApplicationID,
-			EventType:     string(ev.EventType),
-			Domain:        ev.Domain,
-			SessionID:     ev.SessionID,
+			EventID:        ev.EventID,
+			PseudonymousID: cmd.PseudonymousID,
+			ApplicationID:  ev.ApplicationID,
+			EventType:      string(ev.EventType),
+			Domain:         ev.Domain,
+			SessionID:      ev.SessionID,
 		})
 
 		uc.publisher.Publish(ctx, internalevents.TopicEventReceived, internalevents.EventReceived{
-			EventID:       ev.EventID,
-			UserID:        cmd.ExternalUserID,
-			ApplicationID: ev.ApplicationID,
-			EventType:     string(ev.EventType),
-			Domain:        ev.Domain,
-			SessionID:     ev.SessionID,
+			EventID:        ev.EventID,
+			PseudonymousID: cmd.PseudonymousID,
+			ApplicationID:  ev.ApplicationID,
+			EventType:      string(ev.EventType),
+			Domain:         ev.Domain,
+			SessionID:      ev.SessionID,
 		})
 	}
 
 	if uc.redis != nil {
-		if err := uc.cacheUserEvents(ctx, cmd.ExternalUserID, toStore); err != nil {
+		if err := uc.cacheUserEvents(ctx, cmd.PseudonymousID, toStore); err != nil {
 			uc.logger.Warn("failed to cache user events in redis",
-				"user_id", cmd.ExternalUserID,
+				"pseudonymous_id", cmd.PseudonymousID,
 				"error", err,
 			)
 		}
@@ -209,8 +207,8 @@ func (uc *IngestEventsUseCase) Execute(ctx context.Context, cmd IngestCommand) (
 	}, nil
 }
 
-func (uc *IngestEventsUseCase) cacheUserEvents(ctx context.Context, externalUserID string, events []domain.Event) error {
-	key := "user_events:" + externalUserID
+func (uc *IngestEventsUseCase) cacheUserEvents(ctx context.Context, pseudonymousID string, events []domain.Event) error {
+	key := "user_events:" + pseudonymousID
 	values := make([]string, 0, len(events))
 	for _, ev := range events {
 		raw, err := json.Marshal(ev)

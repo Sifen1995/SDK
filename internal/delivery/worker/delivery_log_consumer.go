@@ -2,14 +2,12 @@ package worker
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"log/slog"
 	"os"
 	"strings"
 	"time"
 
+	deliveryApp "skykin-platform/internal/delivery/application"
 	deliverydomain "skykin-platform/internal/delivery/domain"
 	deliveryInfra "skykin-platform/internal/delivery/infrastructure"
 	platformredis "skykin-platform/internal/platform/redis"
@@ -38,10 +36,6 @@ func StartDeliveryLogConsumer(db *gorm.DB, rdb *platformredis.RedisClient, logge
 		logger.Error("delivery log consumer: create group failed", "error", err)
 		return
 	}
-	logger.Info("delivery log consumer: group ready",
-		"stream", billingEventsStream,
-		"group", deliveryLogProcessorGroup,
-	)
 	go runDeliveryLogConsumer(context.Background(), db, rdb, logger)
 }
 
@@ -50,39 +44,13 @@ func runDeliveryLogConsumer(ctx context.Context, db *gorm.DB, rdb *platformredis
 		if ctx.Err() != nil {
 			return
 		}
-
-		msgs, err := rdb.XReadGroup(
-			ctx,
-			deliveryLogProcessorGroup,
-			deliveryLogConsumer,
-			billingEventsStream,
-			"0",
-			deliveryReadBatchSize,
-			0,
-		)
-		if err != nil && err != platformredis.ErrNil {
-			logger.Warn("delivery log consumer: xreadgroup pending failed", "error", err)
-			time.Sleep(time.Second)
-			continue
-		}
-		if len(msgs) == 0 {
-			msgs, err = rdb.XReadGroup(
-				ctx,
-				deliveryLogProcessorGroup,
-				deliveryLogConsumer,
-				billingEventsStream,
-				">",
-				deliveryReadBatchSize,
-				deliveryReadBlock,
-			)
-			if err != nil {
-				if err == platformredis.ErrNil {
-					continue
-				}
-				logger.Warn("delivery log consumer: xreadgroup failed", "error", err)
+		msgs, err := readDeliveryMessages(ctx, rdb)
+		if err != nil {
+			if err != platformredis.ErrNil {
+				logger.Warn("delivery log consumer: read failed", "error", err)
 				time.Sleep(time.Second)
-				continue
 			}
+			continue
 		}
 		if len(msgs) == 0 {
 			continue
@@ -95,10 +63,35 @@ func runDeliveryLogConsumer(ctx context.Context, db *gorm.DB, rdb *platformredis
 		}
 		if err := rdb.XAck(ctx, billingEventsStream, deliveryLogProcessorGroup, ids...); err != nil {
 			logger.Error("delivery log consumer: xack failed", "ids", len(ids), "error", err)
-			continue
 		}
-		logger.Info("delivery log consumer: processed batch", "count", len(ids))
 	}
+}
+
+func readDeliveryMessages(ctx context.Context, rdb *platformredis.RedisClient) ([]platformredis.StreamMessage, error) {
+	msgs, err := rdb.XReadGroup(
+		ctx,
+		deliveryLogProcessorGroup,
+		deliveryLogConsumer,
+		billingEventsStream,
+		"0",
+		deliveryReadBatchSize,
+		0,
+	)
+	if err != nil && err != platformredis.ErrNil {
+		return nil, err
+	}
+	if len(msgs) > 0 {
+		return msgs, nil
+	}
+	return rdb.XReadGroup(
+		ctx,
+		deliveryLogProcessorGroup,
+		deliveryLogConsumer,
+		billingEventsStream,
+		">",
+		deliveryReadBatchSize,
+		deliveryReadBlock,
+	)
 }
 
 func processDeliveryLogBatch(
@@ -109,15 +102,21 @@ func processDeliveryLogBatch(
 ) ([]string, error) {
 	built := make([]deliverydomain.DeliveryLog, 0, len(msgs))
 	ids := make([]string, 0, len(msgs))
-	skipped := 0
+	secret := strings.TrimSpace(os.Getenv("CLICK_TOKEN_SECRET"))
 
 	for _, msg := range msgs {
-		logRow, err := mapStreamToDeliveryLog(msg)
+		logRow, err := deliveryApp.MapStreamToDeliveryLog(deliveryApp.StreamDeliveryFields{
+			CampaignID:     msg.Values["campaign_id"],
+			EventType:      msg.Values["event_type"],
+			PseudonymousID: msg.Values["pseudonymous_id"],
+			Source:         msg.Values["source"],
+			InstallToken:   msg.Values["install_token"],
+			OccurredAt:     msg.Values["occurred_at"],
+		}, secret)
 		if err != nil {
-			skipped++
 			logger.Warn("delivery log consumer: skip message",
 				"id", msg.ID,
-				"campaign_id", strings.TrimSpace(msg.Values["campaign_id"]),
+				"campaign_id", msg.Values["campaign_id"],
 				"error", err,
 			)
 			ids = append(ids, msg.ID)
@@ -134,119 +133,14 @@ func processDeliveryLogBatch(
 		}
 		jobRepo := deliveryInfra.NewDeliveryRepository(db)
 		for i := range built {
-			if err := jobRepo.RecordJob(ctx, built[i].UserID, built[i].CampaignID); err != nil {
+			if err := jobRepo.RecordJob(ctx, built[i].PseudonymousID, built[i].CampaignID); err != nil {
 				logger.Warn("delivery log consumer: delivery_jobs insert failed",
 					"campaign_id", built[i].CampaignID,
-					"user_id", built[i].UserID,
+					"pseudonymous_id", built[i].PseudonymousID,
 					"error", err,
 				)
 			}
 		}
 	}
-	if skipped > 0 {
-		logger.Warn("delivery log consumer: skipped invalid messages",
-			"skipped", skipped,
-			"accepted", len(built),
-		)
-	}
 	return ids, nil
 }
-
-func mapStreamToDeliveryLog(msg platformredis.StreamMessage) (*deliverydomain.DeliveryLog, error) {
-	campaignID := strings.TrimSpace(msg.Values["campaign_id"])
-	eventType := strings.ToLower(strings.TrimSpace(msg.Values["event_type"]))
-	if campaignID == "" || eventType == "" {
-		return nil, errRequiredFields
-	}
-
-	status := statusForEvent(eventType)
-	if status == "" {
-		return nil, errUnsupportedEvent
-	}
-
-	if eventType == "install" {
-		if err := validateInstallToken(msg.Values["install_token"], campaignID); err != nil {
-			return nil, err
-		}
-	}
-
-	userID := strings.TrimSpace(msg.Values["pseudonymous_id"])
-	sessionID := "telemetry"
-	if userID == "" {
-		userID = deliverydomain.AnonymousUserID
-		sessionID = "anonymous"
-	}
-	if src := strings.TrimSpace(msg.Values["source"]); src == "anonymous" {
-		userID = deliverydomain.AnonymousUserID
-		sessionID = "anonymous"
-	}
-
-	return &deliverydomain.DeliveryLog{
-		CampaignID:     campaignID,
-		UserID:         userID,
-		SessionID:      sessionID,
-		DeliveryStatus: status,
-		LoggedAt:       parseOccurredAt(msg.Values["occurred_at"]),
-	}, nil
-}
-
-func statusForEvent(eventType string) string {
-	switch eventType {
-	case "impression":
-		return deliverydomain.StatusRendered
-	case "click":
-		return deliverydomain.StatusClicked
-	case "install", "signup", "purchase":
-		return deliverydomain.StatusConverted
-	default:
-		return ""
-	}
-}
-
-func validateInstallToken(token any, campaignID string) error {
-	secret := strings.TrimSpace(os.Getenv("CLICK_TOKEN_SECRET"))
-	if secret == "" {
-		return nil
-	}
-
-	strToken, ok := token.(string)
-	if !ok {
-		return errInvalidInstallToken
-	}
-	strToken = strings.TrimSpace(strToken)
-	if strToken == "" {
-		return errInvalidInstallToken
-	}
-
-	h := hmac.New(sha256.New, []byte(secret))
-	_, _ = h.Write([]byte(campaignID))
-	expected := hex.EncodeToString(h.Sum(nil))
-	if !hmac.Equal([]byte(strToken), []byte(expected)) {
-		return errInvalidInstallToken
-	}
-	return nil
-}
-
-func parseOccurredAt(raw string) time.Time {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return time.Now().UTC()
-	}
-	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
-		return t.UTC()
-	}
-	if t, err := time.Parse(time.RFC3339, raw); err == nil {
-		return t.UTC()
-	}
-	return time.Now().UTC()
-}
-
-type simpleError string
-
-func (e simpleError) Error() string { return string(e) }
-
-const (
-	errRequiredFields      = simpleError("campaign_id and event_type are required")
-	errUnsupportedEvent    = simpleError("unsupported event_type for delivery log")
-	errInvalidInstallToken = simpleError("invalid install token")
-)

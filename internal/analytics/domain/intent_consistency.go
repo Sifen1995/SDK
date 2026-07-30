@@ -9,12 +9,12 @@ import (
 // TopicIntentConsistencyFinding is published when sustained intent patterns are detected.
 const TopicIntentConsistencyFinding = "IntentConsistencyFinding"
 
-// ConsistentUser is a user exhibiting sustained interest in an intent class.
+// ConsistentUser is a pseudonymous identity exhibiting sustained interest in an intent class.
 type ConsistentUser struct {
-	UserID     string
-	Confidence float64
-	DaysActive int
-	LastSeenAt time.Time
+	PseudonymousID string
+	Confidence     float64
+	DaysActive     int
+	LastSeenAt     time.Time
 }
 
 // IntentConsistencyFinding is an analytics insight — not a persisted business entity.

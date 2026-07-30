@@ -75,6 +75,7 @@ func toAnonymousCampaignDTO(c *campaignApp.CampaignWithClickToken) AnonymousCamp
 		DestinationURL:     c.DestinationURL,
 		CanvasJSON:         canvas,
 		FrequencyCapPerDay: cap,
+		ClickToken:         c.ClickToken,
 		PlanName:           c.PlanName,
 		PlanMonthlyFeeETB:  c.PlanMonthlyFeeETB,
 	}

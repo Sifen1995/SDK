@@ -41,16 +41,16 @@ func (r *MembershipRepository) BulkInsert(ctx context.Context, segmentID uuid.UU
 
 func (r *MembershipRepository) insertBatch(ctx context.Context, segmentID uuid.UUID, users []*domain.UserInCandidate) error {
 	var b strings.Builder
-	b.WriteString(`INSERT INTO segment_memberships (segment_id, user_id, confidence, days_active) VALUES `)
+	b.WriteString(`INSERT INTO segment_memberships (segment_id, pseudonymous_id, confidence, days_active) VALUES `)
 	args := make([]interface{}, 0, len(users)*4)
 	for i, u := range users {
 		if i > 0 {
 			b.WriteString(", ")
 		}
 		b.WriteString("(?, ?, ?, ?)")
-		args = append(args, segmentID, u.UserID, u.Confidence, u.DaysActive)
+		args = append(args, segmentID, u.PseudonymousID, u.Confidence, u.DaysActive)
 	}
-	b.WriteString(` ON CONFLICT (segment_id, user_id) DO UPDATE SET confidence = EXCLUDED.confidence, days_active = EXCLUDED.days_active, added_at = CURRENT_TIMESTAMP`)
+	b.WriteString(` ON CONFLICT (segment_id, pseudonymous_id) DO UPDATE SET confidence = EXCLUDED.confidence, days_active = EXCLUDED.days_active, added_at = CURRENT_TIMESTAMP`)
 	return r.db.WithContext(ctx).Exec(b.String(), args...).Error
 }
 
@@ -66,14 +66,14 @@ func (r *MembershipRepository) CountMembers(ctx context.Context, segmentID uuid.
 	return int(count), nil
 }
 
-func (r *MembershipRepository) FindUsersInSegment(ctx context.Context, segmentID uuid.UUID) ([]string, error) {
+func (r *MembershipRepository) FindPseudonymousIDsInSegment(ctx context.Context, segmentID uuid.UUID) ([]string, error) {
 	var ids []string
 	err := r.db.WithContext(ctx).Raw(`
-		SELECT user_id FROM segment_memberships
+		SELECT pseudonymous_id FROM segment_memberships
 		WHERE segment_id = ?
 	`, segmentID).Scan(&ids).Error
 	if err != nil {
-		return nil, fmt.Errorf("find users in segment: %w", err)
+		return nil, fmt.Errorf("find pseudonymous ids in segment: %w", err)
 	}
 	return ids, nil
 }

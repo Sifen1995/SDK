@@ -1,63 +1,38 @@
 package http
 
 import (
-	"context"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 
+	deliveryApp "skykin-platform/internal/delivery/application"
 	platformHTTP "skykin-platform/internal/platform/http"
-	platformredis "skykin-platform/internal/platform/redis"
 
 	"github.com/gin-gonic/gin"
 )
 
-const (
-	billingEventsStream    = "stream:billing_events"
-	billingEventsStreamMax = 100000
-
-	telemetryDedupKeyPrefix = "lock:telemetry:"
-	telemetryClickTTL       = time.Hour
-	telemetryImpressionTTL  = 5 * time.Minute
-)
-
 // AnonymousTrackRequest is a non-consented impression (or related) bill track payload.
 type AnonymousTrackRequest struct {
-	// CampaignID of the served creative
 	CampaignID string `json:"campaign_id" binding:"required,uuid" example:"c1a2b3c4-d5e6-7890-abcd-ef1234567890"`
-	// EventType for anonymous bill track (impression)
-	EventType string `json:"event_type" binding:"required" example:"impression"`
+	EventType  string `json:"event_type" binding:"required" example:"impression"`
 }
 
 // TelemetryTrackRequest is a consented ad interaction from the Flutter SDK.
 type TelemetryTrackRequest struct {
-	// CampaignID of the served creative
-	CampaignID string `json:"campaign_id" binding:"required,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
-	// EventType: impression | click | install | signup | purchase
-	EventType string `json:"event_type" binding:"required" example:"impression"`
-	// PseudonymousID from consent; required for impression/click Redis dedup
-	PseudonymousID string `json:"pseudonymous_id" binding:"omitempty,uuid" example:"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"`
-	// TransactionValue used for REV_SHARE / purchase events
+	CampaignID       string  `json:"campaign_id" binding:"required,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+	EventType        string  `json:"event_type" binding:"required" example:"impression"`
+	PseudonymousID   string  `json:"pseudonymous_id" binding:"omitempty,uuid" example:"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"`
 	TransactionValue float64 `json:"transaction_value" binding:"omitempty,gte=0" example:"0"`
-	// OccurredAt RFC3339 timestamp; defaults to server UTC now when omitted
-	OccurredAt string `json:"occurred_at" binding:"omitempty" example:"2026-07-18T12:00:00Z"`
-	// InstallToken is optional and only required for install events.
-	InstallToken string `json:"install_token,omitempty" binding:"omitempty" example:"signed-install-token"`
-}
-
-type billingStreamPublisher interface {
-	SetNX(ctx context.Context, key string, value string, ttl time.Duration) (bool, error)
-	XAdd(ctx context.Context, stream string, maxLen int64, values map[string]interface{}) (string, error)
+	OccurredAt       string  `json:"occurred_at" binding:"omitempty" example:"2026-07-18T12:00:00Z"`
+	InstallToken     string  `json:"install_token,omitempty" binding:"omitempty" example:"signed-install-token"`
 }
 
 // TelemetryHandler accepts high-volume consented telemetry and write-behinds via Redis Streams.
 type TelemetryHandler struct {
-	rdb billingStreamPublisher
+	ingest *deliveryApp.TelemetryIngestService
 }
 
-func NewTelemetryHandler(rdb *platformredis.RedisClient) *TelemetryHandler {
-	return &TelemetryHandler{rdb: rdb}
+func NewTelemetryHandler(ingest *deliveryApp.TelemetryIngestService) *TelemetryHandler {
+	return &TelemetryHandler{ingest: ingest}
 }
 
 // Track godoc
@@ -74,7 +49,7 @@ func NewTelemetryHandler(rdb *platformredis.RedisClient) *TelemetryHandler {
 // @Failure      503  {object}  platformHTTP.APIError
 // @Router       /telemetry/track [post]
 func (h *TelemetryHandler) Track(c *gin.Context) {
-	if h == nil || h.rdb == nil {
+	if h == nil || h.ingest == nil {
 		platformHTTP.Error(c, http.StatusServiceUnavailable, "telemetry stream unavailable", "")
 		return
 	}
@@ -85,69 +60,26 @@ func (h *TelemetryHandler) Track(c *gin.Context) {
 		return
 	}
 
-	eventType := strings.ToLower(strings.TrimSpace(req.EventType))
-	switch eventType {
-	case "impression", "click", "install", "signup", "purchase":
-	default:
-		platformHTTP.Error(c, http.StatusBadRequest, "invalid event_type", "must be impression, click, install, signup, or purchase")
+	err := h.ingest.TrackConsented(c.Request.Context(), deliveryApp.ConsentedTrackCommand{
+		CampaignID:       req.CampaignID,
+		EventType:        req.EventType,
+		PseudonymousID:   req.PseudonymousID,
+		TransactionValue: req.TransactionValue,
+		OccurredAt:       req.OccurredAt,
+		InstallToken:     req.InstallToken,
+	})
+	if err != nil {
+		msg := err.Error()
+		switch {
+		case strings.Contains(msg, "unavailable"):
+			platformHTTP.Error(c, http.StatusServiceUnavailable, "telemetry stream unavailable", msg)
+		case strings.Contains(msg, "dedup failed"), strings.Contains(msg, "enqueue failed"):
+			platformHTTP.Error(c, http.StatusServiceUnavailable, "telemetry enqueue failed", msg)
+		default:
+			platformHTTP.Error(c, http.StatusBadRequest, "invalid telemetry payload", msg)
+		}
 		return
 	}
-
-	campaignID := strings.TrimSpace(req.CampaignID)
-	pseudonymousID := strings.TrimSpace(req.PseudonymousID)
-
-	if eventType == "install" && strings.TrimSpace(req.InstallToken) == "" {
-		platformHTTP.Error(c, http.StatusBadRequest, "missing_token", "install_token is required for install events")
-		return
-	}
-
-	// High-speed dedup gate for spam impressions/clicks before stream write-behind.
-	if ttl, ok := telemetryDedupTTL(eventType); ok {
-		if pseudonymousID == "" {
-			platformHTTP.Error(c, http.StatusBadRequest, "pseudonymous_id required", "required for impression and click deduplication")
-			return
-		}
-		lockKey := telemetryDedupKeyPrefix + pseudonymousID + ":" + campaignID + ":" + eventType
-		acquired, err := h.rdb.SetNX(c.Request.Context(), lockKey, "1", ttl)
-		if err != nil {
-			platformHTTP.Error(c, http.StatusServiceUnavailable, "telemetry dedup failed", err.Error())
-			return
-		}
-		if !acquired {
-			// Duplicate within TTL window — accept silently, do not enqueue.
-			c.Status(http.StatusAccepted)
-			return
-		}
-	}
-
-	occurredAt := strings.TrimSpace(req.OccurredAt)
-	if occurredAt == "" {
-		occurredAt = time.Now().UTC().Format(time.RFC3339Nano)
-	} else if _, err := time.Parse(time.RFC3339Nano, occurredAt); err != nil {
-		if _, err2 := time.Parse(time.RFC3339, occurredAt); err2 != nil {
-			platformHTTP.Error(c, http.StatusBadRequest, "invalid occurred_at", "expected RFC3339")
-			return
-		}
-	}
-
-	values := map[string]interface{}{
-		"campaign_id":       campaignID,
-		"event_type":        eventType,
-		"transaction_value": strconv.FormatFloat(req.TransactionValue, 'f', 4, 64),
-		"occurred_at":       occurredAt,
-	}
-	if eventType == "install" {
-		values["install_token"] = strings.TrimSpace(req.InstallToken)
-	}
-	if pseudonymousID != "" {
-		values["pseudonymous_id"] = pseudonymousID
-	}
-
-	if _, err := h.rdb.XAdd(c.Request.Context(), billingEventsStream, billingEventsStreamMax, values); err != nil {
-		platformHTTP.Error(c, http.StatusServiceUnavailable, "telemetry enqueue failed", err.Error())
-		return
-	}
-
 	c.Status(http.StatusAccepted)
 }
 
@@ -165,7 +97,7 @@ func (h *TelemetryHandler) Track(c *gin.Context) {
 // @Failure      503  {object}  platformHTTP.APIError
 // @Router       /telemetry/track-anonymous [post]
 func (h *TelemetryHandler) TrackAnonymous(c *gin.Context) {
-	if h == nil || h.rdb == nil {
+	if h == nil || h.ingest == nil {
 		platformHTTP.Error(c, http.StatusServiceUnavailable, "telemetry stream unavailable", "")
 		return
 	}
@@ -176,39 +108,18 @@ func (h *TelemetryHandler) TrackAnonymous(c *gin.Context) {
 		return
 	}
 
-	eventType := strings.ToLower(strings.TrimSpace(req.EventType))
-	if eventType != "impression" {
-		platformHTTP.Error(c, http.StatusBadRequest, "invalid event_type", "anonymous track currently accepts impression only")
+	err := h.ingest.TrackAnonymous(c.Request.Context(), deliveryApp.AnonymousTrackCommand{
+		CampaignID: req.CampaignID,
+		EventType:  req.EventType,
+	})
+	if err != nil {
+		msg := err.Error()
+		if strings.Contains(msg, "unavailable") || strings.Contains(msg, "enqueue failed") {
+			platformHTTP.Error(c, http.StatusServiceUnavailable, "telemetry enqueue failed", msg)
+			return
+		}
+		platformHTTP.Error(c, http.StatusBadRequest, "invalid anonymous track payload", msg)
 		return
 	}
-
-	campaignID := strings.TrimSpace(req.CampaignID)
-	occurredAt := time.Now().UTC().Format(time.RFC3339Nano)
-
-	values := map[string]interface{}{
-		"campaign_id":       campaignID,
-		"event_type":        eventType,
-		"transaction_value": "0.0000",
-		"occurred_at":       occurredAt,
-		"source":            "anonymous",
-	}
-
-	if _, err := h.rdb.XAdd(c.Request.Context(), billingEventsStream, billingEventsStreamMax, values); err != nil {
-		platformHTTP.Error(c, http.StatusServiceUnavailable, "telemetry enqueue failed", err.Error())
-		return
-	}
-
 	c.Status(http.StatusAccepted)
-}
-
-// telemetryDedupTTL returns the lock TTL for event types that must be deduplicated.
-func telemetryDedupTTL(eventType string) (time.Duration, bool) {
-	switch eventType {
-	case "click":
-		return telemetryClickTTL, true
-	case "impression":
-		return telemetryImpressionTTL, true
-	default:
-		return 0, false
-	}
 }
