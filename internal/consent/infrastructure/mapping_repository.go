@@ -73,3 +73,24 @@ func (r *PseudonymousMappingRepository) FindPseudonymousIDsByUserIDs(
 	}
 	return out, nil
 }
+
+// FindOneDemoPseudonymousID picks a random active demo SMS recipient's mapping.
+// Only users in demo_sms_recipients are returned so ingest-ad can mock-dispatch.
+func (r *PseudonymousMappingRepository) FindOneDemoPseudonymousID(ctx context.Context) (string, error) {
+	var id uuid.UUID
+	err := r.db.WithContext(ctx).
+		Table("demo_sms_recipients AS rec").
+		Select("COALESCE(rec.pseudonymous_id, pm.pseudonymous_id)").
+		Joins("INNER JOIN pseudonymous_mappings pm ON pm.user_id = rec.user_id").
+		Where("rec.is_active = TRUE").
+		Order("RANDOM()").
+		Limit(1).
+		Scan(&id).Error
+	if err != nil {
+		return "", err
+	}
+	if id == uuid.Nil {
+		return "", gorm.ErrRecordNotFound
+	}
+	return id.String(), nil
+}

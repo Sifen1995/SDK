@@ -40,6 +40,7 @@ func (c *UserProvisionedConsumer) handle(e messaging.Event) {
 		payload.UserID,
 		payload.PseudonymousID,
 		payload.ConsentLevel,
+		payload.SMSConsented,
 		payload.SDKVersion,
 	); err != nil {
 		c.logger.Error("complete consent registration failed",

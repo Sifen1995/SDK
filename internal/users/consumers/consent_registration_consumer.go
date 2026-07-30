@@ -35,7 +35,7 @@ func (c *ConsentRegistrationConsumer) handle(e messaging.Event) {
 		c.logger.Error("invalid ConsentRegistrationRequested payload")
 		return
 	}
-	if err := c.uc.Execute(e.Ctx, payload.PseudonymousID, payload.ConsentLevel, payload.SDKVersion); err != nil {
+	if err := c.uc.Execute(e.Ctx, payload.PseudonymousID, payload.ConsentLevel, payload.SMSConsented, payload.SDKVersion); err != nil {
 		c.logger.Error("provision user for consent failed",
 			"pseudonymous_id", payload.PseudonymousID,
 			"error", err,

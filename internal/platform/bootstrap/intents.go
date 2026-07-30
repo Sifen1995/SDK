@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
 	campaignApp "skykin-platform/internal/campaigns/application"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	deliveryApp "skykin-platform/internal/delivery/application"
 	intentApp "skykin-platform/internal/intents/application"
 	intentsInfra "skykin-platform/internal/intents/infrastructure"
 	intentHTTP "skykin-platform/internal/intents/interfaces/http"
@@ -18,7 +20,13 @@ import (
 )
 
 // NewIntentSystem wires the intents ingest + ad fetch + anonymous aggregate flow.
-func NewIntentSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *intentHTTP.Handler {
+// smsDispatch may be nil when SMS click secret is unset; SMS_PLUS then fails on dispatch.
+func NewIntentSystem(
+	db *gorm.DB,
+	cfg *configs.Config,
+	logger *slog.Logger,
+	smsDispatch *deliveryApp.SMSDispatchService,
+) *intentHTTP.Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -50,8 +58,21 @@ func NewIntentSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger) *int
 	cachedCampaigns := campaignInfra.NewCachedCampaignRepository(campaignRepo, redisCampaign, platformRDB)
 	adSelector := campaignApp.NewIntentAdSelector(cachedCampaigns)
 
-	svc := intentApp.NewIntentService(profileRepo, cache, adSelector)
+	var smsPort intentApp.SMSAdDispatcher
+	if smsDispatch != nil {
+		smsPort = &smsAdDispatcherAdapter{svc: smsDispatch}
+	}
+
+	svc := intentApp.NewIntentService(profileRepo, cache, adSelector, smsPort)
 	return intentHTTP.NewHandler(svc, aggregateIngest)
+}
+
+type smsAdDispatcherAdapter struct {
+	svc *deliveryApp.SMSDispatchService
+}
+
+func (a *smsAdDispatcherAdapter) Dispatch(ctx context.Context, campaignID, pseudonymousID string) error {
+	return a.svc.DispatchCampaignMatch(ctx, campaignID, pseudonymousID)
 }
 
 // StartIntentLogWorker launches the background BRPop → Postgres batch flusher.

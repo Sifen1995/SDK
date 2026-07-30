@@ -25,19 +25,60 @@ func NewIntentAdSelector(campaigns EligibleCampaignSelector) *IntentAdSelector {
 }
 
 // SelectAd finds the highest-plan-tier eligible campaign for an intent and channel.
+// When channelCode is empty and smsConsented is true, SMS_PLUS is tried first;
+// a miss falls back to non-SMS channels. When smsConsented is false, SMS_PLUS is excluded.
 func (s *IntentAdSelector) SelectAd(
 	ctx context.Context,
 	pseudonymousID, targetIntent, channelCode string,
+	smsConsented bool,
 ) (*intentsApp.AdSelection, error) {
 	if s == nil || s.campaigns == nil {
 		return nil, fmt.Errorf("ad selector is not configured")
 	}
 
-	codes := []string{channelCode}
-	if channelCode == "" {
-		codes = []string{"IN_APP_BANNER", "SMS_PLUS", "PUSH", "NATIVE_FEED"}
+	if channelCode != "" {
+		if channelCode == "SMS_PLUS" && !smsConsented {
+			return nil, fmt.Errorf("no active campaign for intent %s", targetIntent)
+		}
+		return s.selectOne(ctx, pseudonymousID, targetIntent, channelCode)
 	}
 
+	if smsConsented {
+		if ad, err := s.selectOne(ctx, pseudonymousID, targetIntent, "SMS_PLUS"); err == nil {
+			return ad, nil
+		}
+	}
+
+	return s.selectBestAmong(ctx, pseudonymousID, targetIntent, []string{
+		"IN_APP_BANNER", "PUSH", "NATIVE_FEED",
+	})
+}
+
+func (s *IntentAdSelector) selectOne(
+	ctx context.Context,
+	pseudonymousID, targetIntent, channelCode string,
+) (*intentsApp.AdSelection, error) {
+	campaign, err := s.campaigns.SelectBestCampaign(ctx, targetIntent, channelCode, pseudonymousID)
+	if err != nil {
+		return nil, err
+	}
+	content, err := CampaignAdContent(campaign, channelCode)
+	if err != nil {
+		return nil, err
+	}
+	return &intentsApp.AdSelection{
+		CampaignID:   campaign.ID,
+		CampaignName: campaign.Name,
+		ChannelCode:  channelCode,
+		Content:      content,
+	}, nil
+}
+
+func (s *IntentAdSelector) selectBestAmong(
+	ctx context.Context,
+	pseudonymousID, targetIntent string,
+	codes []string,
+) (*intentsApp.AdSelection, error) {
 	var best *intentsApp.AdSelection
 	var bestPlanFee float64
 	for _, code := range codes {

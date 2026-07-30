@@ -36,6 +36,6 @@ func NewConsentSystem(
 	usersConsumers.NewConsentRegistrationConsumer(provisionUC, logger).Register(bus)
 	consentConsumers.NewUserProvisionedConsumer(completeUC, logger).Register(bus)
 
-	createUC := consentApp.NewCreateConsentUseCase(bus, logger)
+	createUC := consentApp.NewCreateConsentUseCase(bus, mappingRepo, logger)
 	return consentHTTP.NewHandler(createUC)
 }

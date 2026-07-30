@@ -280,7 +280,7 @@ func (r *CachedCampaignRepository) loadEligibleCampaigns(
 		return nil, err
 	}
 
-	if r.rdb != nil {
+	if r.rdb != nil && len(campaigns) > 0 {
 		if payload, err := json.Marshal(campaigns); err == nil {
 			_ = r.rdb.Set(ctx, key, string(payload), eligibleCampaignsTTL)
 		}

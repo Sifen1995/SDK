@@ -36,7 +36,9 @@ func NewProvisionUserForConsentUseCase(
 
 func (uc *ProvisionUserForConsentUseCase) Execute(
 	ctx context.Context,
-	pseudonymousID, consentLevel, sdkVersion string,
+	pseudonymousID, consentLevel string,
+	smsConsented bool,
+	sdkVersion string,
 ) error {
 	user := &domain.User{}
 	if err := uc.users.Create(ctx, user); err != nil {
@@ -49,6 +51,7 @@ func (uc *ProvisionUserForConsentUseCase) Execute(
 			UserID:         user.ID,
 			PseudonymousID: pseudonymousID,
 			ConsentLevel:   consentLevel,
+			SMSConsented:   smsConsented,
 			SDKVersion:     sdkVersion,
 		},
 		Ctx: ctx,
@@ -58,6 +61,7 @@ func (uc *ProvisionUserForConsentUseCase) Execute(
 		"user_id", user.ID,
 		"pseudonymous_id", pseudonymousID,
 		"consent_level", consentLevel,
+		"sms_consented", smsConsented,
 	)
 	return nil
 }

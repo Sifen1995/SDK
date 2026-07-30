@@ -10,4 +10,6 @@ type IngestAndFetchAdResult struct {
 	CampaignName   string
 	ChannelCode    string
 	AdContent      map[string]any
+	// SMSDispatched is true when an SMS+ campaign was matched and mock/real dispatch ran.
+	SMSDispatched bool
 }

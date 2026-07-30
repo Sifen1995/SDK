@@ -12,6 +12,7 @@ const (
 type ConsentRegistrationRequestedPayload struct {
 	PseudonymousID string
 	ConsentLevel   string
+	SMSConsented   bool
 	SDKVersion     string
 }
 
@@ -21,5 +22,6 @@ type ConsentCreatedPayload struct {
 	UserID         int64
 	PseudonymousID string
 	ConsentLevel   string
+	SMSConsented   bool
 	SDKVersion     string
 }

@@ -15,7 +15,7 @@ import (
 )
 
 type intentAdIngestor interface {
-	IngestAndFetchAd(ctx context.Context, profile *domain.IntentProfile, channelCode string) (*intentApp.IngestAndFetchAdResult, error)
+	IngestAndFetchAd(ctx context.Context, profile *domain.IntentProfile, channelCode string, smsConsented bool) (*intentApp.IngestAndFetchAdResult, error)
 }
 
 type intentAggregateReporter interface {
@@ -34,13 +34,14 @@ func NewHandler(svc *intentApp.IntentService, aggregates intentAggregateReporter
 
 // IngestIntentAd godoc
 // @Summary      Ingest intent profile and fetch matching ad
-// @Description  Flutter sends an on-device ML intent (from accessibility + app usage). Backend caches the active intent, enqueues the profile for async Postgres persistence (Redis queue:intent_logs), ranks eligible campaigns by subscription plan tier in memory (after budget/frequency filters), and returns the winning campaign creative. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.
+// @Description  Flutter sends an on-device ML intent (from accessibility + app usage). When sms_consented is true and an SMS_PLUS campaign matches, returns 202 after mock/real SMS dispatch (no in-app ad body). Otherwise returns 200 with a non-SMS creative. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.
 // @Tags         SDK - Intents
 // @Accept       json
 // @Produce      json
 // @Security     APIKeyAuth && SDKSecretAuth
-// @Param        body  body  IngestIntentAdRequest  true  "Intent profile + optional channel"
+// @Param        body  body  IngestIntentAdRequest  true  "Intent profile + optional channel + sms_consented"
 // @Success      200   {object}  IngestIntentAdResponse
+// @Success      202   {object}  IngestIntentAdAcceptedResponse
 // @Failure      400   {object}  platformHTTP.APIError
 // @Failure      401   {object}  platformHTTP.APIError
 // @Failure      404   {object}  platformHTTP.APIError
@@ -53,22 +54,29 @@ func (h *Handler) IngestIntentAd(c *gin.Context) {
 		return
 	}
 
+	channelCode := normalizeChannelCode(strings.TrimSpace(req.ChannelCode))
+
 	result, err := h.ingest.IngestAndFetchAd(c.Request.Context(), &domain.IntentProfile{
 		PseudonymousID: strings.TrimSpace(req.PseudonymousID),
 		IntentName:     strings.TrimSpace(req.IntentName),
 		Confidence:     req.Confidence,
 		ModelVersion:   strings.TrimSpace(req.ModelVersion),
-	}, strings.TrimSpace(req.ChannelCode))
+	}, channelCode, req.SMSConsented)
 	if err != nil {
 		msg := err.Error()
 		status := http.StatusInternalServerError
 		switch {
 		case strings.Contains(msg, "required") || strings.Contains(msg, "must be between"):
 			status = http.StatusBadRequest
-		case strings.Contains(msg, "no active campaign"):
+		case strings.Contains(msg, "no active campaign"), strings.Contains(msg, "no eligible campaign"):
 			status = http.StatusNotFound
 		}
 		platformHTTP.Error(c, status, "intent ingest failed", msg)
+		return
+	}
+
+	if result.SMSDispatched {
+		c.JSON(http.StatusAccepted, IngestIntentAdAcceptedResponse{Status: "accepted"})
 		return
 	}
 
@@ -138,4 +146,13 @@ func (h *Handler) IngestIntentAggregate(c *gin.Context) {
 	}
 
 	c.Status(http.StatusAccepted)
+}
+
+func normalizeChannelCode(code string) string {
+	switch strings.ToUpper(strings.TrimSpace(code)) {
+	case "SMS":
+		return "SMS_PLUS"
+	default:
+		return code
+	}
 }

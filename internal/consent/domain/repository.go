@@ -21,4 +21,6 @@ type PseudonymousMappingRepository interface {
 	FindByUserID(ctx context.Context, userID int64) (*PseudonymousMapping, error)
 	// FindPseudonymousIDsByUserIDs resolves a batch of internal user ids for operator reads.
 	FindPseudonymousIDsByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error)
+	// FindOneDemoPseudonymousID returns an active demo_sms_recipients user's mapping.
+	FindOneDemoPseudonymousID(ctx context.Context) (string, error)
 }

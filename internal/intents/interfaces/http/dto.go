@@ -10,8 +10,16 @@ type IngestIntentAdRequest struct {
 	Confidence float64 `json:"confidence" binding:"required" example:"0.87"`
 	// ModelVersion identifies the on-device / ML model version
 	ModelVersion string `json:"model_version" binding:"omitempty" example:"1.0.0"`
-	// ChannelCode delivery channel; empty tries IN_APP_BANNER, SMS_PLUS, PUSH, NATIVE_FEED
+	// ChannelCode delivery channel; empty prefers SMS_PLUS when sms_consented, else non-SMS channels.
+	// Use SMS_PLUS (not SMS), IN_APP_BANNER, PUSH, or NATIVE_FEED.
 	ChannelCode string `json:"channel_code" binding:"omitempty" example:"IN_APP_BANNER"`
+	// SMSConsented allows SMS_PLUS selection when true (trusted from the request)
+	SMSConsented bool `json:"sms_consented" example:"true"`
+}
+
+// IngestIntentAdAcceptedResponse is returned when an SMS+ campaign was dispatched (HTTP 202).
+type IngestIntentAdAcceptedResponse struct {
+	Status string `json:"status" example:"accepted"`
 }
 
 // IngestIntentAdResponse returns the persisted intent and matched campaign creative.

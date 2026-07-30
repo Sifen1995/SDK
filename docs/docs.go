@@ -1807,7 +1807,7 @@ const docTemplate = `{
                         "SDKSecretAuth": []
                     }
                 ],
-                "description": "Flutter sends only consent_level and sdk_version. In Swagger Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); the UI auto-computes X-Signature. Backend generates pseudonymous_id and event-drives user + mapping + consent.",
+                "description": "Flutter sends consent_level, optional sms_consented, and sdk_version. When sms_consented=true, returns an existing demo user's pseudonymous_id (no new user). When false, generates a new pseudonymous_id and event-drives user + mapping + consent. Authorize with X-API-Key and X-SDK-Secret; Swagger UI auto-computes X-Signature.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1865,7 +1865,7 @@ const docTemplate = `{
                         "SDKSecretAuth": []
                     }
                 ],
-                "description": "Flutter sends an on-device ML intent (from accessibility + app usage). Backend caches the active intent, enqueues the profile for async Postgres persistence (Redis queue:intent_logs), ranks eligible campaigns by subscription plan tier in memory (after budget/frequency filters), and returns the winning campaign creative. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.",
+                "description": "Flutter sends an on-device ML intent (from accessibility + app usage). When sms_consented is true and an SMS_PLUS campaign matches, returns 202 after mock/real SMS dispatch (no in-app ad body). Otherwise returns 200 with a non-SMS creative. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); Swagger UI auto-computes X-Signature.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1878,7 +1878,7 @@ const docTemplate = `{
                 "summary": "Ingest intent profile and fetch matching ad",
                 "parameters": [
                     {
-                        "description": "Intent profile + optional channel",
+                        "description": "Intent profile + optional channel + sms_consented",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -1892,6 +1892,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/internal_intents_interfaces_http.IngestIntentAdResponse"
+                        }
+                    },
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/internal_intents_interfaces_http.IngestIntentAdAcceptedResponse"
                         }
                     },
                     "400": {
@@ -2195,6 +2201,175 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/telemetry/sms/click": {
+            "get": {
+                "description": "Public redirect endpoint embedded in SMS+ message bodies. Validates the signed tracking token, enqueues a click event to stream:billing_events (billing + delivery_log consumers write behind), and redirects to the campaign destination_url. No X-API-Key required.",
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "SDK - SMS+"
+                ],
+                "summary": "Track SMS+ CTA click",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Signed SMS click tracking token from sms_send_attempts",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted when destination_url is empty"
+                    },
+                    "302": {
+                        "description": "Redirect to campaign destination_url"
+                    },
+                    "400": {
+                        "description": "missing token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid sms click token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "sms click tracking unavailable",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/telemetry/sms/debug/sends": {
+            "get": {
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
+                "description": "Returns the latest SMS+ send attempts with masked phone numbers for demo/debug inspection. Authorize with X-API-Key (and X-SDK-Secret for POSTs; GET only needs the API key).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - SMS+"
+                ],
+                "summary": "List recent SMS+ send attempts (demo)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_delivery_http.SMSSendAttemptDTO"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/telemetry/sms/twilio-status": {
+            "post": {
+                "description": "Public webhook for Twilio delivery receipts. Verifies X-Twilio-Signature, then updates sms_send_attempts status (sent/delivered/failed). Does not write billing_events. Mounted only when SMS_PROVIDER=twilio. Content-Type: application/x-www-form-urlencoded.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "SDK - SMS+"
+                ],
+                "summary": "Twilio SMS status callback",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Idempotent send key (campaign_id:pseudonymous_id)",
+                        "name": "send_key",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Twilio message SID",
+                        "name": "MessageSid",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Twilio status (queued|sent|delivered|undelivered|failed)",
+                        "name": "MessageStatus",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Twilio request signature",
+                        "name": "X-Twilio-Signature",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Status recorded"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "type": "string"
                         }
@@ -2962,6 +3137,11 @@ const docTemplate = `{
                     "description": "SDKVersion is the Flutter SDK version string",
                     "type": "string",
                     "example": "1.0.0"
+                },
+                "sms_consented": {
+                    "description": "SMSConsented indicates the user allows SMS+ delivery.",
+                    "type": "boolean",
+                    "example": true
                 }
             }
         },
@@ -2977,6 +3157,11 @@ const docTemplate = `{
                     "description": "PseudonymousID is a backend-generated UUID for Flutter to attach to intents",
                     "type": "string",
                     "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                },
+                "sms_consented": {
+                    "description": "SMSConsented echoes whether SMS+ delivery was granted",
+                    "type": "boolean",
+                    "example": true
                 },
                 "status": {
                     "description": "Status is always \"success\" on HTTP 201",
@@ -3059,6 +3244,35 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_delivery_http.SMSSendAttemptDTO": {
+            "type": "object",
+            "properties": {
+                "campaign_id": {
+                    "type": "string",
+                    "example": "1a0d7721-ed1d-4bd7-ab63-8195b5e5d91d"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-07-30T10:13:10Z"
+                },
+                "phone_masked": {
+                    "type": "string",
+                    "example": "+15*******07"
+                },
+                "provider": {
+                    "type": "string",
+                    "example": "mock"
+                },
+                "pseudonymous_id": {
+                    "type": "string",
+                    "example": "a9a1208b-7521-4ff0-8d88-52a48450784b"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "sent"
+                }
+            }
+        },
         "internal_delivery_http.TelemetryTrackRequest": {
             "type": "object",
             "required": [
@@ -3093,6 +3307,15 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_intents_interfaces_http.IngestIntentAdAcceptedResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "accepted"
+                }
+            }
+        },
         "internal_intents_interfaces_http.IngestIntentAdRequest": {
             "type": "object",
             "required": [
@@ -3102,7 +3325,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "channel_code": {
-                    "description": "ChannelCode delivery channel; empty tries IN_APP_BANNER, SMS_PLUS, PUSH, NATIVE_FEED",
+                    "description": "ChannelCode delivery channel; empty prefers SMS_PLUS when sms_consented, else non-SMS channels",
                     "type": "string",
                     "example": "IN_APP_BANNER"
                 },
@@ -3125,6 +3348,11 @@ const docTemplate = `{
                     "description": "PseudonymousID from POST /consent (UUID)",
                     "type": "string",
                     "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                },
+                "sms_consented": {
+                    "description": "SMSConsented allows SMS_PLUS selection when true (trusted from the request)",
+                    "type": "boolean",
+                    "example": true
                 }
             }
         },

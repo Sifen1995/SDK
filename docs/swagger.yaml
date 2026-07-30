@@ -458,6 +458,10 @@ definitions:
         description: SDKVersion is the Flutter SDK version string
         example: 1.0.0
         type: string
+      sms_consented:
+        description: SMSConsented indicates the user allows SMS+ delivery.
+        example: true
+        type: boolean
     required:
     - consent_level
     - sdk_version
@@ -473,6 +477,10 @@ definitions:
           to intents
         example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
         type: string
+      sms_consented:
+        description: SMSConsented echoes whether SMS+ delivery was granted
+        example: true
+        type: boolean
       status:
         description: Status is always "success" on HTTP 201
         example: success
@@ -532,6 +540,27 @@ definitions:
     - campaign_id
     - event_type
     type: object
+  internal_delivery_http.SMSSendAttemptDTO:
+    properties:
+      campaign_id:
+        example: 1a0d7721-ed1d-4bd7-ab63-8195b5e5d91d
+        type: string
+      created_at:
+        example: "2026-07-30T10:13:10Z"
+        type: string
+      phone_masked:
+        example: +15*******07
+        type: string
+      provider:
+        example: mock
+        type: string
+      pseudonymous_id:
+        example: a9a1208b-7521-4ff0-8d88-52a48450784b
+        type: string
+      status:
+        example: sent
+        type: string
+    type: object
   internal_delivery_http.TelemetryTrackRequest:
     properties:
       campaign_id:
@@ -557,11 +586,17 @@ definitions:
     - campaign_id
     - event_type
     type: object
+  internal_intents_interfaces_http.IngestIntentAdAcceptedResponse:
+    properties:
+      status:
+        example: accepted
+        type: string
+    type: object
   internal_intents_interfaces_http.IngestIntentAdRequest:
     properties:
       channel_code:
-        description: ChannelCode delivery channel; empty tries IN_APP_BANNER, SMS_PLUS,
-          PUSH, NATIVE_FEED
+        description: ChannelCode delivery channel; empty prefers SMS_PLUS when sms_consented,
+          else non-SMS channels
         example: IN_APP_BANNER
         type: string
       confidence:
@@ -580,6 +615,11 @@ definitions:
         description: PseudonymousID from POST /consent (UUID)
         example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
         type: string
+      sms_consented:
+        description: SMSConsented allows SMS_PLUS selection when true (trusted from
+          the request)
+        example: true
+        type: boolean
     required:
     - confidence
     - intent_name
@@ -2350,10 +2390,11 @@ paths:
     post:
       consumes:
       - application/json
-      description: Flutter sends only consent_level and sdk_version. In Swagger Authorize
-        with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); the UI auto-computes
-        X-Signature. Backend generates pseudonymous_id and event-drives user + mapping
-        + consent.
+      description: Flutter sends consent_level, optional sms_consented, and sdk_version.
+        When sms_consented=true, returns an existing demo user's pseudonymous_id (no
+        new user). When false, generates a new pseudonymous_id and event-drives user
+        + mapping + consent. Authorize with X-API-Key and X-SDK-Secret; Swagger UI
+        auto-computes X-Signature.
       parameters:
       - description: Consent registration
         in: body
@@ -2391,13 +2432,12 @@ paths:
       consumes:
       - application/json
       description: Flutter sends an on-device ML intent (from accessibility + app
-        usage). Backend caches the active intent, enqueues the profile for async Postgres
-        persistence (Redis queue:intent_logs), ranks eligible campaigns by subscription
-        plan tier in memory (after budget/frequency filters), and returns the winning
-        campaign creative. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret
+        usage). When sms_consented is true and an SMS_PLUS campaign matches, returns
+        202 after mock/real SMS dispatch (no in-app ad body). Otherwise returns 200
+        with a non-SMS creative. Authorize with X-API-Key (pk_live_...) and X-SDK-Secret
         (sk_secret_...); Swagger UI auto-computes X-Signature.
       parameters:
-      - description: Intent profile + optional channel
+      - description: Intent profile + optional channel + sms_consented
         in: body
         name: body
         required: true
@@ -2410,6 +2450,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/internal_intents_interfaces_http.IngestIntentAdResponse'
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/internal_intents_interfaces_http.IngestIntentAdAcceptedResponse'
         "400":
           description: Bad Request
           schema:
@@ -2619,6 +2663,124 @@ paths:
       summary: Track anonymous CPC click
       tags:
       - SDK - Bill Track
+  /telemetry/sms/click:
+    get:
+      description: Public redirect endpoint embedded in SMS+ message bodies. Validates
+        the signed tracking token, enqueues a click event to stream:billing_events
+        (billing + delivery_log consumers write behind), and redirects to the campaign
+        destination_url. No X-API-Key required.
+      parameters:
+      - description: Signed SMS click tracking token from sms_send_attempts
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "202":
+          description: Accepted when destination_url is empty
+        "302":
+          description: Redirect to campaign destination_url
+        "400":
+          description: missing token
+          schema:
+            type: string
+        "401":
+          description: invalid sms click token
+          schema:
+            type: string
+        "503":
+          description: sms click tracking unavailable
+          schema:
+            type: string
+      summary: Track SMS+ CTA click
+      tags:
+      - SDK - SMS+
+  /telemetry/sms/debug/sends:
+    get:
+      description: Returns the latest SMS+ send attempts with masked phone numbers
+        for demo/debug inspection. Authorize with X-API-Key (and X-SDK-Secret for
+        POSTs; GET only needs the API key).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_delivery_http.SMSSendAttemptDTO'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - APIKeyAuth: []
+      summary: List recent SMS+ send attempts (demo)
+      tags:
+      - SDK - SMS+
+  /telemetry/sms/twilio-status:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: 'Public webhook for Twilio delivery receipts. Verifies X-Twilio-Signature,
+        then updates sms_send_attempts status (sent/delivered/failed). Does not write
+        billing_events. Mounted only when SMS_PROVIDER=twilio. Content-Type: application/x-www-form-urlencoded.'
+      parameters:
+      - description: Idempotent send key (campaign_id:pseudonymous_id)
+        in: query
+        name: send_key
+        required: true
+        type: string
+      - description: Twilio message SID
+        in: formData
+        name: MessageSid
+        type: string
+      - description: Twilio status (queued|sent|delivered|undelivered|failed)
+        in: formData
+        name: MessageStatus
+        required: true
+        type: string
+      - description: Twilio request signature
+        in: header
+        name: X-Twilio-Signature
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "204":
+          description: Status recorded
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "503":
+          description: Service Unavailable
+          schema:
+            type: string
+      summary: Twilio SMS status callback
+      tags:
+      - SDK - SMS+
   /telemetry/track:
     post:
       consumes:

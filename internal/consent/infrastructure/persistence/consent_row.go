@@ -13,6 +13,7 @@ type ConsentRow struct {
 	ID           string     `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	UserID       int64      `gorm:"type:bigint;not null;index"`
 	ConsentLevel string     `gorm:"type:varchar(20);not null"`
+	SMSConsented bool       `gorm:"column:sms_consented;not null;default:false"`
 	IsActive     bool       `gorm:"not null;default:true;index"`
 	GrantedAt    *time.Time `gorm:"type:timestamptz"`
 	RevokedAt    *time.Time `gorm:"type:timestamptz"`
@@ -28,6 +29,7 @@ func (c *ConsentRow) ToDomain() *domain.Consent {
 		ID:           c.ID,
 		UserID:       c.UserID,
 		ConsentLevel: c.ConsentLevel,
+		SMSConsented: c.SMSConsented,
 		IsActive:     c.IsActive,
 		GrantedAt:    c.GrantedAt,
 		RevokedAt:    c.RevokedAt,
@@ -41,6 +43,7 @@ func (c *ConsentRow) FromDomain(consent *domain.Consent) {
 	c.ID = consent.ID
 	c.UserID = consent.UserID
 	c.ConsentLevel = consent.ConsentLevel
+	c.SMSConsented = consent.SMSConsented
 	c.IsActive = consent.IsActive
 	c.GrantedAt = consent.GrantedAt
 	c.RevokedAt = consent.RevokedAt

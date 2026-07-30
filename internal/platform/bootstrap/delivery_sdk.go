@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -12,10 +13,14 @@ import (
 	billingInfra "skykin-platform/internal/billing/infrastructure"
 	billingWorker "skykin-platform/internal/billing/worker"
 	campaignApp "skykin-platform/internal/campaigns/application"
+	campaigndomain "skykin-platform/internal/campaigns/domain"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
 	deliveryApp "skykin-platform/internal/delivery/application"
+	deliveryConsumers "skykin-platform/internal/delivery/consumers"
 	deliveryHTTP "skykin-platform/internal/delivery/http"
+	deliveryInfra "skykin-platform/internal/delivery/infrastructure"
 	deliveryWorker "skykin-platform/internal/delivery/worker"
+	"skykin-platform/internal/platform/messaging"
 	platformredis "skykin-platform/internal/platform/redis"
 
 	"gorm.io/gorm"
@@ -23,9 +28,13 @@ import (
 
 // DeliverySDKHandlers holds SDK delivery + telemetry HTTP handlers.
 type DeliverySDKHandlers struct {
-	Campaigns *deliveryHTTP.CampaignHandler
-	Telemetry *deliveryHTTP.TelemetryHandler
-	CPC       *deliveryHTTP.CPCClickHandler
+	Campaigns   *deliveryHTTP.CampaignHandler
+	Telemetry   *deliveryHTTP.TelemetryHandler
+	CPC         *deliveryHTTP.CPCClickHandler
+	SMSClick    *deliveryHTTP.SMSClickHandler
+	Twilio      *deliveryHTTP.TwilioWebhookHandler
+	SMSDebug    *deliveryHTTP.SMSDebugHandler
+	SMSDispatch *deliveryApp.SMSDispatchService
 }
 
 // NewDeliverySDKSystem wires anonymous campaigns and telemetry track ingest.
@@ -51,9 +60,28 @@ func NewDeliverySDKSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger)
 	cached := campaignInfra.NewCachedCampaignRepository(campaignRepo, redisCampaign, platformRDB)
 	secretKey := cfg.ClickTokenSecret
 	anonSvc := campaignApp.NewAnonymousCampaignService(cached, secretKey)
+	sendAttempts := deliveryInfra.NewSMSSendAttemptRepository(db)
+	recipients := deliveryInfra.NewDemoSMSRecipientRepository(db)
+	logs := deliveryInfra.NewDeliveryLogRepository(db)
+	campaigns := &smsCampaignReader{repo: campaignRepo}
+	smsProvider := buildSMSProvider(cfg)
+	var smsDispatch *deliveryApp.SMSDispatchService
+	if strings.TrimSpace(cfg.SMSClickSecret) != "" {
+		smsDispatch = deliveryApp.NewSMSDispatchService(
+			campaigns,
+			recipients,
+			sendAttempts,
+			logs,
+			smsProvider,
+			cfg.SMSBaseURL,
+			cfg.SMSClickSecret,
+		)
+	}
 
 	out := &DeliverySDKHandlers{
-		Campaigns: deliveryHTTP.NewCampaignHandler(anonSvc),
+		Campaigns:   deliveryHTTP.NewCampaignHandler(anonSvc),
+		SMSDebug:    deliveryHTTP.NewSMSDebugHandler(sendAttempts),
+		SMSDispatch: smsDispatch,
 	}
 	if platformRDB != nil {
 		out.Telemetry = deliveryHTTP.NewTelemetryHandler(deliveryApp.NewTelemetryIngestService(platformRDB))
@@ -63,10 +91,31 @@ func NewDeliverySDKSystem(db *gorm.DB, cfg *configs.Config, logger *slog.Logger)
 		} else {
 			logger.Warn("delivery sdk: anonymous CPC click handler disabled (click token secret required)")
 		}
+		if smsDispatch != nil {
+			out.SMSClick = deliveryHTTP.NewSMSClickHandler(deliveryApp.NewSMSClickService(sendAttempts, platformRDB))
+			if strings.EqualFold(cfg.SMSProvider, "twilio") && strings.TrimSpace(cfg.TwilioAuthToken) != "" {
+				out.Twilio = deliveryHTTP.NewTwilioWebhookHandler(
+					deliveryApp.NewTwilioStatusIngestService(sendAttempts, cfg.TwilioAuthToken),
+				)
+			}
+		} else {
+			logger.Warn("delivery sdk: sms click tracking disabled (sms click secret required)")
+		}
 	} else {
 		logger.Warn("delivery sdk: telemetry track disabled (redis required)")
 	}
 	return out
+}
+
+func RegisterDeliveryEventConsumers(
+	bus *messaging.Bus,
+	dispatch *deliveryApp.SMSDispatchService,
+	logger *slog.Logger,
+) {
+	if bus == nil || dispatch == nil {
+		return
+	}
+	deliveryConsumers.NewSMSPlusConsumer(dispatch, logger).Register(bus)
 }
 
 // StartBillingStreamWorker launches the Redis Streams write-behind billing consumer.
@@ -162,4 +211,40 @@ type budgetExhaustionMarker struct {
 
 func (m *budgetExhaustionMarker) MarkExhausted(ctx context.Context, campaignID string) error {
 	return m.flags.SetBudgetExhausted(ctx, campaignID, 0)
+}
+
+type smsCampaignReader struct {
+	repo campaigndomain.CampaignRepository
+}
+
+func (r *smsCampaignReader) GetSMSCampaign(
+	ctx context.Context,
+	campaignID string,
+) (*deliveryApp.SMSCampaign, error) {
+	campaign, err := r.repo.Get(ctx, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	if campaign == nil {
+		return nil, fmt.Errorf("campaign not found: %s", campaignID)
+	}
+	return &deliveryApp.SMSCampaign{
+		ID:             campaign.ID,
+		Title:          campaign.Title,
+		BodyText:       campaign.BodyText,
+		DestinationURL: campaign.DestinationURL,
+	}, nil
+}
+
+func buildSMSProvider(cfg *configs.Config) deliveryApp.SMSProvider {
+	if strings.EqualFold(strings.TrimSpace(cfg.SMSProvider), "twilio") {
+		return deliveryInfra.NewTwilioSMSProvider(
+			cfg.TwilioAccountSID,
+			cfg.TwilioAuthToken,
+			cfg.TwilioFromNumber,
+			cfg.TwilioMessagingServiceSID,
+			&http.Client{Timeout: 15 * time.Second},
+		)
+	}
+	return deliveryInfra.NewMockSMSProvider("")
 }

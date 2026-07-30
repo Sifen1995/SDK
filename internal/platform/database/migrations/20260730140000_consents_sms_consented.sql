@@ -1,0 +1,2 @@
+ALTER TABLE consents
+    ADD COLUMN IF NOT EXISTS sms_consented BOOLEAN NOT NULL DEFAULT false;

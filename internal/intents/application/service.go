@@ -16,21 +16,30 @@ type IntentService struct {
 	profiles ProfileRepository
 	cache    ActiveIntentCache
 	ads      AdSelector
+	sms      SMSAdDispatcher
 }
 
-func NewIntentService(profiles ProfileRepository, cache ActiveIntentCache, ads AdSelector) *IntentService {
+func NewIntentService(
+	profiles ProfileRepository,
+	cache ActiveIntentCache,
+	ads AdSelector,
+	sms SMSAdDispatcher,
+) *IntentService {
 	return &IntentService{
 		profiles: profiles,
 		cache:    cache,
 		ads:      ads,
+		sms:      sms,
 	}
 }
 
 // IngestAndFetchAd validates the profile, caches it, persists it, and returns a campaign ad.
+// When smsConsented and an SMS_PLUS campaign matches, it dispatches SMS and sets SMSDispatched.
 func (s *IntentService) IngestAndFetchAd(
 	ctx context.Context,
 	profile *domain.IntentProfile,
 	channelCode string,
+	smsConsented bool,
 ) (*IngestAndFetchAdResult, error) {
 	if s == nil || s.profiles == nil || s.ads == nil {
 		return nil, fmt.Errorf("intent service is not configured")
@@ -49,12 +58,12 @@ func (s *IntentService) IngestAndFetchAd(
 		return nil, fmt.Errorf("save intent profile: %w", err)
 	}
 
-	ad, err := s.ads.SelectAd(ctx, profile.PseudonymousID, profile.IntentName, channelCode)
+	ad, err := s.ads.SelectAd(ctx, profile.PseudonymousID, profile.IntentName, channelCode, smsConsented)
 	if err != nil {
 		return nil, err
 	}
 
-	return &IngestAndFetchAdResult{
+	result := &IngestAndFetchAdResult{
 		PseudonymousID: profile.PseudonymousID,
 		IntentName:     profile.IntentName,
 		Confidence:     profile.Confidence,
@@ -63,7 +72,20 @@ func (s *IntentService) IngestAndFetchAd(
 		CampaignName:   ad.CampaignName,
 		ChannelCode:    ad.ChannelCode,
 		AdContent:      ad.Content,
-	}, nil
+	}
+
+	if ad.ChannelCode == "SMS_PLUS" {
+		if s.sms == nil {
+			return nil, fmt.Errorf("sms dispatch is not configured")
+		}
+		if err := s.sms.Dispatch(ctx, ad.CampaignID, profile.PseudonymousID); err != nil {
+			return nil, fmt.Errorf("sms dispatch: %w", err)
+		}
+		result.SMSDispatched = true
+		result.AdContent = nil
+	}
+
+	return result, nil
 }
 
 func normalizeProfileTimestamps(profile *domain.IntentProfile) {

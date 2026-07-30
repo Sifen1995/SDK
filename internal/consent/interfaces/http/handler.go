@@ -26,7 +26,7 @@ func NewHandler(createConsent *application.CreateConsentUseCase) *Handler {
 
 // CreateConsent godoc
 // @Summary      Register SDK user consent
-// @Description  Flutter sends only consent_level and sdk_version. In Swagger Authorize with X-API-Key (pk_live_...) and X-SDK-Secret (sk_secret_...); the UI auto-computes X-Signature. Backend generates pseudonymous_id and event-drives user + mapping + consent.
+// @Description  Flutter sends consent_level, optional sms_consented, and sdk_version. When sms_consented=true, returns an existing demo user's pseudonymous_id (no new user). When false, generates a new pseudonymous_id and event-drives user + mapping + consent. Authorize with X-API-Key and X-SDK-Secret; Swagger UI auto-computes X-Signature.
 // @Tags         SDK - Consent
 // @Accept       json
 // @Produce      json
@@ -46,6 +46,7 @@ func (h *Handler) CreateConsent(c *gin.Context) {
 
 	result, err := h.createConsent.Execute(c.Request.Context(), application.CreateConsentCommand{
 		ConsentLevel: req.ConsentLevel,
+		SMSConsented: req.SMSConsented,
 		SDKVersion:   req.SDKVersion,
 	})
 	if err != nil {
@@ -53,6 +54,8 @@ func (h *Handler) CreateConsent(c *gin.Context) {
 		status := http.StatusInternalServerError
 		if strings.Contains(msg, "required") || strings.Contains(msg, "invalid consent level") {
 			status = http.StatusBadRequest
+		} else if strings.Contains(msg, "no demo users") {
+			status = http.StatusServiceUnavailable
 		}
 		platformHTTP.Error(c, status, "consent registration failed", msg)
 		return
@@ -61,6 +64,7 @@ func (h *Handler) CreateConsent(c *gin.Context) {
 	c.JSON(http.StatusCreated, CreateConsentResponse{
 		Status:         "success",
 		ConsentLevel:   result.ConsentLevel,
+		SMSConsented:   result.SMSConsented,
 		PseudonymousID: result.PseudonymousID,
 	})
 }

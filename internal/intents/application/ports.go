@@ -27,5 +27,10 @@ type AdSelection struct {
 
 // AdSelector selects a campaign ad for an intent without exposing campaign repositories here.
 type AdSelector interface {
-	SelectAd(ctx context.Context, pseudonymousID, targetIntent, channelCode string) (*AdSelection, error)
+	SelectAd(ctx context.Context, pseudonymousID, targetIntent, channelCode string, smsConsented bool) (*AdSelection, error)
+}
+
+// SMSAdDispatcher dispatches an SMS+ campaign match (composition root wires delivery).
+type SMSAdDispatcher interface {
+	Dispatch(ctx context.Context, campaignID, pseudonymousID string) error
 }

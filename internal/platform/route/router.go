@@ -37,8 +37,9 @@ func InitRouter(
 	// Event ingestion HTTP + bus publishing intentionally not mounted.
 	// Package internal/events is retained for later reactivation.
 	consentHandler := bootstrap.NewConsentSystem(db, bus, slog.Default())
-	intentHandler := bootstrap.NewIntentSystem(db, cfg, slog.Default())
 	deliverySDK := bootstrap.NewDeliverySDKSystem(db, cfg, slog.Default())
+	intentHandler := bootstrap.NewIntentSystem(db, cfg, slog.Default(), deliverySDK.SMSDispatch)
+	bootstrap.RegisterDeliveryEventConsumers(bus, deliverySDK.SMSDispatch, slog.Default())
 
 	// Stream write-behind: billing owns billing_events, delivery owns campaign_delivery_logs.
 	bootstrap.StartBillingStreamWorker(db, cfg, slog.Default())
@@ -47,11 +48,12 @@ func InitRouter(
 	bootstrap.StartIntentLogWorker(db, cfg, slog.Default())
 
 	sdkGroup := r.Group("/api/v1")
+	deliveryHTTP.RegisterPublicRoutes(r, deliverySDK.SMSClick, deliverySDK.Twilio)
 	sdkGroup.Use(sdkAuthMiddleware)
 	{
 		consentHTTP.RegisterRoutes(sdkGroup, consentHandler)
 		intentHTTP.RegisterRoutes(sdkGroup, intentHandler)
-		deliveryHTTP.RegisterSDKRoutes(sdkGroup, deliverySDK.Campaigns, deliverySDK.Telemetry, deliverySDK.CPC)
+		deliveryHTTP.RegisterSDKRoutes(sdkGroup, deliverySDK.Campaigns, deliverySDK.Telemetry, deliverySDK.CPC, deliverySDK.SMSDebug)
 	}
 
 	return intentJobs

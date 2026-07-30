@@ -55,6 +55,7 @@ func (uc *CompleteConsentRegistrationUseCase) Execute(
 	userID int64,
 	pseudonymousID string,
 	consentLevel string,
+	smsConsented bool,
 	sdkVersion string,
 ) error {
 	if userID == 0 {
@@ -80,6 +81,7 @@ func (uc *CompleteConsentRegistrationUseCase) Execute(
 	consent := &domain.Consent{
 		UserID:       userID,
 		ConsentLevel: consentLevel,
+		SMSConsented: smsConsented,
 		IsActive:     true,
 		GrantedAt:    &now,
 		SDKVersion:   sdkVersion,
@@ -95,6 +97,7 @@ func (uc *CompleteConsentRegistrationUseCase) Execute(
 			UserID:         userID,
 			PseudonymousID: pseudonymousID,
 			ConsentLevel:   consentLevel,
+			SMSConsented:   smsConsented,
 			SDKVersion:     sdkVersion,
 		},
 		Ctx: ctx,
@@ -105,6 +108,7 @@ func (uc *CompleteConsentRegistrationUseCase) Execute(
 		"user_id", userID,
 		"pseudonymous_id", pseudonymousID,
 		"consent_level", consentLevel,
+		"sms_consented", smsConsented,
 	)
 	return nil
 }

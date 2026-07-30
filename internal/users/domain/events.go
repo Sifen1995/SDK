@@ -11,5 +11,6 @@ type UserProvisionedForConsentPayload struct {
 	UserID         int64
 	PseudonymousID string
 	ConsentLevel   string
+	SMSConsented   bool
 	SDKVersion     string
 }

@@ -8,12 +8,12 @@ import (
 
 	"skykin-platform/configs"
 	adportalpersistence "skykin-platform/internal/ad_portal/infrastructure/persistence"
+	analyticspersistence "skykin-platform/internal/analytics/infrastructure/persistence"
 	audiencepersistence "skykin-platform/internal/audience/infrastructure/persistence"
 	authpersistence "skykin-platform/internal/auth/infrastructure/persistence"
 	billingpersistence "skykin-platform/internal/billing/infrastructure/persistence"
 	campaignpersistence "skykin-platform/internal/campaigns/infrastructure/persistence"
 	deliverypersistence "skykin-platform/internal/delivery/infrastructure/persistence"
-	analyticspersistence "skykin-platform/internal/analytics/infrastructure/persistence"
 	eventpersistence "skykin-platform/internal/events/infrastructure/persistence"
 	intentpersistence "skykin-platform/internal/intents/infrastructure/persistence"
 	rewardpersistence "skykin-platform/internal/rewards/infrastructure/persistence"
@@ -32,6 +32,15 @@ var usersConsentIdentitySQL string
 
 //go:embed migrations/20260729120000_pseudonymous_identity.sql
 var pseudonymousIdentitySQL string
+
+//go:embed migrations/20260730130000_sms_demo_delivery.sql
+var smsDemoDeliverySQL string
+
+//go:embed migrations/20260730140000_consents_sms_consented.sql
+var consentsSMSConsentedSQL string
+
+//go:embed migrations/20260730150000_demo_sms_recipient_pseudonymous.sql
+var demoSMSRecipientPseudonymousSQL string
 
 func ConnectDB(cfg *configs.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
@@ -77,6 +86,18 @@ func Migrate(db *gorm.DB) error {
 		return fmt.Errorf("pseudonymous identity migration: %w", err)
 	}
 
+	if err := db.Exec(smsDemoDeliverySQL).Error; err != nil {
+		return fmt.Errorf("sms demo delivery migration: %w", err)
+	}
+
+	if err := db.Exec(consentsSMSConsentedSQL).Error; err != nil {
+		return fmt.Errorf("consents sms_consented migration: %w", err)
+	}
+
+	if err := db.Exec(demoSMSRecipientPseudonymousSQL).Error; err != nil {
+		return fmt.Errorf("demo sms recipient pseudonymous migration: %w", err)
+	}
+
 	if err := db.AutoMigrate(
 		&userpersistence.UserRow{},
 		&eventpersistence.EventRecord{},
@@ -104,6 +125,8 @@ func Migrate(db *gorm.DB) error {
 		// consents + pseudonymous_mappings are created by applyUsersConsentIdentityMigration
 		// (explicit unique constraint names). Do not AutoMigrate them — GORM would try to
 		// DROP uni_pseudonymous_mappings_* constraints that do not exist.
+		// demo_sms_recipients + sms_send_attempts are also created by explicit SQL migration
+		// so GORM does not attempt to rewrite their unique constraints on startup.
 	); err != nil {
 		return err
 	}
@@ -121,6 +144,7 @@ func Migrate(db *gorm.DB) error {
 	seedBillingCatalog(db)
 	seedAudienceSegments(db)
 	seedDemoFashionUser(db)
+	seedDemoSMSRecipients(db)
 	return nil
 }
 
