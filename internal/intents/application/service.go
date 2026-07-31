@@ -78,7 +78,10 @@ func (s *IntentService) IngestAndFetchAd(
 		if s.sms == nil {
 			return nil, fmt.Errorf("sms dispatch is not configured")
 		}
-		if err := s.sms.Dispatch(ctx, ad.CampaignID, profile.PseudonymousID); err != nil {
+		if ad.Campaign == nil {
+			return nil, fmt.Errorf("sms dispatch requires selected campaign")
+		}
+		if err := s.sms.Dispatch(ctx, ad.Campaign, profile.PseudonymousID); err != nil {
 			return nil, fmt.Errorf("sms dispatch: %w", err)
 		}
 		result.SMSDispatched = true

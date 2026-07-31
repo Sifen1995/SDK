@@ -55,6 +55,7 @@ func NewSMSDispatchService(
 	}
 }
 
+// DispatchCampaignMatch loads the campaign by id then dispatches (targeting-job path).
 func (s *SMSDispatchService) DispatchCampaignMatch(
 	ctx context.Context,
 	campaignID, pseudonymousID string,
@@ -64,19 +65,37 @@ func (s *SMSDispatchService) DispatchCampaignMatch(
 	if campaignID == "" || pseudonymousID == "" {
 		return fmt.Errorf("campaign_id and pseudonymous_id are required")
 	}
-	if s == nil || s.campaigns == nil || s.recipients == nil || s.attempts == nil || s.logs == nil || s.provider == nil {
+	if s == nil || s.campaigns == nil {
 		return fmt.Errorf("sms dispatch service is not configured")
 	}
+	campaign, err := s.campaigns.GetSMSCampaign(ctx, campaignID)
+	if err != nil {
+		return err
+	}
+	return s.DispatchSMSCampaign(ctx, campaign, pseudonymousID)
+}
+
+// DispatchSMSCampaign sends using an already-loaded campaign creative (ingest-ad path).
+func (s *SMSDispatchService) DispatchSMSCampaign(
+	ctx context.Context,
+	campaign *SMSCampaign,
+	pseudonymousID string,
+) error {
+	pseudonymousID = strings.TrimSpace(pseudonymousID)
+	if campaign == nil || strings.TrimSpace(campaign.ID) == "" || pseudonymousID == "" {
+		return fmt.Errorf("campaign and pseudonymous_id are required")
+	}
+	if s == nil || s.recipients == nil || s.attempts == nil || s.logs == nil || s.provider == nil {
+		return fmt.Errorf("sms dispatch service is not configured")
+	}
+
+	campaignID := strings.TrimSpace(campaign.ID)
 
 	recipient, err := s.recipients.FindActiveByPseudonymousID(ctx, pseudonymousID)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil
 		}
-		return err
-	}
-	campaign, err := s.campaigns.GetSMSCampaign(ctx, campaignID)
-	if err != nil {
 		return err
 	}
 

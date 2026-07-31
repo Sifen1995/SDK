@@ -545,8 +545,20 @@ definitions:
       campaign_id:
         example: 1a0d7721-ed1d-4bd7-ab63-8195b5e5d91d
         type: string
+      campaign_name:
+        example: SMS Demo Campaign
+        type: string
       created_at:
         example: "2026-07-30T10:13:10Z"
+        type: string
+      destination_url:
+        example: https://example.com/sms-offer
+        type: string
+      image_url:
+        example: https://cdn.example.com/creative.jpg
+        type: string
+      message_body:
+        example: Skykin SMS+ - Tap for the demo offer - http://localhost:8081/api/v1/telemetry/sms/click?token=...
         type: string
       phone_masked:
         example: +15*******07
@@ -595,8 +607,9 @@ definitions:
   internal_intents_interfaces_http.IngestIntentAdRequest:
     properties:
       channel_code:
-        description: ChannelCode delivery channel; empty prefers SMS_PLUS when sms_consented,
-          else non-SMS channels
+        description: |-
+          ChannelCode delivery channel; empty prefers SMS_PLUS when sms_consented, else non-SMS channels.
+          Use SMS_PLUS (not SMS), IN_APP_BANNER, PUSH, or NATIVE_FEED.
         example: IN_APP_BANNER
         type: string
       confidence:
@@ -2699,9 +2712,9 @@ paths:
       - SDK - SMS+
   /telemetry/sms/debug/sends:
     get:
-      description: Returns the latest SMS+ send attempts with masked phone numbers
-        for demo/debug inspection. Authorize with X-API-Key (and X-SDK-Secret for
-        POSTs; GET only needs the API key).
+      description: Returns the latest SMS+ send attempts with masked phones plus message_body,
+        campaign_name, destination_url, and image_url for demo/debug inspection. Authorize
+        with X-API-Key (and X-SDK-Secret for POSTs; GET only needs the API key).
       produces:
       - application/json
       responses:

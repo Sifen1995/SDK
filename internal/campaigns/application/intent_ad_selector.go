@@ -71,6 +71,7 @@ func (s *IntentAdSelector) selectOne(
 		CampaignName: campaign.Name,
 		ChannelCode:  channelCode,
 		Content:      content,
+		Campaign:     campaign,
 	}, nil
 }
 
@@ -100,6 +101,7 @@ func (s *IntentAdSelector) selectBestAmong(
 				CampaignName: campaign.Name,
 				ChannelCode:  code,
 				Content:      content,
+				Campaign:     campaign,
 			}
 		}
 	}

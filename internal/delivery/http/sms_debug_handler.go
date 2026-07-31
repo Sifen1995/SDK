@@ -26,16 +26,20 @@ func NewSMSDebugHandler(attempts smsAttemptLister) *SMSDebugHandler {
 // SMSSendAttemptDTO is the Swagger/demo payload for recent SMS+ sends (phone masked).
 type SMSSendAttemptDTO struct {
 	CampaignID     string `json:"campaign_id" example:"1a0d7721-ed1d-4bd7-ab63-8195b5e5d91d"`
+	CampaignName   string `json:"campaign_name" example:"SMS Demo Campaign"`
 	PseudonymousID string `json:"pseudonymous_id" example:"a9a1208b-7521-4ff0-8d88-52a48450784b"`
 	PhoneMasked    string `json:"phone_masked" example:"+15*******07"`
 	Provider       string `json:"provider" example:"mock"`
 	Status         string `json:"status" example:"sent"`
+	MessageBody    string `json:"message_body" example:"Skykin SMS+ - Tap for the demo offer - http://localhost:8081/api/v1/telemetry/sms/click?token=..."`
+	DestinationURL string `json:"destination_url" example:"https://example.com/sms-offer"`
+	ImageURL       string `json:"image_url" example:"https://cdn.example.com/creative.jpg"`
 	CreatedAt      string `json:"created_at" example:"2026-07-30T10:13:10Z"`
 }
 
 // ListRecent godoc
 // @Summary      List recent SMS+ send attempts (demo)
-// @Description  Returns the latest SMS+ send attempts with masked phone numbers for demo/debug inspection. Authorize with X-API-Key (and X-SDK-Secret for POSTs; GET only needs the API key).
+// @Description  Returns the latest SMS+ send attempts with masked phones plus message_body, campaign_name, destination_url, and image_url for demo/debug inspection. Authorize with X-API-Key (and X-SDK-Secret for POSTs; GET only needs the API key).
 // @Tags         SDK - SMS+
 // @Produce      json
 // @Security     APIKeyAuth
@@ -58,10 +62,14 @@ func (h *SMSDebugHandler) ListRecent(c *gin.Context) {
 	for i := range attempts {
 		out = append(out, SMSSendAttemptDTO{
 			CampaignID:     attempts[i].CampaignID,
+			CampaignName:   attempts[i].CampaignName,
 			PseudonymousID: attempts[i].PseudonymousID,
 			PhoneMasked:    maskPhone(attempts[i].PhoneE164),
 			Provider:       attempts[i].Provider,
 			Status:         attempts[i].Status,
+			MessageBody:    attempts[i].MessageBody,
+			DestinationURL: attempts[i].DestinationURL,
+			ImageURL:       attempts[i].ImageURL,
 			CreatedAt:      attempts[i].CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}

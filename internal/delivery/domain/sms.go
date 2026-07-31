@@ -43,6 +43,10 @@ type SMSSendAttempt struct {
 	SentAt            *time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+
+	// Optional join fields for debug/list responses (not persisted on create).
+	CampaignName string
+	ImageURL     string
 }
 
 type DemoSMSRecipientRepository interface {

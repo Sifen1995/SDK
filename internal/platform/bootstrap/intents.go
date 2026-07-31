@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	analyticsApp "skykin-platform/internal/analytics/application"
 	analyticsInfra "skykin-platform/internal/analytics/infrastructure"
 	campaignApp "skykin-platform/internal/campaigns/application"
+	campaigndomain "skykin-platform/internal/campaigns/domain"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
 	deliveryApp "skykin-platform/internal/delivery/application"
 	intentApp "skykin-platform/internal/intents/application"
@@ -71,8 +73,23 @@ type smsAdDispatcherAdapter struct {
 	svc *deliveryApp.SMSDispatchService
 }
 
-func (a *smsAdDispatcherAdapter) Dispatch(ctx context.Context, campaignID, pseudonymousID string) error {
-	return a.svc.DispatchCampaignMatch(ctx, campaignID, pseudonymousID)
+func (a *smsAdDispatcherAdapter) Dispatch(
+	ctx context.Context,
+	campaign *campaigndomain.Campaign,
+	pseudonymousID string,
+) error {
+	if a == nil || a.svc == nil {
+		return fmt.Errorf("sms dispatch is not configured")
+	}
+	if campaign == nil {
+		return fmt.Errorf("campaign is required")
+	}
+	return a.svc.DispatchSMSCampaign(ctx, &deliveryApp.SMSCampaign{
+		ID:             campaign.ID,
+		Title:          campaign.Title,
+		BodyText:       campaign.BodyText,
+		DestinationURL: campaign.DestinationURL,
+	}, pseudonymousID)
 }
 
 // StartIntentLogWorker launches the background BRPop → Postgres batch flusher.

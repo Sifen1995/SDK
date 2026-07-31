@@ -101,16 +101,27 @@ func (r *SMSSendAttemptRepository) ListRecent(ctx context.Context, limit int) ([
 	if limit <= 0 {
 		limit = 20
 	}
-	var rows []persistence.SMSSendAttemptRow
+	type recentRow struct {
+		persistence.SMSSendAttemptRow
+		CampaignName string `gorm:"column:campaign_name"`
+		ImageURL     string `gorm:"column:image_url"`
+	}
+	var rows []recentRow
 	if err := r.db.WithContext(ctx).
-		Order("created_at DESC").
+		Table("sms_send_attempts AS a").
+		Select(`a.*, c.name AS campaign_name, COALESCE(c.image_url, '') AS image_url`).
+		Joins("LEFT JOIN campaigns c ON c.id = a.campaign_id").
+		Order("a.created_at DESC").
 		Limit(limit).
-		Find(&rows).Error; err != nil {
+		Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]deliverydomain.SMSSendAttempt, 0, len(rows))
 	for i := range rows {
-		out = append(out, *mapSMSSendAttemptRow(&rows[i]))
+		attempt := mapSMSSendAttemptRow(&rows[i].SMSSendAttemptRow)
+		attempt.CampaignName = rows[i].CampaignName
+		attempt.ImageURL = rows[i].ImageURL
+		out = append(out, *attempt)
 	}
 	return out, nil
 }

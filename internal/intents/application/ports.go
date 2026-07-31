@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	"skykin-platform/internal/intents/domain"
+	campaigndomain "skykin-platform/internal/campaigns/domain"
+	intentdomain "skykin-platform/internal/intents/domain"
 )
 
 // ProfileRepository persists SDK intent profiles (intents module only).
 type ProfileRepository interface {
-	Save(ctx context.Context, profile *domain.IntentProfile) error
+	Save(ctx context.Context, profile *intentdomain.IntentProfile) error
 }
 
 // ActiveIntentCache caches the latest intent name per pseudonymous user (Job 3).
@@ -23,6 +24,8 @@ type AdSelection struct {
 	CampaignName string
 	ChannelCode  string
 	Content      map[string]any
+	// Campaign is the full eligible campaign; required for SMS+ dispatch.
+	Campaign *campaigndomain.Campaign
 }
 
 // AdSelector selects a campaign ad for an intent without exposing campaign repositories here.
@@ -32,5 +35,5 @@ type AdSelector interface {
 
 // SMSAdDispatcher dispatches an SMS+ campaign match (composition root wires delivery).
 type SMSAdDispatcher interface {
-	Dispatch(ctx context.Context, campaignID, pseudonymousID string) error
+	Dispatch(ctx context.Context, campaign *campaigndomain.Campaign, pseudonymousID string) error
 }

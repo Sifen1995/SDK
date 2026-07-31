@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	campaigndomain "skykin-platform/internal/campaigns/domain"
 	"skykin-platform/internal/intents/application"
 	"skykin-platform/internal/intents/domain"
 )
@@ -38,17 +39,20 @@ type stubSMS struct {
 	err          error
 }
 
-func (s *stubSMS) Dispatch(ctx context.Context, campaignID, pseudonymousID string) error {
+func (s *stubSMS) Dispatch(ctx context.Context, campaign *campaigndomain.Campaign, pseudonymousID string) error {
 	s.called = true
-	s.campaignID = campaignID
 	s.pseudonymous = pseudonymousID
+	if campaign != nil {
+		s.campaignID = campaign.ID
+	}
 	return s.err
 }
 
 func TestIngestAndFetchAd_SMSFound_Dispatches(t *testing.T) {
 	ads := &stubAds{ad: &application.AdSelection{
 		CampaignID: "camp-sms", CampaignName: "SMS", ChannelCode: "SMS_PLUS",
-		Content: map[string]any{"body": "hi"},
+		Content:  map[string]any{"body": "hi"},
+		Campaign: &campaigndomain.Campaign{ID: "camp-sms", Title: "T", BodyText: "B"},
 	}}
 	sms := &stubSMS{}
 	svc := application.NewIntentService(stubProfiles{}, nil, ads, sms)
@@ -78,7 +82,8 @@ func TestIngestAndFetchAd_SMSFound_Dispatches(t *testing.T) {
 func TestIngestAndFetchAd_SMSMissing_ReturnsNonSMS(t *testing.T) {
 	ads := &stubAds{ad: &application.AdSelection{
 		CampaignID: "camp-banner", CampaignName: "Banner", ChannelCode: "IN_APP_BANNER",
-		Content: map[string]any{"title": "Sale"},
+		Content:  map[string]any{"title": "Sale"},
+		Campaign: &campaigndomain.Campaign{ID: "camp-banner"},
 	}}
 	sms := &stubSMS{}
 	svc := application.NewIntentService(stubProfiles{}, nil, ads, sms)
@@ -129,6 +134,7 @@ func TestIngestAndFetchAd_SMSConsentedFalse_NeverDispatches(t *testing.T) {
 func TestIngestAndFetchAd_SMSDispatchError(t *testing.T) {
 	ads := &stubAds{ad: &application.AdSelection{
 		CampaignID: "camp-sms", ChannelCode: "SMS_PLUS",
+		Campaign: &campaigndomain.Campaign{ID: "camp-sms"},
 	}}
 	sms := &stubSMS{err: errors.New("provider down")}
 	svc := application.NewIntentService(stubProfiles{}, nil, ads, sms)
@@ -140,5 +146,22 @@ func TestIngestAndFetchAd_SMSDispatchError(t *testing.T) {
 	}, "", true)
 	if err == nil {
 		t.Fatal("expected dispatch error")
+	}
+}
+
+func TestIngestAndFetchAd_SMSRequiresCampaign(t *testing.T) {
+	ads := &stubAds{ad: &application.AdSelection{
+		CampaignID: "camp-sms", ChannelCode: "SMS_PLUS",
+	}}
+	sms := &stubSMS{}
+	svc := application.NewIntentService(stubProfiles{}, nil, ads, sms)
+
+	_, err := svc.IngestAndFetchAd(context.Background(), &domain.IntentProfile{
+		PseudonymousID: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+		IntentName:     "fashion_interest",
+		Confidence:     0.9,
+	}, "", true)
+	if err == nil {
+		t.Fatal("expected error when Campaign is nil")
 	}
 }

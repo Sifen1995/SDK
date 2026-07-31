@@ -2262,7 +2262,7 @@ const docTemplate = `{
                         "APIKeyAuth": []
                     }
                 ],
-                "description": "Returns the latest SMS+ send attempts with masked phone numbers for demo/debug inspection. Authorize with X-API-Key (and X-SDK-Secret for POSTs; GET only needs the API key).",
+                "description": "Returns the latest SMS+ send attempts with masked phones plus message_body, campaign_name, destination_url, and image_url for demo/debug inspection. Authorize with X-API-Key (and X-SDK-Secret for POSTs; GET only needs the API key).",
                 "produces": [
                     "application/json"
                 ],
@@ -3251,9 +3251,25 @@ const docTemplate = `{
                     "type": "string",
                     "example": "1a0d7721-ed1d-4bd7-ab63-8195b5e5d91d"
                 },
+                "campaign_name": {
+                    "type": "string",
+                    "example": "SMS Demo Campaign"
+                },
                 "created_at": {
                     "type": "string",
                     "example": "2026-07-30T10:13:10Z"
+                },
+                "destination_url": {
+                    "type": "string",
+                    "example": "https://example.com/sms-offer"
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://cdn.example.com/creative.jpg"
+                },
+                "message_body": {
+                    "type": "string",
+                    "example": "Skykin SMS+ - Tap for the demo offer - http://localhost:8081/api/v1/telemetry/sms/click?token=..."
                 },
                 "phone_masked": {
                     "type": "string",
@@ -3325,7 +3341,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "channel_code": {
-                    "description": "ChannelCode delivery channel; empty prefers SMS_PLUS when sms_consented, else non-SMS channels",
+                    "description": "ChannelCode delivery channel; empty prefers SMS_PLUS when sms_consented, else non-SMS channels.\nUse SMS_PLUS (not SMS), IN_APP_BANNER, PUSH, or NATIVE_FEED.",
                     "type": "string",
                     "example": "IN_APP_BANNER"
                 },
