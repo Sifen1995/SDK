@@ -8,6 +8,7 @@ import (
 	authRoutes "skykin-platform/internal/auth/routes"
 	consentHTTP "skykin-platform/internal/consent/interfaces/http"
 	deliveryHTTP "skykin-platform/internal/delivery/http"
+	fraudHTTP "skykin-platform/internal/fraud/interfaces/http"
 	intentHTTP "skykin-platform/internal/intents/interfaces/http"
 	permApp "skykin-platform/internal/permissions/application"
 	permHTTP "skykin-platform/internal/permissions/interfaces/http"
@@ -39,6 +40,7 @@ func InitRouter(
 	consentHandler := bootstrap.NewConsentSystem(db, bus, slog.Default())
 	deliverySDK := bootstrap.NewDeliverySDKSystem(db, cfg, slog.Default())
 	intentHandler := bootstrap.NewIntentSystem(db, cfg, slog.Default(), deliverySDK.SMSDispatch)
+	fraudHandler := bootstrap.NewFraudSystem(db, cfg, slog.Default())
 	bootstrap.RegisterDeliveryEventConsumers(bus, deliverySDK.SMSDispatch, slog.Default())
 
 	// Stream write-behind: billing owns billing_events, delivery owns campaign_delivery_logs.
@@ -53,6 +55,7 @@ func InitRouter(
 	{
 		consentHTTP.RegisterRoutes(sdkGroup, consentHandler)
 		intentHTTP.RegisterRoutes(sdkGroup, intentHandler)
+		fraudHTTP.RegisterRoutes(sdkGroup, fraudHandler)
 		deliveryHTTP.RegisterSDKRoutes(sdkGroup, deliverySDK.Campaigns, deliverySDK.Telemetry, deliverySDK.CPC, deliverySDK.SMSDebug)
 	}
 

@@ -598,6 +598,168 @@ definitions:
     - campaign_id
     - event_type
     type: object
+  internal_fraud_interfaces_http.BlockedDomainDTO:
+    properties:
+      created_at:
+        example: "2026-08-01T10:00:00Z"
+        type: string
+      domain:
+        example: telebirr-verify.example
+        type: string
+      expires_at:
+        example: "2026-09-01T10:00:00Z"
+        type: string
+      severity:
+        example: critical
+        type: string
+      source:
+        example: manual_review
+        type: string
+      status:
+        enum:
+        - active
+        - revoked
+        example: active
+        type: string
+      threat_type:
+        example: url_phishing
+        type: string
+      updated_at:
+        example: "2026-08-03T08:20:00Z"
+        type: string
+    type: object
+  internal_fraud_interfaces_http.BlockedSenderDTO:
+    properties:
+      created_at:
+        example: "2026-08-01T10:00:00Z"
+        type: string
+      sender_hash:
+        example: a1b2c3d4...
+        type: string
+      severity:
+        example: high
+        type: string
+      source:
+        example: community_report
+        type: string
+      status:
+        enum:
+        - active
+        - revoked
+        example: active
+        type: string
+      threat_type:
+        example: financial_scam
+        type: string
+      updated_at:
+        example: "2026-08-03T08:20:00Z"
+        type: string
+    type: object
+  internal_fraud_interfaces_http.ScamPatternDTO:
+    properties:
+      confidence:
+        example: 0.95
+        type: number
+      id:
+        example: urgent-telebirr-link
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      language:
+        example: en
+        type: string
+      pattern_type:
+        example: regex
+        type: string
+      pattern_value:
+        example: (?i)urgent.*telebirr.*https?://
+        type: string
+      threat_category:
+        example: brand_impersonation
+        type: string
+      updated_at:
+        example: "2026-08-03T08:20:00Z"
+        type: string
+    type: object
+  internal_fraud_interfaces_http.SyncResponse:
+    properties:
+      blocked_domains:
+        items:
+          $ref: '#/definitions/internal_fraud_interfaces_http.BlockedDomainDTO'
+        type: array
+      blocked_senders:
+        items:
+          $ref: '#/definitions/internal_fraud_interfaces_http.BlockedSenderDTO'
+        type: array
+      mode:
+        enum:
+        - full
+        - delta
+        example: delta
+        type: string
+      next_cursor:
+        example: "2026-08-03T08:30:00.123456Z"
+        type: string
+      scam_patterns:
+        items:
+          $ref: '#/definitions/internal_fraud_interfaces_http.ScamPatternDTO'
+        type: array
+      status:
+        example: success
+        type: string
+    type: object
+  internal_fraud_interfaces_http.ThreatReportAcceptedResponse:
+    properties:
+      report_id:
+        example: 8ae89c1c-bfd8-40d2-9b78-50f5c46c413f
+        type: string
+      reported_at:
+        example: "2026-08-03T09:20:00Z"
+        type: string
+      status:
+        example: accepted
+        type: string
+    type: object
+  internal_fraud_interfaces_http.ThreatReportRequest:
+    properties:
+      detection_source:
+        enum:
+        - blocklist
+        - pattern
+        - ml
+        example: ml
+        type: string
+      sdk_version:
+        example: 1.0.0
+        type: string
+      sender_hash:
+        example: 06f89eae59f69e7bc024476c2c77a1e3f02af36ab6692370b8e394f329afeb11
+        type: string
+      severity:
+        enum:
+        - low
+        - medium
+        - high
+        - critical
+        example: high
+        type: string
+      threat_type:
+        enum:
+        - url_phishing
+        - financial_scam
+        - brand_impersonation
+        example: url_phishing
+        type: string
+      url_domain:
+        example: https://telebirr-verify.example/login
+        type: string
+    required:
+    - detection_source
+    - sdk_version
+    - severity
+    - threat_type
+    type: object
   internal_intents_interfaces_http.IngestIntentAdAcceptedResponse:
     properties:
       status:
@@ -2638,6 +2800,82 @@ paths:
       summary: Register a new developer
       tags:
       - Portal - Auth
+  /reports:
+    post:
+      consumes:
+      - application/json
+      description: Persists one normalized threat report and stages it for one-hour
+        threshold aggregation. No user or pseudonymous identifier is collected.
+      parameters:
+      - description: Threat report
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_fraud_interfaces_http.ThreatReportRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/internal_fraud_interfaces_http.ThreatReportAcceptedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - APIKeyAuth: []
+        SDKSecretAuth: []
+      summary: Submit an anonymous threat report
+      tags:
+      - SDK - Fraud
+  /sync:
+    get:
+      description: Returns a full active snapshot when since is omitted. With an RFC3339
+        since cursor, returns changed rows including revoked, expired, and inactive
+        tombstones. Store next_cursor and supply it on the next poll.
+      parameters:
+      - description: Previous next_cursor (RFC3339/RFC3339Nano)
+        in: query
+        name: since
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_fraud_interfaces_http.SyncResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/skykin-platform_internal_platform_http.APIError'
+      security:
+      - APIKeyAuth: []
+      summary: Sync fraud intelligence
+      tags:
+      - SDK - Fraud
   /telemetry/anonymous-click:
     post:
       consumes:

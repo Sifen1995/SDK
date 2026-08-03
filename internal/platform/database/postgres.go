@@ -42,6 +42,9 @@ var consentsSMSConsentedSQL string
 //go:embed migrations/20260730150000_demo_sms_recipient_pseudonymous.sql
 var demoSMSRecipientPseudonymousSQL string
 
+//go:embed migrations/fraud.sql
+var fraudSQL string
+
 func ConnectDB(cfg *configs.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
@@ -88,6 +91,10 @@ func Migrate(db *gorm.DB) error {
 
 	if err := db.Exec(consentsSMSConsentedSQL).Error; err != nil {
 		return fmt.Errorf("consents sms_consented migration: %w", err)
+	}
+
+	if err := db.Exec(fraudSQL).Error; err != nil {
+		return fmt.Errorf("fraud sync migration: %w", err)
 	}
 
 	if err := db.AutoMigrate(
@@ -148,6 +155,7 @@ func Migrate(db *gorm.DB) error {
 	seedAudienceSegments(db)
 	seedDemoFashionUser(db)
 	seedDemoSMSRecipients(db)
+	seedFraudIntelligence(db)
 	return nil
 }
 

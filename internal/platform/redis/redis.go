@@ -4,6 +4,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -108,6 +109,26 @@ func (c *RedisClient) Exists(ctx context.Context, key string) (bool, error) {
 // IncrByFloat atomically adds incr to a float key and returns the new value.
 func (c *RedisClient) IncrByFloat(ctx context.Context, key string, incr float64) (float64, error) {
 	return c.Client.IncrByFloat(ctx, key, incr).Result()
+}
+
+// ZAdd adds or updates one sorted-set member.
+func (c *RedisClient) ZAdd(ctx context.Context, key, member string, score float64) error {
+	return c.Client.ZAdd(ctx, key, redis.Z{Score: score, Member: member}).Err()
+}
+
+// ZRemRangeByScore removes sorted-set members in the inclusive score range.
+func (c *RedisClient) ZRemRangeByScore(ctx context.Context, key string, min, max float64) error {
+	return c.Client.ZRemRangeByScore(
+		ctx,
+		key,
+		strconv.FormatFloat(min, 'f', -1, 64),
+		strconv.FormatFloat(max, 'f', -1, 64),
+	).Err()
+}
+
+// ZCard returns the number of sorted-set members.
+func (c *RedisClient) ZCard(ctx context.Context, key string) (int64, error) {
+	return c.Client.ZCard(ctx, key).Result()
 }
 
 // StreamMessage is one Redis Stream entry.

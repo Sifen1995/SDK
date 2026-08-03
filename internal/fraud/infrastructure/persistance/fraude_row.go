@@ -3,6 +3,8 @@ package persistance
 import (
 	"database/sql"
 	"time"
+
+	frauddomain "skykin-platform/internal/fraud/domain"
 )
 
 // BlockedDomainsRow maps the blocked_domains table.
@@ -14,6 +16,7 @@ type BlockedDomainsRow struct {
 	Status     string       `gorm:"column:status;type:varchar(32);not null;default:active;index"`
 	CreatedAt  time.Time    `gorm:"column:created_at;not null;default:now()"`
 	ExpiresAt  sql.NullTime `gorm:"column:expires_at"`
+	UpdatedAt  time.Time    `gorm:"column:updated_at;not null;default:now();index"`
 }
 
 // BlockedSendersRow maps the blocked_senders table.
@@ -22,7 +25,9 @@ type BlockedSendersRow struct {
 	ThreatType string    `gorm:"column:threat_type;type:varchar(64);not null"`
 	Severity   string    `gorm:"column:severity;type:varchar(32);not null"`
 	Source     string    `gorm:"column:source;type:varchar(64);not null"`
+	Status     string    `gorm:"column:status;type:varchar(32);not null;default:active;index"`
 	CreatedAt  time.Time `gorm:"column:created_at;not null;default:now()"`
+	UpdatedAt  time.Time `gorm:"column:updated_at;not null;default:now();index"`
 }
 
 // ScamPatternsRow maps the scam_patterns table.
@@ -33,7 +38,7 @@ type ScamPatternsRow struct {
 	ThreatCategory string    `gorm:"column:threat_category;type:varchar(64);not null"`
 	Confidence     float64   `gorm:"column:confidence;type:numeric(3,2);not null"`
 	Language       string    `gorm:"column:language;type:varchar(8);not null;default:any"`
-	IsActive       bool      `gorm:"column:is_active;not null;default:true;index"`
+	IsActive       bool      `gorm:"column:is_active;not null;index"`
 	UpdatedAt      time.Time `gorm:"column:updated_at;not null;default:now()"`
 }
 
@@ -57,3 +62,127 @@ func (BlockedSendersRow) TableName() string { return "blocked_senders" }
 func (ScamPatternsRow) TableName() string { return "scam_patterns" }
 
 func (ThreatReportsRow) TableName() string { return "threat_reports" }
+
+func (r BlockedDomainsRow) ToDomain() frauddomain.BlockedDomain {
+	var expiresAt *time.Time
+	if r.ExpiresAt.Valid {
+		value := r.ExpiresAt.Time
+		expiresAt = &value
+	}
+	return frauddomain.BlockedDomain{
+		Domain:     r.Domain,
+		ThreatType: r.ThreatType,
+		Severity:   r.Severity,
+		Source:     r.Source,
+		Status:     r.Status,
+		CreatedAt:  r.CreatedAt,
+		ExpiresAt:  expiresAt,
+		UpdatedAt:  r.UpdatedAt,
+	}
+}
+
+func BlockedDomainsRowFromDomain(value frauddomain.BlockedDomain) BlockedDomainsRow {
+	row := BlockedDomainsRow{
+		Domain:     value.Domain,
+		ThreatType: value.ThreatType,
+		Severity:   value.Severity,
+		Source:     value.Source,
+		Status:     value.Status,
+		CreatedAt:  value.CreatedAt,
+		UpdatedAt:  value.UpdatedAt,
+	}
+	if value.ExpiresAt != nil {
+		row.ExpiresAt = sql.NullTime{Time: *value.ExpiresAt, Valid: true}
+	}
+	return row
+}
+
+func (r BlockedSendersRow) ToDomain() frauddomain.BlockedSender {
+	return frauddomain.BlockedSender{
+		SenderHash: r.SenderHash,
+		ThreatType: r.ThreatType,
+		Severity:   r.Severity,
+		Source:     r.Source,
+		Status:     r.Status,
+		CreatedAt:  r.CreatedAt,
+		UpdatedAt:  r.UpdatedAt,
+	}
+}
+
+func BlockedSendersRowFromDomain(value frauddomain.BlockedSender) BlockedSendersRow {
+	return BlockedSendersRow{
+		SenderHash: value.SenderHash,
+		ThreatType: value.ThreatType,
+		Severity:   value.Severity,
+		Source:     value.Source,
+		Status:     value.Status,
+		CreatedAt:  value.CreatedAt,
+		UpdatedAt:  value.UpdatedAt,
+	}
+}
+
+func (r ScamPatternsRow) ToDomain() frauddomain.ScamPattern {
+	return frauddomain.ScamPattern{
+		ID:             r.ID,
+		PatternType:    r.PatternType,
+		PatternValue:   r.PatternValue,
+		ThreatCategory: r.ThreatCategory,
+		Confidence:     r.Confidence,
+		Language:       r.Language,
+		IsActive:       r.IsActive,
+		UpdatedAt:      r.UpdatedAt,
+	}
+}
+
+func ScamPatternsRowFromDomain(value frauddomain.ScamPattern) ScamPatternsRow {
+	return ScamPatternsRow{
+		ID:             value.ID,
+		PatternType:    value.PatternType,
+		PatternValue:   value.PatternValue,
+		ThreatCategory: value.ThreatCategory,
+		Confidence:     value.Confidence,
+		Language:       value.Language,
+		IsActive:       value.IsActive,
+		UpdatedAt:      value.UpdatedAt,
+	}
+}
+
+func (r ThreatReportsRow) ToDomain() frauddomain.ThreatReport {
+	var senderHash, urlDomain *string
+	if r.SenderHash.Valid {
+		value := r.SenderHash.String
+		senderHash = &value
+	}
+	if r.URLDomain.Valid {
+		value := r.URLDomain.String
+		urlDomain = &value
+	}
+	return frauddomain.ThreatReport{
+		ID:              r.ID,
+		ThreatType:      r.ThreatType,
+		Severity:        r.Severity,
+		SenderHash:      senderHash,
+		URLDomain:       urlDomain,
+		DetectionSource: r.DetectionSource,
+		SDKVersion:      r.SDKVersion,
+		ReportedAt:      r.ReportedAt,
+	}
+}
+
+func ThreatReportsRowFromDomain(value frauddomain.ThreatReport) ThreatReportsRow {
+	row := ThreatReportsRow{
+		ID:              value.ID,
+		ThreatType:      value.ThreatType,
+		Severity:        value.Severity,
+		DetectionSource: value.DetectionSource,
+		SDKVersion:      value.SDKVersion,
+		ReportedAt:      value.ReportedAt,
+	}
+	if value.SenderHash != nil {
+		row.SenderHash = sql.NullString{String: *value.SenderHash, Valid: true}
+	}
+	if value.URLDomain != nil {
+		row.URLDomain = sql.NullString{String: *value.URLDomain, Valid: true}
+	}
+	return row
+}

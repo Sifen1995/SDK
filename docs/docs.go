@@ -2154,6 +2154,121 @@ const docTemplate = `{
                 }
             }
         },
+        "/reports": {
+            "post": {
+                "security": [
+                    {
+                        "APIKeyAuth": [],
+                        "SDKSecretAuth": []
+                    }
+                ],
+                "description": "Persists one normalized threat report and stages it for one-hour threshold aggregation. No user or pseudonymous identifier is collected.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Fraud"
+                ],
+                "summary": "Submit an anonymous threat report",
+                "parameters": [
+                    {
+                        "description": "Threat report",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_fraud_interfaces_http.ThreatReportRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/internal_fraud_interfaces_http.ThreatReportAcceptedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/sync": {
+            "get": {
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
+                "description": "Returns a full active snapshot when since is omitted. With an RFC3339 since cursor, returns changed rows including revoked, expired, and inactive tombstones. Store next_cursor and supply it on the next poll.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Fraud"
+                ],
+                "summary": "Sync fraud intelligence",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Previous next_cursor (RFC3339/RFC3339Nano)",
+                        "name": "since",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_fraud_interfaces_http.SyncResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/telemetry/anonymous-click": {
             "post": {
                 "description": "Accepts an anonymous click callback for a campaign using a signed token. The endpoint validates the token, queues the event for async billing processing, and returns 202 Accepted immediately.",
@@ -3320,6 +3435,228 @@ const docTemplate = `{
                     "type": "number",
                     "minimum": 0,
                     "example": 0
+                }
+            }
+        },
+        "internal_fraud_interfaces_http.BlockedDomainDTO": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-08-01T10:00:00Z"
+                },
+                "domain": {
+                    "type": "string",
+                    "example": "telebirr-verify.example"
+                },
+                "expires_at": {
+                    "type": "string",
+                    "example": "2026-09-01T10:00:00Z"
+                },
+                "severity": {
+                    "type": "string",
+                    "example": "critical"
+                },
+                "source": {
+                    "type": "string",
+                    "example": "manual_review"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "revoked"
+                    ],
+                    "example": "active"
+                },
+                "threat_type": {
+                    "type": "string",
+                    "example": "url_phishing"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-08-03T08:20:00Z"
+                }
+            }
+        },
+        "internal_fraud_interfaces_http.BlockedSenderDTO": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-08-01T10:00:00Z"
+                },
+                "sender_hash": {
+                    "type": "string",
+                    "example": "a1b2c3d4..."
+                },
+                "severity": {
+                    "type": "string",
+                    "example": "high"
+                },
+                "source": {
+                    "type": "string",
+                    "example": "community_report"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "revoked"
+                    ],
+                    "example": "active"
+                },
+                "threat_type": {
+                    "type": "string",
+                    "example": "financial_scam"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-08-03T08:20:00Z"
+                }
+            }
+        },
+        "internal_fraud_interfaces_http.ScamPatternDTO": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "type": "number",
+                    "example": 0.95
+                },
+                "id": {
+                    "type": "string",
+                    "example": "urgent-telebirr-link"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "language": {
+                    "type": "string",
+                    "example": "en"
+                },
+                "pattern_type": {
+                    "type": "string",
+                    "example": "regex"
+                },
+                "pattern_value": {
+                    "type": "string",
+                    "example": "(?i)urgent.*telebirr.*https?://"
+                },
+                "threat_category": {
+                    "type": "string",
+                    "example": "brand_impersonation"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-08-03T08:20:00Z"
+                }
+            }
+        },
+        "internal_fraud_interfaces_http.SyncResponse": {
+            "type": "object",
+            "properties": {
+                "blocked_domains": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_fraud_interfaces_http.BlockedDomainDTO"
+                    }
+                },
+                "blocked_senders": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_fraud_interfaces_http.BlockedSenderDTO"
+                    }
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "full",
+                        "delta"
+                    ],
+                    "example": "delta"
+                },
+                "next_cursor": {
+                    "type": "string",
+                    "example": "2026-08-03T08:30:00.123456Z"
+                },
+                "scam_patterns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_fraud_interfaces_http.ScamPatternDTO"
+                    }
+                },
+                "status": {
+                    "type": "string",
+                    "example": "success"
+                }
+            }
+        },
+        "internal_fraud_interfaces_http.ThreatReportAcceptedResponse": {
+            "type": "object",
+            "properties": {
+                "report_id": {
+                    "type": "string",
+                    "example": "8ae89c1c-bfd8-40d2-9b78-50f5c46c413f"
+                },
+                "reported_at": {
+                    "type": "string",
+                    "example": "2026-08-03T09:20:00Z"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "accepted"
+                }
+            }
+        },
+        "internal_fraud_interfaces_http.ThreatReportRequest": {
+            "type": "object",
+            "required": [
+                "detection_source",
+                "sdk_version",
+                "severity",
+                "threat_type"
+            ],
+            "properties": {
+                "detection_source": {
+                    "type": "string",
+                    "enum": [
+                        "blocklist",
+                        "pattern",
+                        "ml"
+                    ],
+                    "example": "ml"
+                },
+                "sdk_version": {
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "sender_hash": {
+                    "type": "string",
+                    "example": "06f89eae59f69e7bc024476c2c77a1e3f02af36ab6692370b8e394f329afeb11"
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": [
+                        "low",
+                        "medium",
+                        "high",
+                        "critical"
+                    ],
+                    "example": "high"
+                },
+                "threat_type": {
+                    "type": "string",
+                    "enum": [
+                        "url_phishing",
+                        "financial_scam",
+                        "brand_impersonation"
+                    ],
+                    "example": "url_phishing"
+                },
+                "url_domain": {
+                    "type": "string",
+                    "example": "https://telebirr-verify.example/login"
                 }
             }
         },
