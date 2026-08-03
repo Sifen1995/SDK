@@ -1,0 +1,20 @@
+# Core data & ML
+numpy
+pandas
+scipy
+scikit-learn
+joblib
+
+# Gradient boosting (optional — train.py auto-falls back to
+# RandomForestClassifier if this fails to import/install)
+lightgbm
+
+# Evaluation charts (src/models/evaluate.py)
+matplotlib
+seaborn
+
+# On-device export (src/export/convert_to_tflite.py)
+tensorflow
+
+# Tests
+pytest

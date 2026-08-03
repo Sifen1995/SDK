@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
 	consentpersistence "skykin-platform/internal/consent/infrastructure/persistence"
@@ -18,6 +20,16 @@ import (
 
 const demoFashionCohortSize = 12
 const demoSDKVersion = "demo"
+const demoPhonePrefix = "+1555000"
+
+// demoRecipientDisplayName keeps the label aligned with the phone slot the row owns.
+func demoRecipientDisplayName(phone string) string {
+	slot, err := strconv.Atoi(strings.TrimPrefix(phone, demoPhonePrefix))
+	if !strings.HasPrefix(phone, demoPhonePrefix) || err != nil {
+		return "Demo User"
+	}
+	return fmt.Sprintf("Demo User %02d", slot)
+}
 
 // seedDemoFashionUser inserts demo SDK users with mappings, consents, and
 // fashion intents. Runs ensure on every migrate so mappings always exist.
@@ -111,8 +123,10 @@ func seedDemoSMSRecipients(db *gorm.DB) {
 		PseudonymousID uuid.UUID
 	}
 	var demoUsers []demoUserMapping
+	// DISTINCT ON: a user with more than one demo consent would otherwise appear twice
+	// and shift every following phone slot.
 	if err := db.Raw(`
-		SELECT c.user_id, m.pseudonymous_id
+		SELECT DISTINCT ON (c.user_id) c.user_id, m.pseudonymous_id
 		FROM consents c
 		INNER JOIN pseudonymous_mappings m ON m.user_id = c.user_id
 		WHERE c.sdk_version = ?
@@ -123,39 +137,66 @@ func seedDemoSMSRecipients(db *gorm.DB) {
 		return
 	}
 
+	var existingRows []deliverypersistence.DemoSMSRecipientRow
+	if err := db.Find(&existingRows).Error; err != nil {
+		log.Printf("demo sms recipient seed (non-fatal): %v", err)
+		return
+	}
+
+	// A recipient keeps the phone number it was created with. Demo user ids are random,
+	// so cohort ordering changes between boots; re-deriving the phone from the loop index
+	// hands an already-claimed number to a different user and trips the unique index.
+	existingByUserID := make(map[int64]deliverypersistence.DemoSMSRecipientRow, len(existingRows))
+	claimedPhones := make(map[string]struct{}, len(existingRows))
+	for _, row := range existingRows {
+		existingByUserID[row.UserID] = row
+		claimedPhones[row.PhoneE164] = struct{}{}
+	}
+
+	nextSlot := 1
+	allocatePhone := func() string {
+		for {
+			phone := fmt.Sprintf("%s%04d", demoPhonePrefix, nextSlot)
+			nextSlot++
+			if _, taken := claimedPhones[phone]; !taken {
+				claimedPhones[phone] = struct{}{}
+				return phone
+			}
+		}
+	}
+
 	for i := range demoUsers {
 		pseudo := demoUsers[i].PseudonymousID
 		userID := demoUsers[i].UserID
-		updates := map[string]any{
-			"phone_e164":      fmt.Sprintf("+1555000%04d", i+1),
-			"display_name":    fmt.Sprintf("Demo User %02d", i+1),
-			"pseudonymous_id": pseudo,
-			"is_active":       true,
-			"is_mock":         true,
+
+		if existing, ok := existingByUserID[userID]; ok {
+			updates := map[string]any{
+				"pseudonymous_id": pseudo,
+				"is_active":       true,
+				"is_mock":         true,
+			}
+			if existing.DisplayName == "" {
+				updates["display_name"] = demoRecipientDisplayName(existing.PhoneE164)
+			}
+			if err := db.Model(&deliverypersistence.DemoSMSRecipientRow{}).
+				Where("user_id = ?", userID).
+				Updates(updates).Error; err != nil {
+				log.Printf("demo sms recipient update (non-fatal): %v", err)
+			}
+			continue
 		}
 
-		var existing deliverypersistence.DemoSMSRecipientRow
-		err := db.Where("user_id = ?", userID).First(&existing).Error
-		if err == gorm.ErrRecordNotFound {
-			row := deliverypersistence.DemoSMSRecipientRow{
-				UserID:         userID,
-				PhoneE164:      updates["phone_e164"].(string),
-				DisplayName:    updates["display_name"].(string),
-				PseudonymousID: &pseudo,
-				IsActive:       true,
-				IsMock:         true,
-			}
-			if createErr := db.Create(&row).Error; createErr != nil {
-				log.Printf("demo sms recipient seed (non-fatal): %v", createErr)
-			}
-			continue
+		phone := allocatePhone()
+		row := deliverypersistence.DemoSMSRecipientRow{
+			UserID:         userID,
+			PhoneE164:      phone,
+			DisplayName:    demoRecipientDisplayName(phone),
+			PseudonymousID: &pseudo,
+			IsActive:       true,
+			IsMock:         true,
 		}
-		if err != nil {
+		if err := db.Create(&row).Error; err != nil {
 			log.Printf("demo sms recipient seed (non-fatal): %v", err)
-			continue
-		}
-		if err := db.Model(&existing).Updates(updates).Error; err != nil {
-			log.Printf("demo sms recipient update (non-fatal): %v", err)
 		}
 	}
 

@@ -1,0 +1,73 @@
+{
+  "model_version": "1.0.0",
+  "model_type": "binary_spam_detector",
+  "labels": {
+    "0": "ham",
+    "1": "spam"
+  },
+  "input": {
+    "name": "features",
+    "dtype": "float32",
+    "shape": [
+      1,
+      3016
+    ],
+    "description": "Hybrid vector = TF-IDF (from saved vocabulary) + tabular structural/URL features in the order listed under tabular_features."
+  },
+  "output": {
+    "name": "spam_prob",
+    "dtype": "float32",
+    "shape": [
+      1,
+      1
+    ],
+    "description": "Sigmoid spam probability in [0, 1]."
+  },
+  "threshold": 0.5,
+  "tfidf_vocab_size": 3000,
+  "tabular_features": [
+    "text_length",
+    "word_count",
+    "digit_count",
+    "uppercase_count",
+    "has_brand_mention",
+    "has_urgency_word",
+    "has_amharic",
+    "has_url",
+    "url_count",
+    "url_length",
+    "domain_entropy",
+    "is_high_risk_tld",
+    "is_url_shortener",
+    "ip_in_url",
+    "subdomain_count",
+    "has_hyphen_in_domain"
+  ],
+  "recommended_files": {
+    "tflite_float32": "scam_detector_float32.tflite",
+    "tflite_dynamic": "scam_detector_dynamic.tflite",
+    "keras": "scam_detector.keras",
+    "sklearn_teacher": "../artifacts/scam_detector.joblib",
+    "tfidf_vectorizer": "../artifacts/tfidf_vectorizer.joblib",
+    "feature_config": "../artifacts/feature_config.joblib"
+  },
+  "modes": {
+    "message": "Pass SMS body as text; build hybrid features; score.",
+    "url": "Pass URL string (optionally prefixed with http://); build hybrid features; score."
+  },
+  "keras_metrics": {
+    "val_accuracy": 0.9875,
+    "val_roc_auc": 0.9986,
+    "test_accuracy": 0.9875,
+    "test_roc_auc": 0.9915
+  },
+  "tflite_verification": {
+    "samples": 300,
+    "accuracy": 0.9867,
+    "roc_auc": 0.9975
+  },
+  "model_size_kb": {
+    "float32": 3083.8,
+    "dynamic": 777.6
+  }
+}

@@ -86,16 +86,8 @@ func Migrate(db *gorm.DB) error {
 		return fmt.Errorf("pseudonymous identity migration: %w", err)
 	}
 
-	if err := db.Exec(smsDemoDeliverySQL).Error; err != nil {
-		return fmt.Errorf("sms demo delivery migration: %w", err)
-	}
-
 	if err := db.Exec(consentsSMSConsentedSQL).Error; err != nil {
 		return fmt.Errorf("consents sms_consented migration: %w", err)
-	}
-
-	if err := db.Exec(demoSMSRecipientPseudonymousSQL).Error; err != nil {
-		return fmt.Errorf("demo sms recipient pseudonymous migration: %w", err)
 	}
 
 	if err := db.AutoMigrate(
@@ -129,6 +121,17 @@ func Migrate(db *gorm.DB) error {
 		// so GORM does not attempt to rewrite their unique constraints on startup.
 	); err != nil {
 		return err
+	}
+
+	// Runs after AutoMigrate: sms_send_attempts has a foreign key to campaigns(id) and
+	// demo_sms_recipients to users(id), both of which AutoMigrate creates. On a fresh
+	// database these statements fail with 42P01 if they execute earlier.
+	if err := db.Exec(smsDemoDeliverySQL).Error; err != nil {
+		return fmt.Errorf("sms demo delivery migration: %w", err)
+	}
+
+	if err := db.Exec(demoSMSRecipientPseudonymousSQL).Error; err != nil {
+		return fmt.Errorf("demo sms recipient pseudonymous migration: %w", err)
 	}
 
 	alignAdPortalSchema(db)
