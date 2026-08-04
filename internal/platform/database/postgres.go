@@ -55,24 +55,37 @@ func ConnectDB(cfg *configs.Config) (*gorm.DB, error) {
 		cfg.DBPort,
 	)
 
-	db, err := gorm.Open(gormpg.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to open gorm connection: %v", err)
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get underlying sql.DB: %v", err)
-	}
+	const (
+		maxAttempts = 30
+		retryDelay  = 2 * time.Second
+	)
 
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-
-	if err := sqlDB.Ping(); err != nil {
-		return nil, fmt.Errorf("error pinging Postgres: %v", err)
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		db, err := gorm.Open(gormpg.Open(dsn), &gorm.Config{})
+		if err != nil {
+			lastErr = fmt.Errorf("failed to open gorm connection: %v", err)
+		} else {
+			sqlDB, err := db.DB()
+			if err != nil {
+				lastErr = fmt.Errorf("failed to get underlying sql.DB: %v", err)
+			} else {
+				sqlDB.SetMaxIdleConns(10)
+				sqlDB.SetMaxOpenConns(100)
+				if err := sqlDB.Ping(); err != nil {
+					lastErr = fmt.Errorf("error pinging Postgres: %v", err)
+				} else {
+					log.Println("database connected")
+					return db, nil
+				}
+			}
+		}
+		if attempt < maxAttempts {
+			log.Printf("database not ready (attempt %d/%d): %v", attempt, maxAttempts, lastErr)
+			time.Sleep(retryDelay)
+		}
 	}
-
-	log.Println("database connected")
-	return db, nil
+	return nil, fmt.Errorf("failed to connect to postgres after %d attempts: %v", maxAttempts, lastErr)
 }
 
 func Migrate(db *gorm.DB) error {
@@ -160,14 +173,25 @@ func Migrate(db *gorm.DB) error {
 }
 
 // alignPersistenceTimestamps backfills null audit columns before AutoMigrate adds NOT NULL constraints.
+// Skips tables that do not exist yet (fresh volume / first boot).
 func alignPersistenceTimestamps(db *gorm.DB) {
-	stmts := []string{
-		`UPDATE reward_rules SET created_at = NOW() WHERE created_at IS NULL`,
-		`UPDATE rewards SET created_at = NOW() WHERE created_at IS NULL`,
+	for _, table := range []string{"reward_rules", "rewards"} {
+		if !tableExists(db, table) {
+			continue
+		}
+		_ = db.Exec(
+			fmt.Sprintf(`UPDATE %s SET created_at = NOW() WHERE created_at IS NULL`, table),
+		).Error
 	}
-	for _, stmt := range stmts {
-		_ = db.Exec(stmt).Error
-	}
+}
+
+func tableExists(db *gorm.DB, name string) bool {
+	var count int64
+	_ = db.Raw(`
+		SELECT COUNT(*) FROM information_schema.tables
+		WHERE table_schema = 'public' AND table_name = ?
+	`, name).Scan(&count).Error
+	return count > 0
 }
 
 func seedPortalRoles(db *gorm.DB) {
@@ -317,7 +341,10 @@ func applyUsersConsentIdentityMigration(db *gorm.DB) error {
 	}
 
 	// Clear intent rows that referenced legacy uuid user ids before rebuild.
-	_ = db.Exec(`TRUNCATE TABLE intents RESTART IDENTITY CASCADE`).Error
+	// On a brand-new database the intents table does not exist yet — skip quietly.
+	if tableExists(db, "intents") {
+		_ = db.Exec(`TRUNCATE TABLE intents RESTART IDENTITY CASCADE`).Error
+	}
 
 	if err := db.Exec(usersConsentIdentitySQL).Error; err != nil {
 		return err

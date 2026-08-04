@@ -8,6 +8,7 @@ import (
 	"skykin-platform/internal/ad_portal/infrastructure/persistence"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Repository struct {
@@ -16,6 +17,12 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
+}
+
+func (r *Repository) quiet(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).Session(&gorm.Session{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 }
 
 func (r *Repository) GetRoleBySlug(ctx context.Context, slug string) (*domain.Role, error) {
@@ -46,7 +53,7 @@ func (r *Repository) CreatePortalUser(ctx context.Context, u *domain.PortalUser)
 
 func (r *Repository) GetPortalUserByEmail(ctx context.Context, email string) (*domain.PortalUser, error) {
 	var row persistence.PortalUserRow
-	err := r.db.WithContext(ctx).
+	err := r.quiet(ctx).
 		Preload("Role").
 		Preload("Advertiser").
 		Where("email = ?", email).

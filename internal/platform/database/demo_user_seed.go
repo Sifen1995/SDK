@@ -78,8 +78,14 @@ func ensureDemoFashionCohort(db *gorm.DB) {
 
 func ensureDemoUserArtifacts(db *gorm.DB, userID int64, now time.Time, offset int) {
 	var mapping consentpersistence.PseudonymousMappingRow
-	err := db.Where("user_id = ?", userID).First(&mapping).Error
-	if err == gorm.ErrRecordNotFound {
+	var mappingCount int64
+	if err := db.Model(&consentpersistence.PseudonymousMappingRow{}).
+		Where("user_id = ?", userID).
+		Count(&mappingCount).Error; err != nil {
+		log.Printf("demo fashion mapping ensure (non-fatal): user_id=%d err=%v", userID, err)
+		return
+	}
+	if mappingCount == 0 {
 		mapping = consentpersistence.PseudonymousMappingRow{
 			UserID:         userID,
 			PseudonymousID: uuid.New(),
@@ -89,14 +95,20 @@ func ensureDemoUserArtifacts(db *gorm.DB, userID int64, now time.Time, offset in
 			return
 		}
 		log.Printf("demo fashion mapping created: user_id=%d pseudonymous_id=%s", userID, mapping.PseudonymousID)
-	} else if err != nil {
+	} else if err := db.Where("user_id = ?", userID).First(&mapping).Error; err != nil {
 		log.Printf("demo fashion mapping ensure (non-fatal): user_id=%d err=%v", userID, err)
 		return
 	}
 
 	var consent consentpersistence.ConsentRow
-	cerr := db.Where("user_id = ? AND sdk_version = ?", userID, demoSDKVersion).First(&consent).Error
-	if cerr == gorm.ErrRecordNotFound {
+	var consentCount int64
+	if err := db.Model(&consentpersistence.ConsentRow{}).
+		Where("user_id = ? AND sdk_version = ?", userID, demoSDKVersion).
+		Count(&consentCount).Error; err != nil {
+		log.Printf("demo fashion consent ensure (non-fatal): user_id=%d err=%v", userID, err)
+		return
+	}
+	if consentCount == 0 {
 		consent = consentpersistence.ConsentRow{
 			UserID:       userID,
 			ConsentLevel: "individual",
@@ -108,8 +120,9 @@ func ensureDemoUserArtifacts(db *gorm.DB, userID int64, now time.Time, offset in
 		if err := db.Create(&consent).Error; err != nil {
 			log.Printf("demo fashion consent ensure (non-fatal): user_id=%d err=%v", userID, err)
 		}
-	} else if cerr != nil {
-		log.Printf("demo fashion consent ensure (non-fatal): user_id=%d err=%v", userID, cerr)
+	} else if err := db.Where("user_id = ? AND sdk_version = ?", userID, demoSDKVersion).
+		First(&consent).Error; err != nil {
+		log.Printf("demo fashion consent ensure (non-fatal): user_id=%d err=%v", userID, err)
 	} else if !consent.SMSConsented {
 		_ = db.Model(&consent).Update("sms_consented", true).Error
 	}
