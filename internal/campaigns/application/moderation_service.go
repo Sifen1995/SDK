@@ -7,25 +7,36 @@ import (
 	"time"
 
 	adminEvents "skykin-platform/internal/admin/events"
+	billingdomain "skykin-platform/internal/billing/domain"
 	campaigndomain "skykin-platform/internal/campaigns/domain"
 	campaignvalidation "skykin-platform/internal/campaigns/validation"
-	billingdomain "skykin-platform/internal/billing/domain"
 	"skykin-platform/internal/platform/messaging"
 )
 
+// LinkedGeofenceActivator turns on store zones attached to a campaign after admin approve.
+type LinkedGeofenceActivator interface {
+	ActivateForCampaign(ctx context.Context, campaignID string) error
+}
+
 // ModerationService handles operator review, approval, and activation of campaigns.
 type ModerationService struct {
-	repo     campaigndomain.CampaignRepository
-	channels billingdomain.ChannelRepository
-	bus      *messaging.Bus
+	repo      campaigndomain.CampaignRepository
+	channels  billingdomain.ChannelRepository
+	bus       *messaging.Bus
+	geofences LinkedGeofenceActivator
 }
 
 func NewModerationService(
 	repo campaigndomain.CampaignRepository,
 	channels billingdomain.ChannelRepository,
 	bus *messaging.Bus,
+	geofences ...LinkedGeofenceActivator,
 ) *ModerationService {
-	return &ModerationService{repo: repo, channels: channels, bus: bus}
+	svc := &ModerationService{repo: repo, channels: channels, bus: bus}
+	if len(geofences) > 0 {
+		svc.geofences = geofences[0]
+	}
+	return svc
 }
 
 func (s *ModerationService) ListPending(ctx context.Context) ([]campaigndomain.Campaign, error) {
@@ -60,9 +71,12 @@ func (s *ModerationService) Validate(ctx context.Context, campaignID, operatorUs
 		c.ValidationStatus = vr.Status
 		c.ValidationNotes = vr.Notes
 		c.ModerationStatus = campaigndomain.ModerationApproved
+		// One admin approve goes live: campaign + linked geofence stores.
+		c.IsActive = true
 	case "reject":
 		c.ModerationStatus = campaigndomain.ModerationRejected
 		c.ValidationStatus = "failed"
+		c.IsActive = false
 		if notes != "" {
 			c.ValidationNotes = notes
 			c.ModerationNotes = notes
@@ -82,6 +96,12 @@ func (s *ModerationService) Validate(ctx context.Context, campaignID, operatorUs
 		return nil, err
 	}
 
+	if action == "approve" && s.geofences != nil {
+		if err := s.geofences.ActivateForCampaign(ctx, campaignID); err != nil {
+			return nil, fmt.Errorf("activate linked geofence zones: %w", err)
+		}
+	}
+
 	if s.bus != nil {
 		switch action {
 		case "approve":
@@ -92,6 +112,14 @@ func (s *ModerationService) Validate(ctx context.Context, campaignID, operatorUs
 					CampaignID:     campaignID,
 					OperatorUserID: operatorUserID,
 					ChannelCode:    channelCode,
+				},
+			})
+			s.bus.Publish(messaging.Event{
+				Name: adminEvents.TopicCampaignActivated,
+				Ctx:  ctx,
+				Payload: adminEvents.CampaignActivatedEvent{
+					CampaignID:     campaignID,
+					OperatorUserID: operatorUserID,
 				},
 			})
 		case "reject":
@@ -121,25 +149,33 @@ func (s *ModerationService) Activate(ctx context.Context, campaignID, operatorUs
 	if c.ValidationStatus != "passed" {
 		return nil, errors.New("campaign validation_status must be passed")
 	}
-	if c.IsActive {
-		return c, nil
+
+	newlyActivated := false
+	if !c.IsActive {
+		now := time.Now().UTC()
+		c.IsActive = true
+		c.UpdatedAt = now
+		if c.ModeratedBy == nil {
+			c.ModeratedBy = &operatorUserID
+		}
+		if c.ModeratedAt == nil {
+			c.ModeratedAt = &now
+		}
+
+		if err := s.repo.Update(ctx, c); err != nil {
+			return nil, err
+		}
+		newlyActivated = true
 	}
 
-	now := time.Now().UTC()
-	c.IsActive = true
-	c.UpdatedAt = now
-	if c.ModeratedBy == nil {
-		c.ModeratedBy = &operatorUserID
-	}
-	if c.ModeratedAt == nil {
-		c.ModeratedAt = &now
+	// Activate any still-inactive linked stores (e.g. linked after campaign approve).
+	if s.geofences != nil {
+		if err := s.geofences.ActivateForCampaign(ctx, campaignID); err != nil {
+			return nil, fmt.Errorf("activate linked geofence zones: %w", err)
+		}
 	}
 
-	if err := s.repo.Update(ctx, c); err != nil {
-		return nil, err
-	}
-
-	if s.bus != nil {
+	if newlyActivated && s.bus != nil {
 		s.bus.Publish(messaging.Event{
 			Name: adminEvents.TopicCampaignActivated,
 			Ctx:  ctx,

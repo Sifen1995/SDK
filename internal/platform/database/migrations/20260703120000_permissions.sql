@@ -78,7 +78,7 @@ AND   p.name IN (
     'campaigns:create', 'campaigns:read',
     'campaigns:update', 'analytics:read',
     'billing:read', 'segments:read',
-    'segments:purchase');
+    'segments:purchase', 'geofences:manage');
 
 INSERT INTO rbac_role_permissions (role_id, permission_id)
 SELECT r.id, p.id

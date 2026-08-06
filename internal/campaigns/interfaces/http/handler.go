@@ -118,7 +118,7 @@ func (h *Handler) GetCampaign(c *gin.Context) {
 
 // ActivateCampaign godoc
 // @Summary      Activate campaign
-// @Description  Sets is_active=true when validation_status is passed.
+// @Description  Sets is_active=true when moderation_status is approved and validation_status is passed.
 // @Tags         Ad Portal - Campaigns
 // @Security     BearerAuth
 // @Param        id   path  string  true  "Campaign ID"

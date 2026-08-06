@@ -37,7 +37,7 @@ func (h *CampaignHandler) ListPendingCampaigns(c *gin.Context) {
 
 // ValidateCampaign godoc
 // @Summary      Approve or reject a pending campaign
-// @Description  Approve runs creative validation against the campaign channel and sets moderation_status=approved. Reject sets moderation_status=rejected.
+// @Description  Approve runs creative validation, sets moderation_status=approved, validation_status=passed, campaign.is_active=true if not already active, and activates linked inactive geofence_zones. Reject sets moderation_status=rejected.
 // @Tags         Ad Portal - Admin
 // @Accept       json
 // @Produce      json
@@ -64,7 +64,7 @@ func (h *CampaignHandler) ValidateCampaign(c *gin.Context) {
 
 // ActivateCampaign godoc
 // @Summary      Activate an approved campaign (go live)
-// @Description  Sets is_active=true. Campaign must have moderation_status=approved and validation_status=passed.
+// @Description  Sets is_active=true if not already active. Also activates linked inactive geofence zones. Campaign must have moderation_status=approved and validation_status=passed.
 // @Tags         Ad Portal - Admin
 // @Produce      json
 // @Security     BearerAuth

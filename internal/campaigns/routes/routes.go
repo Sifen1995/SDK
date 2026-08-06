@@ -5,8 +5,9 @@ import (
 	billingApp "skykin-platform/internal/billing/application"
 	billingdomain "skykin-platform/internal/billing/domain"
 	campaignApp "skykin-platform/internal/campaigns/application"
-	campaignHTTP "skykin-platform/internal/campaigns/interfaces/http"
 	campaignInfra "skykin-platform/internal/campaigns/infrastructure"
+	campaignHTTP "skykin-platform/internal/campaigns/interfaces/http"
+	geoinfra "skykin-platform/internal/geofencing/infrastructure"
 	permApp "skykin-platform/internal/permissions/application"
 	"skykin-platform/internal/platform/messaging"
 	platformMiddleware "skykin-platform/internal/platform/middleware"
@@ -31,7 +32,12 @@ func Wire(
 ) *Module {
 	repo := campaignInfra.NewRepository(db)
 	svc := campaignApp.NewCampaignService(repo, subEnforcer, audiencePurchases, channels, bus)
-	moderation := campaignApp.NewModerationService(repo, channels, bus)
+	moderation := campaignApp.NewModerationService(
+		repo,
+		channels,
+		bus,
+		geoinfra.NewGeofenceRepository(db),
+	)
 	return &Module{
 		Handler:    campaignHTTP.NewHandler(svc),
 		Moderation: moderation,

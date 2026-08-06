@@ -645,7 +645,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sets is_active=true. Campaign must have moderation_status=approved and validation_status=passed.",
+                "description": "Sets is_active=true if not already active. Also activates linked inactive geofence zones. Campaign must have moderation_status=approved and validation_status=passed.",
                 "produces": [
                     "application/json"
                 ],
@@ -678,6 +678,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/ad-portal/admin/campaigns/{id}/geofences/activate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Operator turns on draft stores attached to the campaign. Already-active zones are left unchanged.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Activate inactive geofence zones linked to a campaign",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.ZoneListResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/ad-portal/admin/campaigns/{id}/validate": {
             "post": {
                 "security": [
@@ -685,7 +719,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Approve runs creative validation against the campaign channel and sets moderation_status=approved. Reject sets moderation_status=rejected.",
+                "description": "Approve runs creative validation, sets moderation_status=approved, validation_status=passed, campaign.is_active=true if not already active, and activates linked inactive geofence_zones. Reject sets moderation_status=rejected.",
                 "consumes": [
                     "application/json"
                 ],
@@ -723,6 +757,71 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/geofences/pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Operator reviews advertiser-created stores that are not yet is_active=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "List inactive geofence zones pending activation",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.ZoneListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/admin/geofences/{id}/activate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Operator approves a draft store. Idempotent when the zone is already active.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Admin"
+                ],
+                "summary": "Activate a geofence zone if not already active",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Zone ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.ZoneDTO"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
@@ -1469,7 +1568,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sets is_active=true when validation_status is passed.",
+                "description": "Sets is_active=true when moderation_status is approved and validation_status is passed.",
                 "tags": [
                     "Ad Portal - Campaigns"
                 ],
@@ -1489,6 +1588,82 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_campaigns_domain.Campaign"
                         }
+                    }
+                }
+            }
+        },
+        "/ad-portal/campaigns/{id}/geofences": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Geofences"
+                ],
+                "summary": "List zones linked to a campaign",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_geofencing_interface_http.ZoneDTO"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Geofences"
+                ],
+                "summary": "Link campaign to geofence zones",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Campaign ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Zone IDs",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.LinkCampaignZonesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
                     }
                 }
             }
@@ -1546,6 +1721,76 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/internal_billing_interfaces_http.ChannelListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ad-portal/geofences": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Geofences"
+                ],
+                "summary": "List advertiser geofence zones",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_geofencing_interface_http.ZoneDTO"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Advertiser creates a store geofence. Zone is saved with is_active=false until an operator approves a campaign linked to it.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ad Portal - Geofences"
+                ],
+                "summary": "Create geofence zone (store)",
+                "parameters": [
+                    {
+                        "description": "Zone",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.CreateZoneRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.ZoneDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
                         }
                     }
                 }
@@ -1852,6 +2097,145 @@ const docTemplate = `{
                         "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/geofence/event": {
+            "post": {
+                "security": [
+                    {
+                        "APIKeyAuth": [],
+                        "SDKSecretAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Geofences"
+                ],
+                "summary": "Record geofence enter event and return ad creative",
+                "parameters": [
+                    {
+                        "description": "Enter event",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.GeofenceEventRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.GeofenceEventResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/geofences/location-consent": {
+            "patch": {
+                "security": [
+                    {
+                        "APIKeyAuth": [],
+                        "SDKSecretAuth": []
+                    }
+                ],
+                "description": "Updates location_ad_consent on demo_sms_recipients only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Geofences"
+                ],
+                "summary": "Set demo location ad consent",
+                "parameters": [
+                    {
+                        "description": "Consent",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.LocationConsentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.LocationConsentResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/skykin-platform_internal_platform_http.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/geofences/sync": {
+            "get": {
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
+                "description": "Returns active zones within radius_m (default 20000) using PostGIS ST_DWithin.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SDK - Geofences"
+                ],
+                "summary": "Sync nearby geofence zones",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "Latitude",
+                        "name": "lat",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "number",
+                        "description": "Longitude",
+                        "name": "lng",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20000,
+                        "description": "Search radius metres",
+                        "name": "radius_m",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_geofencing_interface_http.SyncResponse"
                         }
                     }
                 }
@@ -3657,6 +4041,180 @@ const docTemplate = `{
                 "url_domain": {
                     "type": "string",
                     "example": "https://telebirr-verify.example/login"
+                }
+            }
+        },
+        "internal_geofencing_interface_http.CreateZoneRequest": {
+            "type": "object",
+            "required": [
+                "latitude",
+                "longitude"
+            ],
+            "properties": {
+                "latitude": {
+                    "type": "number",
+                    "example": 9.022736
+                },
+                "longitude": {
+                    "type": "number",
+                    "example": 38.746799
+                },
+                "radius_metres": {
+                    "type": "integer",
+                    "example": 150
+                }
+            }
+        },
+        "internal_geofencing_interface_http.GeofenceEventRequest": {
+            "type": "object",
+            "required": [
+                "pseudonymous_id",
+                "zone_id"
+            ],
+            "properties": {
+                "accuracy_m": {
+                    "type": "number"
+                },
+                "pseudonymous_id": {
+                    "type": "string"
+                },
+                "zone_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_geofencing_interface_http.GeofenceEventResponse": {
+            "type": "object",
+            "properties": {
+                "ad_content": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "campaign_id": {
+                    "type": "string"
+                },
+                "campaign_name": {
+                    "type": "string"
+                },
+                "channel_code": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "accepted"
+                },
+                "visit_id": {
+                    "type": "string"
+                },
+                "visited_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_geofencing_interface_http.LinkCampaignZonesRequest": {
+            "type": "object",
+            "required": [
+                "zone_ids"
+            ],
+            "properties": {
+                "zone_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "internal_geofencing_interface_http.LocationConsentRequest": {
+            "type": "object",
+            "required": [
+                "pseudonymous_id"
+            ],
+            "properties": {
+                "location_ad_consent": {
+                    "type": "boolean"
+                },
+                "pseudonymous_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_geofencing_interface_http.LocationConsentResponse": {
+            "type": "object",
+            "properties": {
+                "location_ad_consent": {
+                    "type": "boolean"
+                },
+                "pseudonymous_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "success"
+                }
+            }
+        },
+        "internal_geofencing_interface_http.SyncResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "success"
+                },
+                "zones": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_geofencing_interface_http.ZoneDTO"
+                    }
+                }
+            }
+        },
+        "internal_geofencing_interface_http.ZoneDTO": {
+            "type": "object",
+            "properties": {
+                "advertiser_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "8ae89c1c-bfd8-40d2-9b78-50f5c46c413f"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "latitude": {
+                    "type": "number",
+                    "example": 9.022736
+                },
+                "longitude": {
+                    "type": "number",
+                    "example": 38.746799
+                },
+                "radius_metres": {
+                    "type": "integer",
+                    "example": 150
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_geofencing_interface_http.ZoneListResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "zones": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_geofencing_interface_http.ZoneDTO"
+                    }
                 }
             }
         },

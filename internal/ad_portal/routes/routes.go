@@ -3,6 +3,7 @@ package routes
 import (
 	"log/slog"
 
+	"skykin-platform/configs"
 	advertiserApp "skykin-platform/internal/ad_portal/application"
 	advertiserInfra "skykin-platform/internal/ad_portal/infrastructure"
 	adportalHTTP "skykin-platform/internal/ad_portal/interfaces/http"
@@ -12,9 +13,9 @@ import (
 	audienceRoutes "skykin-platform/internal/audience/routes"
 	billingRoutes "skykin-platform/internal/billing/routes"
 	campaignRoutes "skykin-platform/internal/campaigns/routes"
+	geoHTTP "skykin-platform/internal/geofencing/interface/http"
 	permApp "skykin-platform/internal/permissions/application"
 	permHTTP "skykin-platform/internal/permissions/interfaces/http"
-	"skykin-platform/configs"
 	"skykin-platform/internal/platform/bootstrap"
 	"skykin-platform/internal/platform/messaging"
 	platformMiddleware "skykin-platform/internal/platform/middleware"
@@ -45,6 +46,7 @@ func Register(
 	audienceMod.AttachCandidates(audienceApp.NewListSegmentCandidatesUseCase(jobs.CandidateRepo))
 
 	campaignMod := campaignRoutes.Wire(db, billingMod.SubEnforcer, audienceMod.Purchases, billingMod.ChannelRepo, bus)
+	geofenceHandler := bootstrap.NewGeofencingSystem(db, cfg, slog.Default())
 	adminMod := adminRoutes.Wire(
 		db, cfg,
 		jobs,
@@ -71,6 +73,7 @@ func Register(
 				billingMod.RegisterRead(read)
 				audienceMod.RegisterRead(read)
 				campaignMod.RegisterRead(read, checker)
+				geoHTTP.RegisterPortalRead(read, geofenceHandler, checker)
 			}
 
 			write := protected.Group("/")
@@ -78,6 +81,7 @@ func Register(
 			{
 				billingMod.RegisterWrite(write)
 				campaignMod.RegisterWrite(write, checker)
+				geoHTTP.RegisterPortalWrite(write, geofenceHandler, checker)
 			}
 
 			admin := protected.Group("/admin")
@@ -86,6 +90,7 @@ func Register(
 				adminMod.Register(admin, authHandler)
 				analyticsMod.RegisterAdmin(admin, checker)
 				audienceMod.RegisterAdmin(admin)
+				geoHTTP.RegisterAdmin(admin, geofenceHandler)
 				permHTTP.RegisterRoutes(admin, permHandler)
 			}
 		}

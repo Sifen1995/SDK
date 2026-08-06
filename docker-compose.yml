@@ -1,7 +1,7 @@
 services:
-  # 1. PostgreSQL Database
+  # 1. PostgreSQL + PostGIS
   db:
-    image: postgres:15-alpine
+    image: postgis/postgis:15-3.4
     container_name: skykin_db
     environment:
       POSTGRES_USER: ${DB_USER:-skykin_user}
@@ -12,24 +12,28 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-skykin_user} -d ${DB_NAME:-skykin_db}"]
-      interval: 2s
+      # Wait until Postgres accepts connections AND PostGIS is installed in the app DB.
+      # Fresh PostGIS images still load extensions after the first pg_isready succeeds.
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} && psql -U $${POSTGRES_USER} -d $${POSTGRES_DB} -tAc \"SELECT 1 FROM pg_extension WHERE extname='postgis'\" | grep -q 1",
+        ]
+      interval: 3s
       timeout: 5s
-      retries: 30
-      start_period: 5s
+      retries: 40
+      start_period: 45s
 
-  # 2. pgAdmin for Database Management
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: skykin_pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@skykin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+  # 2. Adminer (lightweight DB UI) — host 8082 avoids leftover pgAdmin on 5055
+  adminer:
+    image: adminer:4
+    container_name: skykin_adminer
     ports:
-      - "5055:80"
+      - "8082:8080"
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
 
   # 3. Gin Backend (Go)
   backend:

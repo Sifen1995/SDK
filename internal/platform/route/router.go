@@ -9,6 +9,7 @@ import (
 	consentHTTP "skykin-platform/internal/consent/interfaces/http"
 	deliveryHTTP "skykin-platform/internal/delivery/http"
 	fraudHTTP "skykin-platform/internal/fraud/interfaces/http"
+	geoHTTP "skykin-platform/internal/geofencing/interface/http"
 	intentHTTP "skykin-platform/internal/intents/interfaces/http"
 	permApp "skykin-platform/internal/permissions/application"
 	permHTTP "skykin-platform/internal/permissions/interfaces/http"
@@ -41,6 +42,7 @@ func InitRouter(
 	deliverySDK := bootstrap.NewDeliverySDKSystem(db, cfg, slog.Default())
 	intentHandler := bootstrap.NewIntentSystem(db, cfg, slog.Default(), deliverySDK.SMSDispatch)
 	fraudHandler := bootstrap.NewFraudSystem(db, cfg, slog.Default())
+	geofenceHandler := bootstrap.NewGeofencingSystem(db, cfg, slog.Default())
 	bootstrap.RegisterDeliveryEventConsumers(bus, deliverySDK.SMSDispatch, slog.Default())
 
 	// Stream write-behind: billing owns billing_events, delivery owns campaign_delivery_logs.
@@ -56,6 +58,7 @@ func InitRouter(
 		consentHTTP.RegisterRoutes(sdkGroup, consentHandler)
 		intentHTTP.RegisterRoutes(sdkGroup, intentHandler)
 		fraudHTTP.RegisterRoutes(sdkGroup, fraudHandler)
+		geoHTTP.RegisterSDK(sdkGroup, geofenceHandler)
 		deliveryHTTP.RegisterSDKRoutes(sdkGroup, deliverySDK.Campaigns, deliverySDK.Telemetry, deliverySDK.CPC, deliverySDK.SMSDebug)
 	}
 

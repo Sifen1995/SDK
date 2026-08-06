@@ -45,6 +45,9 @@ var demoSMSRecipientPseudonymousSQL string
 //go:embed migrations/fraud.sql
 var fraudSQL string
 
+//go:embed migrations/geofencing.sql
+var geofencingSQL string
+
 func ConnectDB(cfg *configs.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
@@ -153,6 +156,12 @@ func Migrate(db *gorm.DB) error {
 	if err := db.Exec(demoSMSRecipientPseudonymousSQL).Error; err != nil {
 		return fmt.Errorf("demo sms recipient pseudonymous migration: %w", err)
 	}
+
+	// After campaigns + demo_sms_recipients exist (FKs / ALTER COLUMN).
+	if err := db.Exec(geofencingSQL).Error; err != nil {
+		return fmt.Errorf("geofencing migration: %w", err)
+	}
+	ensureGeofenceAdvertiserPermission(db)
 
 	alignAdPortalSchema(db)
 	if err := alignSegmentClassificationSchema(db); err != nil {
@@ -394,4 +403,27 @@ func ensureConsentTables(db *gorm.DB) error {
 	}
 	log.Println("consent tables ensured")
 	return nil
+}
+
+// ensureGeofenceAdvertiserPermission assigns geofences:manage to advertiser when RBAC already exists.
+func ensureGeofenceAdvertiserPermission(db *gorm.DB) {
+	if !tableExists(db, "rbac_permissions") || !tableExists(db, "rbac_role_permissions") {
+		return
+	}
+	_ = db.Exec(`
+		INSERT INTO rbac_permissions (name, resource, action, description)
+		SELECT 'geofences:manage', 'geofences', 'manage', 'Create and manage geofence zones'
+		WHERE NOT EXISTS (SELECT 1 FROM rbac_permissions WHERE name = 'geofences:manage')
+	`).Error
+	_ = db.Exec(`
+		INSERT INTO rbac_role_permissions (role_id, permission_id)
+		SELECT r.id, p.id
+		FROM rbac_roles r
+		CROSS JOIN rbac_permissions p
+		WHERE r.name = 'advertiser' AND p.name = 'geofences:manage'
+		  AND NOT EXISTS (
+			SELECT 1 FROM rbac_role_permissions rp
+			WHERE rp.role_id = r.id AND rp.permission_id = p.id
+		  )
+	`).Error
 }

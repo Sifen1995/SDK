@@ -1,4 +1,3 @@
 package persistance
 
-// StoreVisitRow is a placeholder until the geofencing module is implemented.
-type StoreVisitRow struct{}
+// StoreVisitRow lives in geofence_zone_row.go alongside other geofencing rows.

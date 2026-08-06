@@ -184,9 +184,10 @@ func seedDemoSMSRecipients(db *gorm.DB) {
 
 		if existing, ok := existingByUserID[userID]; ok {
 			updates := map[string]any{
-				"pseudonymous_id": pseudo,
-				"is_active":       true,
-				"is_mock":         true,
+				"pseudonymous_id":     pseudo,
+				"is_active":           true,
+				"is_mock":             true,
+				"location_ad_consent": true,
 			}
 			if existing.DisplayName == "" {
 				updates["display_name"] = demoRecipientDisplayName(existing.PhoneE164)
@@ -201,12 +202,13 @@ func seedDemoSMSRecipients(db *gorm.DB) {
 
 		phone := allocatePhone()
 		row := deliverypersistence.DemoSMSRecipientRow{
-			UserID:         userID,
-			PhoneE164:      phone,
-			DisplayName:    demoRecipientDisplayName(phone),
-			PseudonymousID: &pseudo,
-			IsActive:       true,
-			IsMock:         true,
+			UserID:            userID,
+			PhoneE164:         phone,
+			DisplayName:       demoRecipientDisplayName(phone),
+			PseudonymousID:    &pseudo,
+			IsActive:          true,
+			IsMock:            true,
+			LocationAdConsent: true,
 		}
 		if err := db.Create(&row).Error; err != nil {
 			log.Printf("demo sms recipient seed (non-fatal): %v", err)

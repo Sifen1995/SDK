@@ -105,9 +105,10 @@ func (s *CampaignService) Create(ctx context.Context, advertiserID, role string,
 		ModerationStatus:   campaigndomain.ModerationPending,
 	}
 
-	// 4. Creative validation by channel code.
+	// 4. Creative pre-check for advertiser feedback. Final validation_status stays
+	// pending until an operator approves (and activates) the campaign.
 	vr := campaignvalidation.Campaign(c, channel.Code)
-	c.ValidationStatus = vr.Status
+	c.ValidationStatus = "pending"
 	c.ValidationNotes = vr.Notes
 
 	// 5. Persist the campaign and its segment entitlement together. A campaign that
@@ -157,8 +158,14 @@ func (s *CampaignService) Activate(ctx context.Context, advertiserID, role, id s
 	if err != nil {
 		return nil, err
 	}
+	if c.ModerationStatus != campaigndomain.ModerationApproved {
+		return nil, errors.New("campaign must be approved by an operator before activation")
+	}
 	if c.ValidationStatus != "passed" {
 		return nil, errors.New("campaign cannot be activated until validation_status is passed")
+	}
+	if c.IsActive {
+		return c, nil
 	}
 	c.IsActive = true
 	c.UpdatedAt = time.Now().UTC()
