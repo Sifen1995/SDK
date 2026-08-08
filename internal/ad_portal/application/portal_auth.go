@@ -82,26 +82,38 @@ func (s *AuthService) Me(ctx context.Context, portalUserID string) (*domain.Port
 
 func UserResponse(u *domain.PortalUser) map[string]any {
 	resp := map[string]any{
-		"id":            u.ID,
-		"email":         u.Email,
-		"name":          u.Name,
-		"role":          u.RoleSlug(),
-		"role_id":       u.RoleID,
-		"advertiser_id": u.AccountAdvertiserID(),
-		"is_active":     u.IsActive,
+		"id":        u.ID,
+		"email":     u.Email,
+		"name":      u.Name,
+		"role":      u.RoleSlug(),
+		"role_id":   u.RoleID,
+		"is_active": u.IsActive,
 	}
-	if u.Advertiser != nil {
-		resp["company_name"] = u.Advertiser.CompanyName
+	switch u.RoleSlug() {
+	case domain.RoleAdvertiser:
+		if id := u.AccountAdvertiserID(); id != "" {
+			resp["advertiser_id"] = id
+		}
+		if u.Advertiser != nil {
+			resp["company_name"] = u.Advertiser.CompanyName
+		}
+	case domain.RoleReadOnlyAnalyst:
+		if id := u.AccountAnalystID(); id != "" {
+			resp["analyst_id"] = id
+		}
 	}
 	return resp
 }
 
 func (s *AuthService) CreateOperatorUser(ctx context.Context, name, email, password, roleSlug, company string) (*domain.PortalUser, error) {
-	if roleSlug != domain.RoleAdvertiser && roleSlug != domain.RoleReadOnlyAnalyst && roleSlug != domain.RoleOperatorAdmin {
+	switch roleSlug {
+	case domain.RoleOperatorAdmin:
+		return s.createOperatorAdminUser(ctx, name, email, password, roleSlug)
+	case domain.RoleAdvertiser:
+		return s.createAdvertiserUser(ctx, name, email, password, company, roleSlug)
+	case domain.RoleReadOnlyAnalyst:
+		return s.createAnalystUser(ctx, name, email, password, roleSlug)
+	default:
 		return nil, fmt.Errorf("invalid role")
 	}
-	if roleSlug == domain.RoleOperatorAdmin {
-		return s.createOperatorAdminUser(ctx, name, email, password, roleSlug)
-	}
-	return s.createPortalUser(ctx, name, email, password, company, roleSlug)
 }

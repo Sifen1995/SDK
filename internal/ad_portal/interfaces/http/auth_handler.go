@@ -99,12 +99,13 @@ func (h *AuthHandler) Me(c *gin.Context) {
 
 // CreateUser godoc
 // @Summary      Create portal user (operator admin)
+// @Description  Creates operator_admin (no profile FKs), advertiser (company_name → advertisers.company_name + advertiser_id), or read_only_analyst (analysts row + analyst_id; advertiser_id stays null).
 // @Tags         Ad Portal - Admin
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
 // @Param        body  body      CreateUserRequest  true  "User"
-// @Success      201   {object}  MeResponse
+// @Success      201   {object}  CreateUserResponse
 // @Failure      403   {object}  platformHTTP.APIError
 // @Router       /ad-portal/admin/users [post]
 func (h *AuthHandler) CreateUser(c *gin.Context) {

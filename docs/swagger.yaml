@@ -17,6 +17,7 @@ definitions:
   internal_ad_portal_interfaces_http.CreateUserRequest:
     properties:
       company_name:
+        description: required only when role=advertiser (stored on advertisers.company_name)
         type: string
       email:
         type: string
@@ -36,6 +37,11 @@ definitions:
     - name
     - password
     - role
+    type: object
+  internal_ad_portal_interfaces_http.CreateUserResponse:
+    properties:
+      user:
+        $ref: '#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO'
     type: object
   internal_ad_portal_interfaces_http.LoginRequest:
     properties:
@@ -64,28 +70,31 @@ definitions:
   internal_ad_portal_interfaces_http.PortalUserDTO:
     properties:
       advertiser_id:
-        example: 770e8400-e29b-41d4-a716-446655440002
+        example: ""
+        type: string
+      analyst_id:
+        example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
         type: string
       company_name:
-        example: Acme Inc
+        example: ""
         type: string
       email:
-        example: advertiser@test.com
+        example: analyst@example.com
         type: string
       id:
-        example: 550e8400-e29b-41d4-a716-446655440000
+        example: 767b4966-d46b-4b11-ac84-cff55d4ab780
         type: string
       is_active:
         example: true
         type: boolean
       name:
-        example: Jane Doe
+        example: Sam Analyst
         type: string
       role:
-        example: advertiser
+        example: read_only_analyst
         type: string
       role_id:
-        example: 660e8400-e29b-41d4-a716-446655440001
+        example: 14dd2ce5-b97b-4443-868d-1d58add26423
         type: string
     type: object
   internal_ad_portal_interfaces_http.RegisterRequest:
@@ -110,13 +119,13 @@ definitions:
         example: "2026-06-01T12:00:00Z"
         type: string
       email:
-        example: advertiser@test.com
+        example: ops@kaldi.test
         type: string
       id:
         example: 550e8400-e29b-41d4-a716-446655440000
         type: string
       name:
-        example: Jane Doe
+        example: Kaldi Ops
         type: string
       role:
         example: advertiser
@@ -2390,6 +2399,9 @@ paths:
     post:
       consumes:
       - application/json
+      description: Creates operator_admin (no profile FKs), advertiser (company_name
+        → advertisers.company_name + advertiser_id), or read_only_analyst (analysts
+        row + analyst_id; advertiser_id stays null).
       parameters:
       - description: User
         in: body
@@ -2403,7 +2415,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_ad_portal_interfaces_http.MeResponse'
+            $ref: '#/definitions/internal_ad_portal_interfaces_http.CreateUserResponse'
         "403":
           description: Forbidden
           schema:

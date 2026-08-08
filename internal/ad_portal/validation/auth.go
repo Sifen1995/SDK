@@ -44,7 +44,7 @@ func CreateUser(name, email, password, role, company string) (string, error) {
 	default:
 		return "", errors.New("invalid role")
 	}
-	if role != "operator_admin" && strings.TrimSpace(company) == "" {
+	if role == "advertiser" && strings.TrimSpace(company) == "" {
 		return "", errors.New("company_name is required")
 	}
 	return normalizedEmail, nil

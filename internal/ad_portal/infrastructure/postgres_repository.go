@@ -56,6 +56,7 @@ func (r *Repository) GetPortalUserByEmail(ctx context.Context, email string) (*d
 	err := r.quiet(ctx).
 		Preload("Role").
 		Preload("Advertiser").
+		Preload("Analyst").
 		Where("email = ?", email).
 		First(&row).Error
 	if err != nil {
@@ -69,6 +70,7 @@ func (r *Repository) GetPortalUserByID(ctx context.Context, id string) (*domain.
 	err := r.db.WithContext(ctx).
 		Preload("Role").
 		Preload("Advertiser").
+		Preload("Analyst").
 		Where("id = ?", id).
 		First(&row).Error
 	if err != nil {
@@ -108,12 +110,32 @@ func (r *Repository) CreateAdvertiserAndPortalUser(ctx context.Context, adv *dom
 		}
 
 		u.AdvertiserID = &advRow.ID
+		u.AnalystID = nil
 		userRow := persistence.PortalUserRowFromDomain(u)
 		if err := tx.Create(userRow).Error; err != nil {
 			return err
 		}
 		*u = *userRow.ToDomain()
 		*adv = *advRow.ToDomain()
+		return nil
+	})
+}
+
+// CreateAnalystAndPortalUser inserts an analysts profile and links the portal user via analyst_id.
+func (r *Repository) CreateAnalystAndPortalUser(ctx context.Context, analyst *domain.Analyst, u *domain.PortalUser) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		anRow := persistence.AnalystRowFromDomain(analyst)
+		if err := tx.Create(anRow).Error; err != nil {
+			return err
+		}
+		u.AnalystID = &anRow.ID
+		u.AdvertiserID = nil
+		userRow := persistence.PortalUserRowFromDomain(u)
+		if err := tx.Create(userRow).Error; err != nil {
+			return err
+		}
+		*u = *userRow.ToDomain()
+		*analyst = *anRow.ToDomain()
 		return nil
 	})
 }

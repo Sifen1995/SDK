@@ -37,8 +37,18 @@ func AdPortalAuthMiddleware(cfg *configs.Config, auth *application.AuthService) 
 			return
 		}
 		c.Set("portal_user_id", claims.UserID)
-		c.Set("advertiser_id", u.AccountAdvertiserID())
 		c.Set("portal_role", claims.Role)
+		// Company scope only for advertisers — analysts/admins must not inherit advertiser_id.
+		if claims.Role == domain.RoleAdvertiser {
+			c.Set("advertiser_id", u.AccountAdvertiserID())
+		} else {
+			c.Set("advertiser_id", "")
+		}
+		if claims.Role == domain.RoleReadOnlyAnalyst {
+			c.Set("analyst_id", u.AccountAnalystID())
+		} else {
+			c.Set("analyst_id", "")
+		}
 		c.Next()
 	}
 }
@@ -85,8 +95,16 @@ func RequirePortalRead() gin.HandlerFunc {
 }
 
 // AccountAdvertiserID returns the company scope for campaign APIs (loaded from DB in auth middleware).
+// Empty for operator_admin and read_only_analyst.
 func AccountAdvertiserID(c *gin.Context) string {
 	id, _ := c.Get("advertiser_id")
+	s, _ := id.(string)
+	return s
+}
+
+// AccountAnalystID returns the analyst profile id when the session is a read_only_analyst.
+func AccountAnalystID(c *gin.Context) string {
+	id, _ := c.Get("analyst_id")
 	s, _ := id.(string)
 	return s
 }

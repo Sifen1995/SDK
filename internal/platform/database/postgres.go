@@ -48,6 +48,9 @@ var fraudSQL string
 //go:embed migrations/geofencing.sql
 var geofencingSQL string
 
+//go:embed migrations/20260808120000_analysts.sql
+var analystsSQL string
+
 func ConnectDB(cfg *configs.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
@@ -125,6 +128,7 @@ func Migrate(db *gorm.DB) error {
 		&authpersistence.APIKeyRow{},
 		&adportalpersistence.RoleRow{},
 		&adportalpersistence.AdvertiserRow{},
+		&adportalpersistence.AnalystRow{},
 		&adportalpersistence.PortalUserRow{},
 		&campaignpersistence.CampaignRow{},
 		&deliverypersistence.DeliveryJobRow{},
@@ -162,6 +166,10 @@ func Migrate(db *gorm.DB) error {
 		return fmt.Errorf("geofencing migration: %w", err)
 	}
 	ensureGeofenceAdvertiserPermission(db)
+
+	if err := db.Exec(analystsSQL).Error; err != nil {
+		return fmt.Errorf("analysts migration: %w", err)
+	}
 
 	alignAdPortalSchema(db)
 	if err := alignSegmentClassificationSchema(db); err != nil {

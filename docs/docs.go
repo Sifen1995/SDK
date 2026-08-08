@@ -1341,6 +1341,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Creates operator_admin (no profile FKs), advertiser (company_name → advertisers.company_name + advertiser_id), or read_only_analyst (analysts row + analyst_id; advertiser_id stays null).",
                 "consumes": [
                     "application/json"
                 ],
@@ -1366,7 +1367,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.MeResponse"
+                            "$ref": "#/definitions/internal_ad_portal_interfaces_http.CreateUserResponse"
                         }
                     },
                     "403": {
@@ -3018,6 +3019,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "company_name": {
+                    "description": "required only when role=advertiser (stored on advertisers.company_name)",
                     "type": "string"
                 },
                 "email": {
@@ -3037,6 +3039,14 @@ const docTemplate = `{
                         "read_only_analyst",
                         "operator_admin"
                     ]
+                }
+            }
+        },
+        "internal_ad_portal_interfaces_http.CreateUserResponse": {
+            "type": "object",
+            "properties": {
+                "user": {
+                    "$ref": "#/definitions/internal_ad_portal_interfaces_http.PortalUserDTO"
                 }
             }
         },
@@ -3081,19 +3091,23 @@ const docTemplate = `{
             "properties": {
                 "advertiser_id": {
                     "type": "string",
-                    "example": "770e8400-e29b-41d4-a716-446655440002"
+                    "example": ""
+                },
+                "analyst_id": {
+                    "type": "string",
+                    "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                 },
                 "company_name": {
                     "type": "string",
-                    "example": "Acme Inc"
+                    "example": ""
                 },
                 "email": {
                     "type": "string",
-                    "example": "advertiser@test.com"
+                    "example": "analyst@example.com"
                 },
                 "id": {
                     "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                    "example": "767b4966-d46b-4b11-ac84-cff55d4ab780"
                 },
                 "is_active": {
                     "type": "boolean",
@@ -3101,15 +3115,15 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string",
-                    "example": "Jane Doe"
+                    "example": "Sam Analyst"
                 },
                 "role": {
                     "type": "string",
-                    "example": "advertiser"
+                    "example": "read_only_analyst"
                 },
                 "role_id": {
                     "type": "string",
-                    "example": "660e8400-e29b-41d4-a716-446655440001"
+                    "example": "14dd2ce5-b97b-4443-868d-1d58add26423"
                 }
             }
         },
@@ -3144,7 +3158,7 @@ const docTemplate = `{
                 },
                 "email": {
                     "type": "string",
-                    "example": "advertiser@test.com"
+                    "example": "ops@kaldi.test"
                 },
                 "id": {
                     "type": "string",
@@ -3152,7 +3166,7 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string",
-                    "example": "Jane Doe"
+                    "example": "Kaldi Ops"
                 },
                 "role": {
                     "type": "string",
