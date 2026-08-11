@@ -4,6 +4,8 @@ Open Swagger UI: **http://localhost:8081/swagger/index.html**
 
 Backend must be running (`docker compose up`). Adminer (optional): **http://localhost:8082**.
 
+Flutter / emulator implementation and Location-dashboard testing: [`GEOFENCING_FLUTTER_FRONTEND_GUIDE.md`](./GEOFENCING_FLUTTER_FRONTEND_GUIDE.md).
+
 ## Roles (important)
 
 | Role | Who | What they do for geofencing |
@@ -231,7 +233,12 @@ Adminer → `demo_sms_recipients`, or `POST /consent` with `"sms_consented": tru
 }
 ```
 
-Expect **202** with `ad_content` when consent + approved campaign + freq cap allow it.
+Always records a `store_visits` row when consent is granted. An ad is returned (**202** with `ad_content`) when **either**:
+
+1. **Intent + zone:** the same `pseudonymous_id` has a current intent (Redis `user_intent:` or latest DB intent) **and** a live campaign linked to this zone has matching `target_intent`, or  
+2. **Returning visitor:** the user already has **prior** `store_visits` (any zone, excluding this enter) — then any live zone-linked campaign is eligible (subject to budget / frequency cap / plan ranking).
+
+SDK should still send intents when available so the intent path can win. **202 without `ad_content`** is normal for a first-ever store visit with no matching intent.
 
 ---
 

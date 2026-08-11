@@ -48,11 +48,15 @@ type ZoneRepository interface {
 type TargetRepository interface {
 	Link(ctx context.Context, campaignID string, zoneIDs []string) error
 	ListZonesForCampaign(ctx context.Context, campaignID string) ([]GeofenceZone, error)
-	ListEligibleCampaignsForZone(ctx context.Context, zoneID string) ([]campaigndomain.Campaign, error)
+	// ListEligibleCampaignsForZone returns live zone campaigns. When targetIntent is non-empty,
+	// only campaigns with matching target_intent are returned.
+	ListEligibleCampaignsForZone(ctx context.Context, zoneID, targetIntent string) ([]campaigndomain.Campaign, error)
 }
 
 type VisitRepository interface {
 	Create(ctx context.Context, visit *StoreVisit) error
+	// CountByUserExcluding counts store_visits for the user excluding one visit id (any zone).
+	CountByUserExcluding(ctx context.Context, pseudonymousID, excludeVisitID string) (int64, error)
 }
 
 type LocationConsentRepository interface {
