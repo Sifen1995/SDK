@@ -34,6 +34,24 @@ export interface SegmentCandidate {
   scanned_at: string;
 }
 
+/** A store geofence zone created by an advertiser. */
+export interface GeofenceZone {
+  id: string;
+  advertiser_id?: string;
+  latitude: number;
+  longitude: number;
+  radius_metres: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** GET /ad-portal/admin/geofences/pending wraps its array. */
+export interface ZoneListResponse {
+  zones: GeofenceZone[];
+  count: number;
+}
+
 export interface BillingRate {
   id: string;
   plan_id: string;
@@ -74,7 +92,6 @@ export interface Campaign {
   moderationNotes: string;
   channelId: string;
   channelCode: string;
-  billingModel: string;
   createdAt: string;
   updatedAt: string;
 }

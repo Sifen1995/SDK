@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"strings"
 
 	"skykin-platform/internal/consent/domain"
 	"skykin-platform/internal/consent/infrastructure/persistence"
@@ -77,20 +78,28 @@ func (r *PseudonymousMappingRepository) FindPseudonymousIDsByUserIDs(
 // FindOneDemoPseudonymousID picks a random active demo SMS recipient's mapping.
 // Only users in demo_sms_recipients are returned so ingest-ad can mock-dispatch.
 func (r *PseudonymousMappingRepository) FindOneDemoPseudonymousID(ctx context.Context) (string, error) {
-	var id uuid.UUID
-	err := r.db.WithContext(ctx).
+	// Scan into string, not uuid.UUID. uuid.UUID is [16]byte, and GORM dispatches
+	// on the destination's concrete type: an array kind is treated as a 16-element
+	// uint8 result set rather than going through uuid's sql.Scanner, so the UUID
+	// text is converted into a uint8 and every call fails.
+	var raw string
+	tx := r.db.WithContext(ctx).
 		Table("demo_sms_recipients AS rec").
-		Select("COALESCE(rec.pseudonymous_id, pm.pseudonymous_id)").
+		Select("COALESCE(rec.pseudonymous_id, pm.pseudonymous_id) AS pseudonymous_id").
 		Joins("INNER JOIN pseudonymous_mappings pm ON pm.user_id = rec.user_id").
 		Where("rec.is_active = TRUE").
 		Order("RANDOM()").
 		Limit(1).
-		Scan(&id).Error
+		Scan(&raw)
+	if tx.Error != nil {
+		return "", tx.Error
+	}
+	if tx.RowsAffected == 0 || strings.TrimSpace(raw) == "" {
+		return "", gorm.ErrRecordNotFound
+	}
+	id, err := uuid.Parse(strings.TrimSpace(raw))
 	if err != nil {
 		return "", err
-	}
-	if id == uuid.Nil {
-		return "", gorm.ErrRecordNotFound
 	}
 	return id.String(), nil
 }

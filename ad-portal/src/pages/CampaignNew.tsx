@@ -7,10 +7,11 @@ import {
 } from '@skykin/ui';
 import { ArrowLeft, Check, Lock } from 'lucide-react';
 import { useSubscription } from '../context/SubscriptionContext';
-import { useChannels, useSegments, useCreateCampaign } from '../lib/queries';
+import { useChannels, useSegments, useCreateCampaign, useZones, useLinkCampaignZones } from '../lib/queries';
 import { formatEtb } from '../lib/campaignUtils';
 import { googleDriveToDirectImageUrl } from '../lib/googleDrive';
-import { BILLING_MODELS, TARGET_INTENTS, channelNeedsImage, channelNeedsRichCopy } from '../types';
+import { TARGET_INTENTS, channelNeedsImage, channelNeedsRichCopy } from '../types';
+import { CAMPAIGNS_PATH } from '../routes';
 
 const STEPS = ['Audience', 'Setup', 'Creative', 'Budget'] as const;
 
@@ -20,7 +21,10 @@ export default function CampaignNew() {
   const channelsQ = useChannels();
   const segmentsQ = useSegments();
   const create = useCreateCampaign();
+  const zonesQ = useZones();
+  const linkZones = useLinkCampaignZones();
 
+  const zones = zonesQ.data ?? [];
   const channels = channelsQ.data ?? [];
   const segments = segmentsQ.data?.segments ?? [];
   const audiencemartEnabled = segmentsQ.data?.audiencemart_enabled ?? false;
@@ -30,7 +34,6 @@ export default function CampaignNew() {
   const [name, setName] = useState('');
   const [channelId, setChannelId] = useState('');
   const [targetIntent, setTargetIntent] = useState('general_interest');
-  const [billingModel, setBillingModel] = useState('CPC');
   const [title, setTitle] = useState('');
   const [bodyText, setBodyText] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -38,6 +41,9 @@ export default function CampaignNew() {
   const [dailyBudget, setDailyBudget] = useState('200');
   const [totalBudget, setTotalBudget] = useState('2000');
   const [frequencyCap, setFrequencyCap] = useState('3');
+  const [scheduledStartAt, setScheduledStartAt] = useState('');
+  const [scheduledEndAt, setScheduledEndAt] = useState('');
+  const [zoneIds, setZoneIds] = useState<string[]>([]);
   const [stepError, setStepError] = useState('');
 
   useEffect(() => { if (channels.length && !channelId) setChannelId(channels[0].id); }, [channels, channelId]);
@@ -78,8 +84,22 @@ export default function CampaignNew() {
       if (!freq || freq < 1) return 'Frequency cap must be at least 1';
       const maxDaily = subscription?.plan.max_daily_budget_etb;
       if (maxDaily && daily > maxDaily) return `Daily budget exceeds your plan limit of ${formatEtb(maxDaily)}`;
+      // Mirrors the server's `gtfield=ScheduledStartAt` binding so the error
+      // shows here rather than as a 400 after submit.
+      if (scheduledEndAt && !scheduledStartAt) return 'Set a start date before an end date';
+      if (scheduledStartAt && scheduledEndAt && new Date(scheduledEndAt) <= new Date(scheduledStartAt)) {
+        return 'End date must be after the start date';
+      }
     }
     return null;
+  }
+
+  /// `datetime-local` yields a zone-less "YYYY-MM-DDTHH:mm"; the backend binds
+  /// *time.Time, so send a real RFC3339 instant.
+  function toRfc3339(local: string): string | undefined {
+    if (!local) return undefined;
+    const date = new Date(local);
+    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
   }
 
   function goNext() {
@@ -99,10 +119,26 @@ export default function CampaignNew() {
       {
         name: name.trim(), target_intent: targetIntent, channel_id: channelId, segment_id: segmentId,
         title: title.trim() || undefined, body_text: bodyText.trim(), image_url: imageUrl.trim() || undefined,
-        destination_url: destinationUrl.trim(), canvas_json: {}, billing_model: billingModel,
+        destination_url: destinationUrl.trim(), canvas_json: {},
         daily_budget_cap: Number(dailyBudget), total_budget_cap: Number(totalBudget), frequency_cap_per_day: Number(frequencyCap),
+        scheduled_start_at: toRfc3339(scheduledStartAt), scheduled_end_at: toRfc3339(scheduledEndAt),
       },
-      { onSuccess: c => navigate(`/campaigns/${c.id}`) },
+      {
+        onSuccess: async c => {
+          // Zones are linked in a second call — the create DTO has no zone
+          // field. A link failure must not strand the user on the form: the
+          // campaign already exists, so send them to it either way and let the
+          // detail page show which zones are actually attached.
+          if (zoneIds.length > 0) {
+            try {
+              await linkZones.mutateAsync({ campaignId: c.id, zoneIds });
+            } catch {
+              /* surfaced on the detail page's zone list */
+            }
+          }
+          navigate(`/campaigns/${c.id}`);
+        },
+      },
     );
   }
 
@@ -121,7 +157,7 @@ export default function CampaignNew() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit"><Link to="/"><ArrowLeft className="size-4" /> Back to campaigns</Link></Button>
+      <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit"><Link to={CAMPAIGNS_PATH}><ArrowLeft className="size-4" /> Back to campaigns</Link></Button>
       <div>
         <h2 className="font-display text-xl font-bold">New campaign</h2>
         <p className="text-sm text-muted-foreground">Build your campaign in four steps. Segment purchase is included when you submit.</p>
@@ -181,6 +217,51 @@ export default function CampaignNew() {
                     {segments.length === 0 && <p className="text-sm text-muted-foreground">No segments available for purchase right now.</p>}
                   </div>
                 )}
+
+                <div className="border-t border-border pt-5">
+                  <h3 className="font-display font-semibold">Store zones (optional)</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Attach store locations so customers who walk within range receive this
+                    campaign. Draft zones go live automatically when an operator approves it.
+                  </p>
+                  {zones.length === 0 ? (
+                    <div className="mt-3 rounded-lg border border-border bg-muted/50 p-4 text-sm text-muted-foreground">
+                      You have no store zones yet.
+                      <Link to="/zones" className="ml-1 text-identity hover:underline">Create one</Link> to
+                      target customers near a location.
+                    </div>
+                  ) : (
+                    <div className="mt-3 grid gap-2">
+                      {zones.map(zone => {
+                        const selected = zoneIds.includes(zone.id);
+                        return (
+                          <button
+                            key={zone.id}
+                            type="button"
+                            onClick={() => setZoneIds(ids =>
+                              selected ? ids.filter(id => id !== zone.id) : [...ids, zone.id])}
+                            className={cn(
+                              'flex items-center justify-between gap-3 rounded-lg border p-3 text-left transition-colors',
+                              selected ? 'border-identity bg-identity/5 ring-1 ring-identity' : 'border-border hover:bg-muted/50',
+                            )}
+                          >
+                            <span className="min-w-0">
+                              <span className="block font-mono text-sm tabular-nums">
+                                {zone.latitude.toFixed(5)}, {zone.longitude.toFixed(5)}
+                              </span>
+                              <span className="mt-0.5 block text-xs text-muted-foreground">
+                                {zone.radius_metres.toLocaleString()} m radius
+                              </span>
+                            </span>
+                            <Badge variant={zone.is_active ? 'secondary' : 'outline'}>
+                              {zone.is_active ? 'Active' : 'Draft'}
+                            </Badge>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -201,21 +282,13 @@ export default function CampaignNew() {
                     ))}
                   </div>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label>Target intent</Label>
-                    <Select value={targetIntent} onValueChange={setTargetIntent}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{intentOptions.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Billing model</Label>
-                    <Select value={billingModel} onValueChange={setBillingModel}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{BILLING_MODELS.map(m => <SelectItem key={m.value} value={m.value}>{m.label} — {m.description}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-1.5">
+                  <Label>Target intent</Label>
+                  <Select value={targetIntent} onValueChange={setTargetIntent}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{intentOptions.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">All campaigns are billed per click (CPC).</p>
                 </div>
               </div>
             )}
@@ -253,9 +326,10 @@ export default function CampaignNew() {
                 <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
                   <p className="mb-2 font-medium">Review summary</p>
                   <ul className="space-y-1 text-muted-foreground">
-                    <li><span className="text-foreground">{name}</span> · {selectedChannel?.name} · {billingModel}</li>
+                    <li><span className="text-foreground">{name}</span> · {selectedChannel?.name}</li>
                     <li>Intent: {targetIntent.replace(/_/g, ' ')}</li>
                     <li>Segment: {selectedSegment ? `${selectedSegment.name} (${formatEtb(selectedSegment.estimated_price_etb)})` : 'None'}</li>
+                    <li>Store zones: {zoneIds.length === 0 ? 'None' : `${zoneIds.length} linked`}</li>
                   </ul>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-3">
@@ -263,6 +337,17 @@ export default function CampaignNew() {
                   <div className="space-y-1.5"><Label>Total budget (ETB)</Label><Input type="number" min="1" required value={totalBudget} onChange={e => setTotalBudget(e.target.value)} /></div>
                   <div className="space-y-1.5"><Label>Freq. cap / day</Label><Input type="number" min="1" required value={frequencyCap} onChange={e => setFrequencyCap(e.target.value)} /></div>
                 </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="start-at">Start (optional)</Label>
+                    <Input id="start-at" type="datetime-local" value={scheduledStartAt} onChange={e => setScheduledStartAt(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="end-at">End (optional)</Label>
+                    <Input id="end-at" type="datetime-local" value={scheduledEndAt} onChange={e => setScheduledEndAt(e.target.value)} />
+                  </div>
+                </div>
+                <p className="-mt-2 text-xs text-muted-foreground">Leave both empty to run continuously once approved.</p>
                 <div className="rounded-md border border-identity/30 bg-identity/5 px-3 py-2 text-sm text-foreground">
                   After submission your campaign enters <strong>pending moderation</strong>. An operator reviews and activates it — you cannot self-activate.
                 </div>
@@ -276,7 +361,7 @@ export default function CampaignNew() {
               ) : (
                 <Button type="submit" disabled={create.isPending}>{create.isPending ? 'Creating…' : 'Submit for review'}</Button>
               )}
-              <Button asChild variant="ghost" className="ml-auto"><Link to="/">Cancel</Link></Button>
+              <Button asChild variant="ghost" className="ml-auto"><Link to={CAMPAIGNS_PATH}>Cancel</Link></Button>
             </div>
           </CardContent>
         </Card>

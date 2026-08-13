@@ -76,7 +76,12 @@ func (h *Handler) IngestIntentAd(c *gin.Context) {
 	}
 
 	if result.SMSDispatched {
-		c.JSON(http.StatusAccepted, IngestIntentAdAcceptedResponse{Status: "accepted"})
+		c.JSON(http.StatusAccepted, IngestIntentAdAcceptedResponse{
+			Status:       "accepted",
+			CampaignID:   result.CampaignID,
+			CampaignName: result.CampaignName,
+			ChannelCode:  result.ChannelCode,
+		})
 		return
 	}
 

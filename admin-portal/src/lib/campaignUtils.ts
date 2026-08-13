@@ -34,7 +34,6 @@ export function normalizeCampaign(raw: Record<string, unknown>): Campaign {
     moderationNotes: String(raw.ModerationNotes ?? raw.moderation_notes ?? raw.moderationNotes ?? ''),
     channelId: String(raw.ChannelID ?? raw.channel_id ?? raw.channelId ?? ''),
     channelCode: String(raw.ChannelCode ?? raw.channel_code ?? raw.channelCode ?? ''),
-    billingModel: String(raw.BillingModel ?? raw.billing_model ?? raw.billingModel ?? ''),
     createdAt: String(raw.CreatedAt ?? raw.created_at ?? raw.createdAt ?? ''),
     updatedAt: String(raw.UpdatedAt ?? raw.updated_at ?? raw.updatedAt ?? ''),
   };

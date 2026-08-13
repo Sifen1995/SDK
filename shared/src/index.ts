@@ -33,6 +33,8 @@ export { SkykinMark } from './components/brand-mark';
 export { KpiCard, type Trend } from './components/kpi-card';
 export { StatusPill, statusTone, type StatusTone } from './components/status-pill';
 export { ThemeToggle } from './components/theme-toggle';
+export { PortalHome, type PortalHomeProps, type HomeFeature } from './components/portal-home';
+export { ZonePicker, type ZonePickerProps } from './components/zone-picker';
 export {
   Spinner, LoadingState, EmptyState, ErrorState, InlineError, TableSkeleton,
 } from './components/state';

@@ -1,5 +1,10 @@
 import type { Campaign } from '../types';
 
+/** Nullable timestamps arrive as JSON null when unscheduled. */
+function nullableString(value: unknown): string | null {
+  return value == null || value === '' ? null : String(value);
+}
+
 /** Go may serialize Campaign with PascalCase — normalize for the UI. */
 export function normalizeCampaign(raw: Record<string, unknown>): Campaign {
   const canvas = raw.CanvasJSON ?? raw.canvas_json ?? raw.canvasJson ?? {};
@@ -30,11 +35,12 @@ export function normalizeCampaign(raw: Record<string, unknown>): Campaign {
     imageUrl: String(raw.ImageURL ?? raw.image_url ?? raw.imageUrl ?? ''),
     destinationUrl: String(raw.DestinationURL ?? raw.destination_url ?? raw.destinationUrl ?? ''),
     canvasJson,
-    billingModel: String(raw.BillingModel ?? raw.billing_model ?? raw.billingModel ?? 'CPC'),
     dailyBudgetCap: Number(raw.DailyBudgetCap ?? raw.daily_budget_cap ?? raw.dailyBudgetCap ?? 0),
     totalBudgetCap: Number(raw.TotalBudgetCap ?? raw.total_budget_cap ?? raw.totalBudgetCap ?? 0),
     budgetSpent: Number(raw.BudgetSpent ?? raw.budget_spent ?? raw.budgetSpent ?? 0),
     frequencyCapPerDay: Number(raw.FrequencyCapPerDay ?? raw.frequency_cap_per_day ?? raw.frequencyCapPerDay ?? 3),
+    scheduledStartAt: nullableString(raw.ScheduledStartAt ?? raw.scheduled_start_at ?? raw.scheduledStartAt),
+    scheduledEndAt: nullableString(raw.ScheduledEndAt ?? raw.scheduled_end_at ?? raw.scheduledEndAt),
     isActive: Boolean(raw.IsActive ?? raw.is_active ?? raw.isActive ?? false),
     validationStatus: String(raw.ValidationStatus ?? raw.validation_status ?? raw.validationStatus ?? 'pending'),
     validationNotes: String(raw.ValidationNotes ?? raw.validation_notes ?? raw.validationNotes ?? ''),

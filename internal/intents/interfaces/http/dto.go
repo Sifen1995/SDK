@@ -18,8 +18,16 @@ type IngestIntentAdRequest struct {
 }
 
 // IngestIntentAdAcceptedResponse is returned when an SMS+ campaign was dispatched (HTTP 202).
+//
+// The creative is deliberately absent — the SMS is the delivery, and the SDK has
+// nothing to render. The campaign identity is included so the caller can tell the
+// user *which* offer was sent instead of reporting a bare "accepted"; the fields
+// are omitempty so older clients are unaffected.
 type IngestIntentAdAcceptedResponse struct {
-	Status string `json:"status" example:"accepted"`
+	Status       string `json:"status" example:"accepted"`
+	CampaignID   string `json:"campaign_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	CampaignName string `json:"campaign_name,omitempty" example:"Summer Fashion Drop"`
+	ChannelCode  string `json:"channel_code,omitempty" example:"SMS_PLUS"`
 }
 
 // IngestIntentAdResponse returns the persisted intent and matched campaign creative.

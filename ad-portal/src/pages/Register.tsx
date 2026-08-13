@@ -1,17 +1,19 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Button, Card, CardContent, Input, Label, InlineError, ThemeToggle, SkykinMark, cn } from '@skykin/ui';
+import { Button, Card, CardContent, Input, Label, InlineError, ThemeToggle, SkykinMark } from '@skykin/ui';
 import { api } from '../lib/api';
-import { ROLE_META, type PortalRole } from '../types';
 import { useTheme } from '../context/ThemeContext';
 
-type RegisterRole = 'advertiser' | 'read_only_analyst';
-const selectableRoles: RegisterRole[] = ['advertiser', 'read_only_analyst'];
 const steps = ['Register & subscribe to a plan', 'Build campaigns with channels & segments', 'Go live after operator approval'];
 
+// POST /ad-portal/register takes exactly name, email and password. Role is not
+// accepted — every self-registration becomes an advertiser server-side. The role
+// picker that used to live here was inert: gin binding is non-strict, so a user
+// choosing "read-only analyst" silently got an advertiser account anyway.
+// Analyst and operator-admin accounts are created by an operator through
+// POST /ad-portal/admin/users, which does take a role.
 export default function Register() {
-  const [form, setForm] = useState({ name: '', email: '', password: '', companyName: '' });
-  const [role, setRole] = useState<RegisterRole>('advertiser');
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,7 +26,7 @@ export default function Register() {
     setSuccess('');
     setLoading(true);
     try {
-      await api.register({ name: form.name, email: form.email, password: form.password, company_name: form.companyName, role });
+      await api.register({ name: form.name, email: form.email, password: form.password });
       setSuccess('Account created. Redirecting to sign in…');
       setTimeout(() => navigate('/login'), 1600);
     } catch (err) {
@@ -77,36 +79,14 @@ export default function Register() {
                   )}
 
                   <div className="space-y-4">
-                    <div className="space-y-1.5"><Label htmlFor="name">Full name</Label><Input id="name" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Jane Doe" /></div>
-                    <div className="space-y-1.5"><Label htmlFor="company">Company name</Label><Input id="company" required value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} placeholder="Acme Inc" /></div>
+                    <div className="space-y-1.5"><Label htmlFor="name">Full name</Label><Input id="name" required minLength={2} maxLength={100} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Jane Doe" /></div>
                     <div className="space-y-1.5"><Label htmlFor="email">Work email</Label><Input id="email" type="email" required value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="jane@acme.com" /></div>
                     <div className="space-y-1.5"><Label htmlFor="password">Password</Label><Input id="password" type="password" required minLength={8} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min. 8 characters" /></div>
                   </div>
 
-                  <div>
-                    <Label className="mb-2 block">Account role</Label>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {selectableRoles.map(r => {
-                        const meta = ROLE_META[r as PortalRole];
-                        const selected = role === r;
-                        return (
-                          <button
-                            key={r}
-                            type="button"
-                            onClick={() => setRole(r)}
-                            className={cn(
-                              'rounded-lg border p-3 text-left transition-colors',
-                              selected ? 'border-identity bg-identity/5 ring-1 ring-identity' : 'border-border hover:border-border',
-                            )}
-                          >
-                            <p className="text-sm font-semibold">{meta.label}</p>
-                            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{meta.description}</p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">Operator admin accounts are provisioned by Skykin — not available for self-registration.</p>
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    You'll get an advertiser account. Analyst and operator access is provisioned by Skykin.
+                  </p>
 
                   <Button type="submit" disabled={loading} className="w-full">{loading ? 'Creating account…' : 'Create account'}</Button>
                   <p className="text-center text-sm text-muted-foreground">

@@ -20,13 +20,15 @@ import {
   Settings,
   Contact,
   KeyRound,
+  MapPin,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { OVERVIEW_PATH } from '../routes';
 
 const groups: NavGroup[] = [
-  { label: 'Overview', items: [{ label: 'Dashboard', to: '/', end: true, icon: LayoutDashboard }] },
+  { label: 'Overview', items: [{ label: 'Dashboard', to: OVERVIEW_PATH, end: true, icon: LayoutDashboard }] },
   {
     label: 'Analytics',
     items: [
@@ -41,6 +43,7 @@ const groups: NavGroup[] = [
     label: 'Management',
     items: [
       { label: 'Moderation', to: '/campaigns/pending', icon: ShieldCheck },
+      { label: 'Draft Zones', to: '/geofences/pending', icon: MapPin },
       { label: 'Segment Candidates', to: '/segment-candidates', icon: FileCheck },
       { label: 'Plans & Billing', to: '/plans', icon: Settings },
       { label: 'Operator Team', to: '/users', icon: UserPlus },
@@ -50,7 +53,8 @@ const groups: NavGroup[] = [
 ];
 
 const titles: { match: (p: string) => boolean; label: string }[] = [
-  { match: p => p === '/', label: 'Platform Overview' },
+  { match: p => p === OVERVIEW_PATH, label: 'Platform Overview' },
+  { match: p => p.startsWith('/geofences'), label: 'Draft Store Zones' },
   { match: p => p.startsWith('/revenue'), label: 'Revenue Analytics' },
   { match: p => p.startsWith('/delivery'), label: 'Delivery Analytics' },
   { match: p => p.startsWith('/advertisers'), label: 'Advertisers' },

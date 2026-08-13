@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Card, CardContent, Input, Label, InlineError, SkykinMark } from '@skykin/ui';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { OVERVIEW_PATH } from '../routes';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -19,7 +20,7 @@ export default function Login() {
     try {
       const res = await api.login(email, password);
       login(res.token, res.user);
-      navigate('/');
+      navigate(OVERVIEW_PATH);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Check your credentials and try again.');
     } finally {

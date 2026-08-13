@@ -3,10 +3,13 @@ import type {
   CampaignPreview,
   CreateCampaignRequest,
   CreateUserRequest,
+  CreateZoneRequest,
   DeliveryChannel,
+  GeofenceZone,
   Plan,
   PortalUser,
   RegisterRequest,
+  RegisterResponse,
   SegmentsCatalog,
   SubscriptionStatus,
 } from '../types';
@@ -55,7 +58,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   register(data: RegisterRequest) {
-    return request<{ user: PortalUser }>('/register', {
+    return request<RegisterResponse>('/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -133,6 +136,41 @@ export const api = {
 
   previewCampaign(id: string) {
     return request<CampaignPreview>(`/campaigns/${id}/preview`);
+  },
+
+  // --- Geofence zones (advertiser role only; analysts get 403) ---
+
+  /** Returns a bare array, not a wrapped object. */
+  listZones() {
+    return request<GeofenceZone[]>('/geofences');
+  },
+
+  createZone(data: CreateZoneRequest) {
+    return request<GeofenceZone>('/geofences', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  listCampaignZones(campaignId: string) {
+    return request<GeofenceZone[]>(`/campaigns/${campaignId}/geofences`);
+  },
+
+  /** 204 No Content — there is no body to parse. */
+  async linkCampaignZones(campaignId: string, zoneIds: string[]): Promise<void> {
+    const token = localStorage.getItem('adPortalToken');
+    const res = await fetch(`${BASE}/campaigns/${campaignId}/geofences`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ zone_ids: zoneIds }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as APIErrorBody;
+      throw new Error(body.message || body.error || `Linking zones failed (${res.status})`);
+    }
   },
 
   async activateCampaign(id: string): Promise<Campaign> {

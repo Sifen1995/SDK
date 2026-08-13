@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@skykin/ui';
 import { api } from './api';
-import type { CreateCampaignRequest, CreateUserRequest } from '../types';
+import type { CreateCampaignRequest, CreateUserRequest, CreateZoneRequest } from '../types';
 
 /** Query-key factory — granular invalidation, no blanket clears. */
 export const qk = {
@@ -16,6 +16,10 @@ export const qk = {
     segments: ['segments'] as const,
   },
   team: { all: ['team'] as const },
+  zones: {
+    all: ['zones'] as const,
+    forCampaign: (id: string) => ['zones', 'campaign', id] as const,
+  },
 } as const;
 
 export const useCampaigns = (offset: number, limit: number) =>
@@ -34,6 +38,32 @@ export function useCreateCampaign() {
   return useMutation({
     mutationFn: (data: CreateCampaignRequest) => api.createCampaign(data),
     onSuccess: () => client.invalidateQueries({ queryKey: qk.campaigns.all }),
+  });
+}
+
+export const useZones = () => useQuery({ queryKey: qk.zones.all, queryFn: api.listZones });
+export const useCampaignZones = (id: string) =>
+  useQuery({
+    queryKey: qk.zones.forCampaign(id),
+    queryFn: () => api.listCampaignZones(id),
+    enabled: !!id,
+  });
+
+export function useCreateZone() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateZoneRequest) => api.createZone(data),
+    onSuccess: () => client.invalidateQueries({ queryKey: qk.zones.all }),
+  });
+}
+
+export function useLinkCampaignZones() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ campaignId, zoneIds }: { campaignId: string; zoneIds: string[] }) =>
+      api.linkCampaignZones(campaignId, zoneIds),
+    onSuccess: (_, { campaignId }) =>
+      client.invalidateQueries({ queryKey: qk.zones.forCampaign(campaignId) }),
   });
 }
 

@@ -6,6 +6,7 @@ import {
 import { KeyRound, Copy, Check, ShieldAlert } from 'lucide-react';
 import type { Credentials } from '../lib/api';
 import { useCreateApplication } from '../lib/queries';
+import { DASHBOARD_PATH } from '../routes';
 
 const platforms = ['flutter', 'android', 'ios', 'web'];
 
@@ -39,7 +40,7 @@ export default function NewApplication() {
               <CredentialField label="Secret key" value={credentials.secret_key} description="Use to compute HMAC signatures for request payloads." secret />
             </div>
             <div className="mt-6 flex justify-end">
-              <Button onClick={() => navigate('/')}>Go to dashboard</Button>
+              <Button onClick={() => navigate(DASHBOARD_PATH)}>Go to dashboard</Button>
             </div>
           </CardContent>
         </Card>
@@ -77,7 +78,7 @@ export default function NewApplication() {
               <Input id="bundleId" required value={bundleId} onChange={e => setBundleId(e.target.value)} placeholder="com.company.app" className="font-mono" />
             </div>
             <div className="flex gap-3 pt-2">
-              <Button type="button" variant="secondary" className="flex-1" onClick={() => navigate('/')}>Cancel</Button>
+              <Button type="button" variant="secondary" className="flex-1" onClick={() => navigate(DASHBOARD_PATH)}>Cancel</Button>
               <Button type="submit" className="flex-1" disabled={create.isPending}>{create.isPending ? 'Creating…' : 'Create application'}</Button>
             </div>
           </form>

@@ -143,6 +143,38 @@ export const api = {
       .then(res => res.segments ?? []);
   },
 
+  // --- Geofence zones ---
+
+  /** Inactive zones across every advertiser, newest first. */
+  listPendingZones() {
+    return request<import('../types').ZoneListResponse>('/admin/geofences/pending')
+      .then(res => res.zones ?? []);
+  },
+
+  /** Idempotent — an already-active zone returns 200 unchanged. */
+  activateZone(id: string) {
+    return request<import('../types').GeofenceZone>(`/admin/geofences/${id}/activate`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Activates every inactive zone linked to a campaign. Returns *all* linked
+   * zones, not just the ones flipped. Needed for zones linked after approval —
+   * approving a campaign only activates what was linked at that moment.
+   */
+  activateCampaignZones(campaignId: string) {
+    return request<import('../types').ZoneListResponse>(
+      `/admin/campaigns/${campaignId}/geofences/activate`,
+      { method: 'POST' },
+    ).then(res => res.zones ?? []);
+  },
+
+  /** Advertiser-scoped route, readable by any caller holding geofences:manage. */
+  listCampaignZones(campaignId: string) {
+    return request<import('../types').GeofenceZone[]>(`/campaigns/${campaignId}/geofences`);
+  },
+
   // Analytics Endpoints
   analyticsOverview() {
     return request<import('../types/analytics').OverviewStats>('/admin/analytics/overview');

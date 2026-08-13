@@ -3,6 +3,9 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	billingdomain "skykin-platform/internal/billing/domain"
@@ -217,6 +220,94 @@ func (r *Repository) ListActiveMaster(ctx context.Context) ([]campaigndomain.Cam
 // ListActiveByIntent returns approved active campaigns matching a target intent.
 func (r *Repository) ListActiveByIntent(ctx context.Context, intentName string) ([]campaigndomain.Campaign, error) {
 	return r.ListEligibleForDelivery(ctx, intentName, "")
+}
+
+// func (r *Repository) LogDelivery(ctx context.Context, log *campaigndomain.DeliveryLog) error {
+// 	row := persistence.DeliveryLogRowFromDomain(log)
+// 	return r.db.WithContext(ctx).Create(row).Error
+// }
+
+// CampaignAdContent builds the SDK ad payload from a campaign.
+//
+// The advertiser's destination is passed through verbatim unless it is genuinely
+// a Google Play listing, in which case a signed `referrer` is attached so an
+// install can be attributed back to the campaign (see
+// delivery/worker.validateInstallToken, the consumer side of that token).
+//
+// Wrapping anything else is a bug the user sees immediately: the SDK launches
+// destination_url with LaunchMode.externalApplication, so a web landing page
+// rewritten into a play.google.com link opens the Play Store instead of the
+// browser.
+func CampaignAdContent(c *campaigndomain.Campaign, channelCode string, linkBuilder ...*PlayLinkBuilder) (map[string]any, error) {
+	destination := c.DestinationURL
+
+	if packageID := playStorePackageID(destination); packageID != "" && c.ID != "" {
+		if builder := resolvePlayLinkBuilder(linkBuilder); builder != nil {
+			destination = builder.BuildConsentedInstallURL(packageID, c.ID)
+		}
+	}
+	canvas := c.CanvasJSON
+	if canvas == nil {
+		canvas = map[string]any{}
+	}
+	content := map[string]any{
+		"title":           c.Title,
+		"body_text":       c.BodyText,
+		"image_url":       c.ImageURL,
+		"destination_url": destination,
+		"channel_code":    channelCode,
+		"canvas_json":     canvas,
+	}
+	return content, nil
+}
+
+// playStorePackageID returns the Android package id when raw is a Google Play
+// listing — https://play.google.com/store/apps/details?id=… or
+// market://details?id=… — and "" for everything else: web landing pages, deep
+// links into the host app, other app stores.
+//
+// Matching is deliberately narrow on the host. A suffix check alone would accept
+// a lookalike like play.google.com.attacker.net, so only the exact host and its
+// regional subdomains (www./country prefixes) qualify.
+func playStorePackageID(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+
+	switch strings.ToLower(parsed.Scheme) {
+	case "market":
+		if !strings.EqualFold(parsed.Host, "details") {
+			return ""
+		}
+	case "http", "https":
+		host := strings.ToLower(parsed.Hostname())
+		if host != "play.google.com" && !strings.HasSuffix(host, ".play.google.com") {
+			return ""
+		}
+		// Tolerate a trailing slash; reject any other path.
+		if strings.Trim(parsed.Path, "/") != "store/apps/details" {
+			return ""
+		}
+	default:
+		return ""
+	}
+
+	return parsed.Query().Get("id")
+}
+
+func resolvePlayLinkBuilder(linkBuilders []*PlayLinkBuilder) *PlayLinkBuilder {
+	if len(linkBuilders) > 0 && linkBuilders[0] != nil {
+		return linkBuilders[0]
+	}
+	secret := strings.TrimSpace(os.Getenv("CLICK_TOKEN_SECRET"))
+	if secret == "" {
+		return nil
+	}
+	return NewPlayLinkBuilder(secret)
 }
 
 func toEligibleDomainCampaigns(rows []eligibleCampaignScan) ([]campaigndomain.Campaign, error) {
