@@ -48,7 +48,7 @@ func (nilTargets) Link(context.Context, string, []string) error { return nil }
 func (nilTargets) ListZonesForCampaign(context.Context, string) ([]geodomain.GeofenceZone, error) {
 	return nil, nil
 }
-func (nilTargets) ListEligibleCampaignsForZone(context.Context, string) ([]campaigndomain.Campaign, error) {
+func (nilTargets) ListEligibleCampaignsForZone(context.Context, string, string) ([]campaigndomain.Campaign, error) {
 	return nil, nil
 }
 
@@ -59,6 +59,9 @@ func (visitOK) Create(_ context.Context, visit *geodomain.StoreVisit) error {
 	visit.VisitedAt = time.Now().UTC()
 	return nil
 }
+func (visitOK) CountByUserExcluding(context.Context, string, string) (int64, error) {
+	return 0, nil
+}
 
 type consentDenied struct{}
 
@@ -67,7 +70,7 @@ func (consentDenied) SetLocationConsent(context.Context, string, bool) error   {
 
 func TestSyncHandlerRequiresLatLng(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	svc := geoapp.NewGeofencingService(zoneStub{}, nil, nil, nil, nil, nil, nil)
+	svc := geoapp.NewGeofencingService(zoneStub{}, nil, nil, nil, nil, nil, nil, nil)
 	router := gin.New()
 	router.GET("/geofences/sync", NewHandler(svc).Sync)
 
@@ -87,7 +90,7 @@ func TestSyncHandlerRequiresLatLng(t *testing.T) {
 func TestEventHandlerForbiddenWithoutConsent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := geoapp.NewGeofencingService(
-		zoneStub{}, nilTargets{}, visitOK{}, consentDenied{}, nil, nil, nil,
+		zoneStub{}, nilTargets{}, visitOK{}, consentDenied{}, nil, nil, nil, nil,
 	)
 	router := gin.New()
 	router.POST("/geofence/event", NewHandler(svc).Event)

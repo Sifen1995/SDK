@@ -56,6 +56,11 @@ type CampaignOwnerChecker interface {
 	GetByID(ctx context.Context, id string) (*campaigndomain.Campaign, error)
 }
 
+// ActiveIntentReader resolves the user's current intent for geofence ad matching.
+type ActiveIntentReader interface {
+	CurrentIntent(ctx context.Context, pseudonymousID string) (string, error)
+}
+
 type GeofencingService struct {
 	zones     geodomain.ZoneRepository
 	targets   geodomain.TargetRepository
@@ -64,6 +69,7 @@ type GeofencingService struct {
 	freq      geodomain.FrequencyCapPort
 	budget    geodomain.BudgetExhaustedPort
 	campaigns CampaignOwnerChecker
+	intents   ActiveIntentReader
 }
 
 func NewGeofencingService(
@@ -74,6 +80,7 @@ func NewGeofencingService(
 	freq geodomain.FrequencyCapPort,
 	budget geodomain.BudgetExhaustedPort,
 	campaigns CampaignOwnerChecker,
+	intents ActiveIntentReader,
 ) *GeofencingService {
 	return &GeofencingService{
 		zones:     zones,
@@ -83,6 +90,7 @@ func NewGeofencingService(
 		freq:      freq,
 		budget:    budget,
 		campaigns: campaigns,
+		intents:   intents,
 	}
 }
 
@@ -247,10 +255,38 @@ func (s *GeofencingService) ProcessEvent(
 		VisitedAt: visit.VisitedAt,
 	}
 
-	campaigns, err := s.targets.ListEligibleCampaignsForZone(ctx, cmd.ZoneID)
+	intentName := ""
+	if s.intents != nil {
+		name, err := s.intents.CurrentIntent(ctx, cmd.PseudonymousID)
+		if err != nil {
+			return result, err
+		}
+		intentName = name
+	}
+
+	priorCount, err := s.visits.CountByUserExcluding(ctx, cmd.PseudonymousID, visit.ID)
 	if err != nil {
 		return result, err
 	}
+	hasPriorVisits := priorCount > 0
+
+	var campaigns []campaigndomain.Campaign
+	if intentName != "" {
+		campaigns, err = s.targets.ListEligibleCampaignsForZone(ctx, cmd.ZoneID, intentName)
+		if err != nil {
+			return result, err
+		}
+	}
+	if len(campaigns) == 0 && hasPriorVisits {
+		campaigns, err = s.targets.ListEligibleCampaignsForZone(ctx, cmd.ZoneID, "")
+		if err != nil {
+			return result, err
+		}
+	}
+	if len(campaigns) == 0 {
+		return result, nil
+	}
+
 	selected := s.pickCampaign(ctx, cmd.PseudonymousID, campaigns)
 	if selected == nil {
 		return result, nil

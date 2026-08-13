@@ -192,11 +192,11 @@ type eligibleCampaignScan struct {
 
 func (r *GeofenceRepository) ListEligibleCampaignsForZone(
 	ctx context.Context,
-	zoneID string,
+	zoneID, targetIntent string,
 ) ([]campaigndomain.Campaign, error) {
 	now := time.Now().UTC()
 	var rows []eligibleCampaignScan
-	err := r.db.WithContext(ctx).
+	q := r.db.WithContext(ctx).
 		Table("campaigns").
 		Select(`campaigns.*,
 			sp.id AS plan_id,
@@ -212,9 +212,11 @@ func (r *GeofenceRepository) ListEligibleCampaignsForZone(
 			AND campaigns.validation_status = ?
 			AND campaigns.moderation_status = ?
 			AND sub.current_period_start <= ? AND sub.current_period_end >= ?`,
-			zoneID, true, "passed", campaigndomain.ModerationApproved, now, now).
-		Find(&rows).Error
-	if err != nil {
+			zoneID, true, "passed", campaigndomain.ModerationApproved, now, now)
+	if targetIntent != "" {
+		q = q.Where("campaigns.target_intent = ?", targetIntent)
+	}
+	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]campaigndomain.Campaign, 0, len(rows))
@@ -298,4 +300,17 @@ func (r *StoreVisitRepository) Create(ctx context.Context, visit *geodomain.Stor
 	}
 	*visit = row.ToDomain()
 	return nil
+}
+
+func (r *StoreVisitRepository) CountByUserExcluding(ctx context.Context, pseudonymousID, excludeVisitID string) (int64, error) {
+	var count int64
+	q := r.db.WithContext(ctx).Model(&persistance.StoreVisitRow{}).
+		Where("pseudonymous_id = ?", pseudonymousID)
+	if excludeVisitID != "" {
+		q = q.Where("id <> ?", excludeVisitID)
+	}
+	if err := q.Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
 }
