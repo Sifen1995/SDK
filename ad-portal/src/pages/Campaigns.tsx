@@ -145,12 +145,6 @@ export default function Campaigns() {
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      
-                      {c.billingModel && (
-                         <div className="flex items-center rounded-md bg-muted/60 px-2.5 py-1 text-[11px] font-bold text-foreground border border-border shadow-sm">
-                           {c.billingModel}
-                         </div>
-                      )}
                     </div>
                     {c.moderationNotes && c.moderationStatus === 'rejected' && (
                        <div className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive border border-destructive/20">{c.moderationNotes}</div>

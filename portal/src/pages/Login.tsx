@@ -4,6 +4,7 @@ import { Button, Card, CardContent, Input, Label, InlineError, SkykinMark } from
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { AuthHero, SdkSnippet } from '../components/AuthHero';
+import { DASHBOARD_PATH } from '../routes';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -20,7 +21,7 @@ export default function Login() {
     try {
       const res = await api.login(email, password);
       login(res.data.token, res.data.developer);
-      navigate('/');
+      navigate(DASHBOARD_PATH);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed. Check your credentials and try again.');
     } finally {

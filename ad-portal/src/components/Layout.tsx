@@ -8,10 +8,11 @@ import {
   Button,
   type NavGroup,
 } from '@skykin/ui';
-import { Megaphone, CreditCard, User, Users, PlusCircle, LogOut } from 'lucide-react';
+import { Megaphone, CreditCard, MapPin, User, Users, PlusCircle, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useTheme } from '../context/ThemeContext';
+import { CAMPAIGNS_PATH } from '../routes';
 
 function initials(name?: string) {
   if (!name) return 'AD';
@@ -30,8 +31,9 @@ export default function Layout() {
   }
 
   const workspace = [
-    { label: 'Campaigns', to: '/', end: true, icon: Megaphone },
+    { label: 'Campaigns', to: CAMPAIGNS_PATH, end: true, icon: Megaphone },
     ...(canWrite && subscribed ? [{ label: 'New Campaign', to: '/campaigns/new', icon: PlusCircle }] : []),
+    { label: 'Store Zones', to: '/zones', icon: MapPin },
     {
       label: 'Subscription',
       to: '/subscription',

@@ -27,6 +27,11 @@ export const qk = {
     list: () => [...qk.segments.all, 'list'] as const,
     candidates: (status: string) => [...qk.segments.all, 'candidates', status] as const,
   },
+  zones: {
+    all: ['zones'] as const,
+    pending: () => [...qk.zones.all, 'pending'] as const,
+    forCampaign: (id: string) => [...qk.zones.all, 'campaign', id] as const,
+  },
   plans: {
     all: ['plans'] as const,
     billingRates: (planId: string) => [...qk.plans.all, planId, 'billing-rates'] as const,
@@ -81,6 +86,9 @@ export function useModerateCampaign() {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: qk.campaigns.all });
       client.invalidateQueries({ queryKey: qk.analytics.overview() });
+      // Approving calls ActivateForCampaign server-side, so linked zones may
+      // have just flipped to active.
+      client.invalidateQueries({ queryKey: qk.zones.all });
     },
   });
 }
@@ -106,7 +114,38 @@ export function useApproveAndGoLive() {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: qk.campaigns.all });
       client.invalidateQueries({ queryKey: qk.analytics.overview() });
+      // Approving activates linked zones server-side, so the cached zone rows
+      // are stale the moment this resolves.
+      client.invalidateQueries({ queryKey: qk.zones.all });
     },
+  });
+}
+
+// --- Geofence zones ---
+
+export const usePendingZones = () =>
+  useQuery({ queryKey: qk.zones.pending(), queryFn: api.listPendingZones });
+
+export const useCampaignZones = (id: string) =>
+  useQuery({
+    queryKey: qk.zones.forCampaign(id),
+    queryFn: () => api.listCampaignZones(id),
+    enabled: !!id,
+  });
+
+export function useActivateZone() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.activateZone(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: qk.zones.all }),
+  });
+}
+
+export function useActivateCampaignZones() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (campaignId: string) => api.activateCampaignZones(campaignId),
+    onSuccess: () => client.invalidateQueries({ queryKey: qk.zones.all }),
   });
 }
 

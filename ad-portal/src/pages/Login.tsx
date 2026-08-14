@@ -4,6 +4,7 @@ import { Button, Card, CardContent, Input, Label, InlineError, ThemeToggle, Skyk
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { CAMPAIGNS_PATH } from '../routes';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -21,7 +22,7 @@ export default function Login() {
     try {
       const res = await api.login(email, password);
       login(res.token, res.user);
-      navigate('/');
+      navigate(CAMPAIGNS_PATH);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Check your credentials and try again.');
     } finally {

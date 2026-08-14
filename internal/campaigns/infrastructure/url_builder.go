@@ -29,10 +29,11 @@ func (b *PlayLinkBuilder) BuildConsentedInstallURL(packageID, campaignID string)
 	referrerParams.Set("token", token)
 	rawReferrer := referrerParams.Encode()
 
-	// Format final Google Play Store URL
+	// Format final Google Play Store URL. The package id is escaped too — an id
+	// carrying `&` or `#` would otherwise break out of the query parameter.
 	return fmt.Sprintf(
 		"https://play.google.com/store/apps/details?id=%s&referrer=%s",
-		packageID,
+		url.QueryEscape(packageID),
 		url.QueryEscape(rawReferrer),
 	)
 }

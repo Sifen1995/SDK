@@ -1,9 +1,10 @@
 import { Card, CardContent, Button, StatusPill } from '@skykin/ui';
 import { cn } from '@skykin/ui'; // adjust path if this file's utils import differs from KpiCard's
+import { MapPin } from 'lucide-react';
 import type { Campaign } from '../types';
 import CampaignPreviewPanel from './CampaignPreviewPanel';
 import { formatDate, formatLabel } from '../lib/campaignUtils';
-import { useCampaignPreview } from '../lib/queries';
+import { useCampaignPreview, useCampaignZones, useActivateCampaignZones } from '../lib/queries';
 
 export type ModerationAction = 'approve-only' | 'reject' | 'go-live' | 'approve-and-go-live';
 
@@ -16,6 +17,9 @@ interface CampaignModerationCardProps {
 
 export default function CampaignModerationCard({ campaign: c, processing, mode, onAction }: CampaignModerationCardProps) {
   const { data: preview, isPending, isError, error } = useCampaignPreview(c.id);
+  const zones = useCampaignZones(c.id).data ?? [];
+  const draftZoneCount = zones.filter(z => !z.is_active).length;
+  const activateZones = useActivateCampaignZones();
 
   // left-rail accent: quick-scan status signal, independent of the brand blob
   const accent = c.isActive
@@ -58,7 +62,7 @@ export default function CampaignModerationCard({ campaign: c, processing, mode, 
             </div>
             <p className="text-sm text-muted-foreground">
               {formatLabel(c.channelCode || c.creativeFormat || 'channel')} · {formatLabel(c.targetIntent)}
-              {c.billingModel && ` · ${c.billingModel}`} · <span className="font-medium text-foreground">${c.totalBudgetCap} total</span>
+              {' · '}<span className="font-medium text-foreground">${c.totalBudgetCap} total</span>
             </p>
             <p className="mt-2 text-xs text-muted-foreground">Advertiser {c.advertiserId} · Submitted {formatDate(c.createdAt)}</p>
 
@@ -69,6 +73,45 @@ export default function CampaignModerationCard({ campaign: c, processing, mode, 
             )}
             {c.validationNotes && c.validationStatus === 'failed' && (
               <p className="mt-2 text-xs text-destructive">Validation: {c.validationNotes}</p>
+            )}
+
+            {zones.length > 0 && (
+              <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3">
+                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  <MapPin className="size-3.5" />
+                  {zones.length} store zone{zones.length === 1 ? '' : 's'} linked
+                </div>
+                <ul className="mt-2 space-y-1">
+                  {zones.map(zone => (
+                    <li key={zone.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-mono tabular-nums text-muted-foreground">
+                        {zone.latitude.toFixed(4)}, {zone.longitude.toFixed(4)} · {zone.radius_metres.toLocaleString()} m
+                      </span>
+                      <StatusPill status={zone.is_active ? 'active' : 'pending'} />
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {draftZoneCount === 0
+                    ? 'All linked zones are live.'
+                    : c.moderationStatus === 'pending'
+                      ? `Approving this campaign activates ${draftZoneCount} draft zone${draftZoneCount === 1 ? '' : 's'}.`
+                      : `${draftZoneCount} zone${draftZoneCount === 1 ? ' was' : 's were'} linked after approval and ${draftZoneCount === 1 ? 'is' : 'are'} still inactive.`}
+                </p>
+                {/* Only offered once the campaign is past moderation — before
+                    that, approving does this anyway. */}
+                {draftZoneCount > 0 && c.moderationStatus !== 'pending' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-2"
+                    disabled={activateZones.isPending}
+                    onClick={() => activateZones.mutate(c.id)}
+                  >
+                    {activateZones.isPending ? 'Activating…' : 'Activate linked zones'}
+                  </Button>
+                )}
+              </div>
             )}
           </div>
 

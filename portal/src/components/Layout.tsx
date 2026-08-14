@@ -3,6 +3,7 @@ import { AppShell, SkykinMark, ThemeToggle, Avatar, AvatarFallback, Button, type
 import { LayoutGrid, PlusCircle, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { DASHBOARD_PATH } from '../routes';
 
 function initials(name?: string, email?: string) {
   const src = name || email || '';
@@ -14,7 +15,7 @@ const groups: NavGroup[] = [
   {
     label: 'Developer',
     items: [
-      { label: 'Applications', to: '/', end: true, icon: LayoutGrid },
+      { label: 'Applications', to: DASHBOARD_PATH, end: true, icon: LayoutGrid },
       { label: 'New Application', to: '/applications/new', icon: PlusCircle },
     ],
   },

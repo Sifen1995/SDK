@@ -16,12 +16,29 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// bodySignatureExemptRoutes lists the POST routes that authenticate on the
+// publishable X-API-Key alone.
+//
+// POST /geofence/event is delivered by the Android geofence BroadcastReceiver,
+// which the OS frequently wakes in a fresh process — the SDK holds no secret
+// key there, and deliberately never persists one (see ConsentManager). The body
+// carries no secret material (a pseudonymous id, a zone id and an accuracy
+// reading), and X-API-Key already scopes the caller to one application. Its
+// sibling PATCH /geofences/location-consent has always been signature-optional
+// for the same reason.
+//
+// A signature is still verified whenever the caller chooses to send one.
+var bodySignatureExemptRoutes = map[string]bool{
+	"/api/v1/geofence/event": true,
+}
+
 // SDKAuthMiddleware authenticates Flutter/SDK traffic the same way for all
 // /api/v1 routes (consent, intents, …):
 //
 //  1. X-API-Key  = publishable key (pk_live_...)
 //  2. X-Signature = lowercase hex HMAC-SHA256(secret_key, raw request body)
-//     Required for every POST (and whenever X-Signature is sent).
+//     Required for every POST (and whenever X-Signature is sent), except for
+//     the routes in bodySignatureExemptRoutes.
 func SDKAuthMiddleware(authRepo repository.AuthRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		pubKeyPlain := c.GetHeader("X-API-Key")
@@ -39,7 +56,10 @@ func SDKAuthMiddleware(authRepo repository.AuthRepository) gin.HandlerFunc {
 			return
 		}
 
-		needsSignature := c.GetHeader("X-Signature") != "" || c.Request.Method == http.MethodPost
+		signaturePresent := c.GetHeader("X-Signature") != ""
+		postNeedsSignature := c.Request.Method == http.MethodPost &&
+			!bodySignatureExemptRoutes[c.FullPath()]
+		needsSignature := signaturePresent || postNeedsSignature
 		if needsSignature {
 			signature := c.GetHeader("X-Signature")
 			if signature == "" {
